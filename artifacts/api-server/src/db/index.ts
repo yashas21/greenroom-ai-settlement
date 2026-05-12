@@ -1,10 +1,13 @@
 import path from "node:path";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
 const dbPath = path.resolve(process.cwd(), "data", "greenroom.db");
-const sqlite = new Database(dbPath, { readonly: false });
-sqlite.pragma("journal_mode = WAL");
+const envUrl = process.env.DATABASE_URL;
+const dbUrl = envUrl && envUrl.startsWith("file:") ? envUrl : `file:${dbPath}`;
 
-export const db = drizzle(sqlite, { schema });
+export const client = createClient({ url: dbUrl });
+export const db = drizzle(client, { schema });
+
+export type DB = typeof db;
