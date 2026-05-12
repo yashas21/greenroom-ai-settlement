@@ -156,7 +156,7 @@ function classifyComplexity(d: typeof deals.$inferSelect): ComplexityBucket {
   return "simple";
 }
 
-function classifySizeBucket(d: typeof deals.$inferSelect): string {
+export function classifySizeBucket(d: typeof deals.$inferSelect): string {
   if (d.guaranteeAmount == null || d.guaranteeAmount === 0) {
     if (d.percentage != null) return "Uncapped %";
     return "$0–1K";
