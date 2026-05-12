@@ -104,6 +104,7 @@ type Filters = {
   disputedOnly: boolean;
   switchSuggestedOnly: boolean;
   upcomingOnly: boolean;
+  switchEligibleOnly: boolean;
   complexity: string | null;
   size: string | null;
   dealType: string | null;
@@ -118,6 +119,7 @@ const EMPTY_FILTERS: Filters = {
   disputedOnly: false,
   switchSuggestedOnly: false,
   upcomingOnly: false,
+  switchEligibleOnly: false,
   complexity: null,
   size: null,
   dealType: null,
@@ -125,6 +127,8 @@ const EMPTY_FILTERS: Filters = {
   recoupCategory: null,
   recoupDisputedOnly: false,
 };
+
+const ELIGIBLE_DEAL_TYPES = new Set(["vs", "percentage_of_net", "door"]);
 
 function parseFilters(search: string): Filters {
   const params = new URLSearchParams(search);
@@ -134,6 +138,7 @@ function parseFilters(search: string): Filters {
     disputedOnly: params.get("disputed") === "1",
     switchSuggestedOnly: params.get("switch") === "1",
     upcomingOnly: params.get("upcoming") === "1",
+    switchEligibleOnly: params.get("switchEligible") === "1",
     complexity: params.get("complexity"),
     size: params.get("size"),
     dealType: params.get("dealType"),
@@ -150,6 +155,7 @@ function buildQueryString(f: Filters): string {
   if (f.disputedOnly) params.set("disputed", "1");
   if (f.switchSuggestedOnly) params.set("switch", "1");
   if (f.upcomingOnly) params.set("upcoming", "1");
+  if (f.switchEligibleOnly) params.set("switchEligible", "1");
   if (f.complexity) params.set("complexity", f.complexity);
   if (f.size) params.set("size", f.size);
   if (f.dealType) params.set("dealType", f.dealType);
@@ -167,6 +173,7 @@ function isFilterActive(f: Filters): boolean {
     f.disputedOnly ||
     f.switchSuggestedOnly ||
     f.upcomingOnly ||
+    f.switchEligibleOnly ||
     !!f.complexity ||
     !!f.size ||
     !!f.dealType ||
@@ -192,8 +199,20 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
   const unsupportedCount = useMemo(() => rows.filter((r) => r.isUnsupported).length, [rows]);
   const disputedCount = useMemo(() => rows.filter((r) => r.isDisputed).length, [rows]);
   const upcomingCount = useMemo(() => rows.filter((r) => r.tense === "upcoming").length, [rows]);
-  const upcomingEligibleCount = useMemo(
-    () => rows.filter((r) => r.tense === "upcoming" && r.dealType && ["vs", "percentage_of_net", "door"].includes(r.dealType)).length,
+  const upcomingActionableCount = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          r.tense === "upcoming" &&
+          r.dealType !== null &&
+          ELIGIBLE_DEAL_TYPES.has(r.dealType) &&
+          r.switchStatus !== "accepted" &&
+          r.switchStatus !== "declined",
+      ).length,
+    [rows],
+  );
+  const switchAcceptedCount = useMemo(
+    () => rows.filter((r) => r.switchStatus === "accepted").length,
     [rows],
   );
   const switchSuggestedCount = useMemo(
@@ -204,6 +223,15 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
   const filtered = useMemo(() => {
     let out = rows;
     if (filters.upcomingOnly) out = out.filter((r) => r.tense === "upcoming");
+    if (filters.switchEligibleOnly)
+      out = out.filter(
+        (r) =>
+          r.tense === "upcoming" &&
+          r.dealType !== null &&
+          ELIGIBLE_DEAL_TYPES.has(r.dealType) &&
+          r.switchStatus !== "accepted" &&
+          r.switchStatus !== "declined",
+      );
     if (filters.unsupportedOnly) out = out.filter((r) => r.isUnsupported);
     if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
     if (filters.switchSuggestedOnly)
@@ -259,12 +287,35 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           />
         </div>
         <FilterToggle
+          active={filters.switchEligibleOnly}
+          onClick={() => update({
+            switchEligibleOnly: !filters.switchEligibleOnly,
+            upcomingOnly: false,
+          })}
+          variant="brand"
+          label="Actionable upcoming"
+          count={upcomingActionableCount}
+          icon={<Shield className="h-3 w-3" />}
+        />
+        <FilterToggle
           active={filters.upcomingOnly}
-          onClick={() => update({ upcomingOnly: !filters.upcomingOnly })}
+          onClick={() => update({
+            upcomingOnly: !filters.upcomingOnly,
+            switchEligibleOnly: false,
+          })}
           variant="brand"
           label="Upcoming only"
           count={upcomingCount}
         />
+        {switchAcceptedCount > 0 && (
+          <span
+            className="text-[11px] text-emerald-700 bg-emerald-50/70 px-2 py-1 rounded ring-1 ring-emerald-200/60 inline-flex items-center gap-1"
+            title="Smart Switch suggestions accepted by the booker"
+          >
+            <span aria-hidden>🎯</span>
+            {switchAcceptedCount} switched
+          </span>
+        )}
         <FilterToggle
           active={filters.unsupportedOnly}
           onClick={() => update({ unsupportedOnly: !filters.unsupportedOnly })}
@@ -286,11 +337,15 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           label="Smart Switch pending"
           count={switchSuggestedCount}
         />
-        {filters.upcomingOnly && upcomingEligibleCount > 0 && (
-          <span className="text-[11px] text-brand-700 bg-brand-50/50 px-2 py-1 rounded ring-1 ring-brand-200/60">
-            <Shield className="h-2.5 w-2.5 mr-1 inline-block" />
-            {upcomingEligibleCount} upcoming deal{upcomingEligibleCount === 1 ? "" : "s"} eligible for Smart Switch
-          </span>
+        {filters.upcomingOnly && upcomingActionableCount > 0 && !filters.switchEligibleOnly && (
+          <button
+            type="button"
+            onClick={() => update({ switchEligibleOnly: true, upcomingOnly: false })}
+            className="text-[11px] text-brand-700 bg-brand-50/50 hover:bg-brand-50 px-2 py-1 rounded ring-1 ring-brand-200/60 inline-flex items-center gap-1 transition-colors"
+          >
+            <Shield className="h-2.5 w-2.5" />
+            {upcomingActionableCount} actionable for Smart Switch — narrow to these →
+          </button>
         )}
         {isFilterActive(filters) && (
           <button
@@ -472,11 +527,21 @@ function ShowListRow({ row }: { row: ShowRow }) {
 }
 
 function SwitchPill({ status }: { status: SwitchStatus }) {
+  if (status === "accepted") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wide uppercase bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+        title="Smart Switch suggestion accepted — booker will push this on next renegotiation"
+      >
+        <span aria-hidden>🎯</span>
+        Switched
+      </span>
+    );
+  }
   const map = {
     suggested: { variant: "amber" as const, label: "Switch pending" },
-    accepted: { variant: "brand" as const, label: "Switch accepted" },
     declined: { variant: "default" as const, label: "Switch declined" },
-  };
+  } as const;
   const v = map[status];
   return (
     <PlainBadge variant={v.variant}>
@@ -487,13 +552,14 @@ function SwitchPill({ status }: { status: SwitchStatus }) {
 }
 
 function FilterToggle({
-  active, onClick, variant, label, count,
+  active, onClick, variant, label, count, icon,
 }: {
   active: boolean;
   onClick: () => void;
   variant: "amber" | "rose" | "brand";
   label: string;
   count: number;
+  icon?: React.ReactNode;
 }) {
   const palette = variant === "amber"
     ? {
@@ -519,7 +585,11 @@ function FilterToggle({
       aria-pressed={active}
       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium ring-1 ring-inset transition-all ${active ? palette.on : palette.off}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? palette.dot : "bg-ink-300"}`} />
+      {icon ? (
+        <span className={active ? "" : "text-ink-400"}>{icon}</span>
+      ) : (
+        <span className={`w-1.5 h-1.5 rounded-full ${active ? palette.dot : "bg-ink-300"}`} />
+      )}
       {label}
       <span className={`font-mono tabular text-[10.5px] ${active ? "" : "text-ink-400"}`}>
         {count}
