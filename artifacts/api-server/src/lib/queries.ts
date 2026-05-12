@@ -254,19 +254,14 @@ export async function getDealAnalysis() {
   let totalRecoups = 0;
   let disputedRecoupValue = 0;
   for (const s of pastSettlements) {
-    if (!s.recoupsJson) continue;
-    try {
-      const parsed = JSON.parse(s.recoupsJson) as Recoup[];
-      if (!Array.isArray(parsed)) continue;
-      for (const r of parsed) {
-        const slot = recoupsByCategory[r.category] ?? { amount: 0, disputedAmount: 0 };
-        slot.amount += r.amount;
-        if (r.status === "disputed") slot.disputedAmount += r.amount;
-        recoupsByCategory[r.category] = slot;
-        totalRecoups += r.amount;
-        if (r.status === "disputed") disputedRecoupValue += r.amount;
-      }
-    } catch {}
+    for (const r of parseRecoups(s.recoupsJson)) {
+      const slot = recoupsByCategory[r.category] ?? { amount: 0, disputedAmount: 0 };
+      slot.amount += r.amount;
+      if (r.status === "disputed") slot.disputedAmount += r.amount;
+      recoupsByCategory[r.category] = slot;
+      totalRecoups += r.amount;
+      if (r.status === "disputed") disputedRecoupValue += r.amount;
+    }
   }
 
   // Revenue by deal type
