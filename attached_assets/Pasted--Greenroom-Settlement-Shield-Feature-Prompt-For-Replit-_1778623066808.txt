@@ -1,0 +1,460 @@
+# Greenroom — Settlement Shield Feature Prompt
+### For Replit Agent
+
+---
+
+## 1. Context: what you're working with
+
+**App**: Greenroom — venue management software for independent music venues.
+**Stack**: Next.js (App Router), TypeScript, SQLite via Drizzle ORM, Tailwind + shadcn/ui.
+**Primary user**: Mariana Reyes, lead booker at The Crescent (650-cap, Nashville).
+**Core problem**: 82% of customers use spreadsheets instead of the in-app settlement tool because `lib/dealMath.ts` only supports `flat` and `percentage_of_gross` deal types. `vs`, `percentage_of_net`, and `door` deals all return `{ supported: false }`.
+
+**Existing routes you will touch**:
+- `app/shows/page.tsx` — shows list (the "Shows" tab)
+- `app/shows/[id]/page.tsx` — single show detail
+- `app/shows/[id]/settle/page.tsx` — settlement view
+- `app/artists/page.tsx` — artists list (the "Artists" tab)
+- `lib/dealMath.ts` — deal calculation engine (extend, don't replace)
+- `db/schema.ts` — add new columns/tables here
+
+---
+
+## 2. Feature overview: Settlement Shield
+
+Two linked sub-features shipped together.
+
+### 2a. Smart Switch
+At the moment a deal is entered or edited, Greenroom analyses the deal type and expected gross, generates a **flat guarantee equivalent**, and offers to lock the deal as a flat. This eliminates settlement complexity and dispute risk before show night.
+
+Two flavours:
+
+| Trigger | What happens |
+|---------|-------------|
+| Deal type is `vs`, `percentage_of_net`, or `flat` AND expected gross < $5,000 | Suggest converting to flat at the calculated equivalent |
+| Deal type is `door` (any gross) | Suggest converting to the door hybrid structure (floor + split) |
+
+### 2b. Insurance
+Two opt-in products, offered at the moment the switch is accepted. Either party (venue or artist) can enroll one-sided, or both can enroll two-sided (shared cost, 15% cheaper each).
+
+| Product | Trigger | Pays |
+|---------|---------|------|
+| **P1 — Dispute instant pay** | Settlement enters `disputed` status | Resolution amount, up to tier cap, within 24h |
+| **P2 — Suggestion accuracy pay** | Actual payout differs from flat suggestion by > $50 | The gap, up to X = $400 (99.2% coverage) |
+
+---
+
+## 3. Precise calculations
+
+### 3a. Smart Switch — under $5K flat suggestion
+
+> Key finding from 24 months of data: **100% of vs deals under $5K paid the guarantee** — the percentage calculation never fired once. The vs deal is functionally a flat deal at the guarantee amount. The suggestion is therefore exact, not estimated.
+
+**For `vs` deals (expected gross < $5,000):**
+```
+flat_suggestion = guarantee_amount
+```
+Accuracy: avg delta $11 (rounding only). No history needed.
+
+**For `percentage_of_net` deals (expected gross < $5,000):**
+```
+venue_avg_expenses = 1497          // from 24-month historical average
+capped_exp = min(venue_avg_expenses, expense_cap ?? venue_avg_expenses)
+flat_suggestion = percentage × (expected_gross × 0.9 − capped_exp)
+flat_suggestion = round(flat_suggestion / 50) × 50   // round to nearest $50
+```
+Accuracy: avg delta $24, P90 delta $50.
+
+**For `flat` deals:** Already flat — no switch needed. Show a "this deal is already clean" indicator instead.
+
+**Confidence tiers** (affects display band and default insurance tier):
+| Tier | Condition | Display | Default insurance |
+|------|-----------|---------|------------------|
+| A | Artist has 2+ shows on platform | Single number `$X` | Tier 2 |
+| B | Artist has 1 show OR agent has history | `$X` with ± $50 note | Tier 2 |
+| C | New artist, agent has platform history | `$X – $Y` range | Tier 3 |
+| D | Cold booking — no artist or agent history | Range + low-confidence flag | Tier 4 |
+
+---
+
+### 3b. Smart Switch — door deal hybrid
+
+> Key finding: Current door deals give the venue $0 — they absorb all fixed costs and hand the remainder to the artist. The hybrid gives both parties a genuine share.
+
+**Formula (applies to door deals at any gross level):**
+```
+ticketing_fees = gross × 0.10
+exp_input      = min(actual_expenses, 1500)   // cap at venue historical avg
+avail          = gross × 0.90 − exp_input     // available pool
+
+if avail ≤ 500:
+  artist = 500                                 // floor guarantee
+  venue  = avail − 500                         // negative; venue absorbs
+
+if avail > 500:
+  above  = avail − 500
+  artist = 500 + (0.60 × above)               // 60% of pool above floor
+  venue  = (0.40 × above) − (actual_expenses − exp_input)  // 40% minus any overage
+```
+
+**Insurance gap on door deals**: when `actual_expenses > exp_input`, the overage is the venue's responsibility. Insurance (P2, Tier 4+) covers this gap up to X = $400.
+
+**Settlement display formula** (show this to both parties):
+```
+Artist = $500 floor + 60% of available pool above $500
+Venue  = 40% of available pool above $500 (expenses already deducted)
+```
+
+---
+
+### 3c. Insurance pricing tables
+
+**Product 1 — Dispute instant pay**
+
+| Tier | Cap | One-sided $/show | Two-sided each $/show |
+|------|-----|------------------|-----------------------|
+| 1 Starter | $150 | $13 | $7 |
+| 2 Basic | $300 | $18 | $10 |
+| 3 Standard | $500 | $24 | $13 |
+| 4 Pro | $750 | $32 | $17 |
+| 5 Full | $1,000 | $42 | $22 |
+
+Expected cost per show: $9.65 (based on 2.76% dispute rate × $350 avg resolution).
+
+**Product 2 — Suggestion accuracy pay (up to X)**
+
+| Tier | X cap | One-sided $/show | Two-sided each $/show |
+|------|-------|------------------|-----------------------|
+| 1 Starter | $100 | $10 | $6 |
+| 2 Basic | $200 | $18 | $10 |
+| 3 Standard | $300 | $26 | $14 |
+| 4 Pro (default for door) | $400 | $36 | $19 |
+| 5 Full (door only) | $650 | $48 | $25 |
+
+Trigger: `|actual_payout − flat_suggestion| > 50`. Expected cost per show: $25.85 for door deals; < $5 for vs/pn deals.
+
+**X = $400** is the calculated maximum. It covers 99.2% of all observed suggestion gaps across 254 historical shows. Door deals at P90 have a $397 gap — hence Tier 4 as the door default.
+
+---
+
+## 4. Database schema additions
+
+Add these to `db/schema.ts`:
+
+```typescript
+// Flat suggestion generated at deal entry
+export const switchSuggestions = sqliteTable("switch_suggestions", {
+  id: text("id").primaryKey(),
+  showId: text("show_id").notNull().references(() => shows.id),
+  suggestedAt: integer("suggested_at", { mode: "timestamp" }).notNull(),
+  dealTypeFrom: text("deal_type_from").notNull(),
+  suggestedFlat: real("suggested_flat").notNull(),
+  confidenceTier: text("confidence_tier", { enum: ["A","B","C","D"] }).notNull(),
+  bandLow: real("band_low"),
+  bandHigh: real("band_high"),
+  // null = pending, true = accepted, false = declined
+  accepted: integer("accepted", { mode: "boolean" }),
+  acceptedAt: integer("accepted_at", { mode: "timestamp" }),
+  declinedAt: integer("declined_at", { mode: "timestamp" }),
+  // For door hybrid: store the floor and split used
+  doorFloor: real("door_floor"),
+  doorSplit: real("door_split"),
+});
+
+// Insurance enrollments
+export const insuranceEnrollments = sqliteTable("insurance_enrollments", {
+  id: text("id").primaryKey(),
+  showId: text("show_id").notNull().references(() => shows.id),
+  product: text("product", { enum: ["p1_dispute","p2_accuracy"] }).notNull(),
+  side: text("side", { enum: ["venue","artist","both"] }).notNull(),
+  tier: integer("tier").notNull(), // 1-5
+  pricePerShow: real("price_per_show").notNull(),
+  xCap: real("x_cap"),            // for P2 only
+  enrolledAt: integer("enrolled_at", { mode: "timestamp" }).notNull(),
+  // Claim tracking
+  claimTriggeredAt: integer("claim_triggered_at", { mode: "timestamp" }),
+  claimAmount: real("claim_amount"),
+  claimPaidAt: integer("claim_paid_at", { mode: "timestamp" }),
+});
+```
+
+Also add to the `deals` table:
+```typescript
+switchStatus: text("switch_status", {
+  enum: ["not_suggested","suggested","accepted","declined"]
+}).default("not_suggested"),
+```
+
+---
+
+## 5. When to introduce the feature in the deal workflow
+
+The suggestion must fire **at deal entry / deal edit** — not at settlement. By settlement night it is too late. The goal is to resolve the deal structure weeks before show night.
+
+### Exact trigger points:
+
+1. **On `POST /api/deals` or deal edit save**: After the deal record is saved, immediately call `generateSwitchSuggestion(deal, show)`. If the result is non-null, save a `switch_suggestions` record and set `deal.switchStatus = 'suggested'`.
+
+2. **In the show detail page (`app/shows/[id]/page.tsx`)**: Show the suggestion card prominently in the Deal section if `deal.switchStatus === 'suggested'`. Include a "Suggest to agent" button that would send (or copy) the structured proposal.
+
+3. **T-7 advance reminder**: When show status transitions from `booked` → `advanced` and the switch hasn't been accepted, surface a reminder banner.
+
+4. **At settlement entry (`app/shows/[id]/settle/page.tsx`)**: If the switch was accepted, pre-fill the settlement with the flat amount and show a one-click confirm. If it was declined or not yet addressed, show the original deal and the suggestion as an inline nudge.
+
+### State machine for the switch:
+```
+not_suggested
+  → suggested (deal saved, system generated a suggestion)
+    → accepted (Mariana or agent accepted)
+      → insurance_offered (show insurance enrollment UI)
+        → insured / not_insured
+    → declined (agent declined)
+      → original deal stands
+```
+
+---
+
+## 6. UI changes: Shows tab and Artists tab
+
+### 6a. Shows list (`app/shows/page.tsx`)
+
+Add a **Settlement Shield** column to the shows table. Show a compact status pill for each show:
+
+| Pill | Condition |
+|------|-----------|
+| `Shield available` (amber) | Switch suggested but not yet accepted |
+| `Flat locked` (green) | Switch accepted |
+| `Insured` (green + shield icon) | Switch accepted AND insurance enrolled |
+| `Declined` (gray) | Agent declined switch |
+| `Not eligible` (gray) | Gross ≥ $5K and not a door deal |
+
+Add a filter to the shows list: **"Shield status"** — All / Available / Locked / Insured / Needs attention.
+
+The **"Needs attention"** filter is the important one for Mariana: shows where the switch was suggested more than 7 days ago and hasn't been accepted or declined.
+
+### 6b. Show detail page (`app/shows/[id]/page.tsx`)
+
+In the Deal card, add a **Settlement Shield panel** below the deal terms. It has three states:
+
+**State 1 — Suggestion available (switch not yet accepted):**
+```
+┌─────────────────────────────────────────────────────┐
+│ 💡 Settlement Shield available                      │
+│                                                     │
+│ This vs deal will likely settle at flat $1,800.     │
+│ Converting now eliminates 2am math and dispute risk.│
+│                                                     │
+│ [Suggest to agent →]          [See the math ↓]     │
+└─────────────────────────────────────────────────────┘
+```
+
+**State 2 — Switch accepted:**
+```
+┌─────────────────────────────────────────────────────┐
+│ ✓ Flat locked at $1,800                            │
+│                                                     │
+│ Settlement will be one click. Add insurance?        │
+│                                                     │
+│ [Add P1 — Dispute cover $18/show]                   │
+│ [Add P2 — Accuracy cover $10/show]                  │
+└─────────────────────────────────────────────────────┘
+```
+
+**State 3 — Insured:**
+```
+┌─────────────────────────────────────────────────────┐
+│ 🛡 Protected — flat $1,800 + P1 Tier 2             │
+│ Dispute covered up to $300 · Instant pay if needed  │
+└─────────────────────────────────────────────────────┘
+```
+
+### 6c. Artists tab (`app/artists/page.tsx`)
+
+Add two new data points to each artist row / artist detail:
+
+1. **Settlement health score** (A/B/C/D — the confidence tier). This appears as a small badge next to the artist name. Hover tooltip explains: "Based on X shows on platform. A = high confidence flat suggestion accuracy."
+
+2. **Shield history**: In the artist detail panel, show a small table of their past shows with columns: Date | Deal type | Switch offered | Accepted | Insurance | Outcome. This gives Mariana a quick read on whether this artist/agent is receptive to flat conversions.
+
+**Artist tab new filter**: "Switch acceptance rate" — surfaces artists whose agents consistently accept flat conversions (good candidates for proactive pitch).
+
+### 6d. Settlement page (`app/shows/[id]/settle/page.tsx`)
+
+If the switch was accepted:
+- Pre-fill `totalToArtist` with the locked flat amount
+- Hide the multi-step expense calculation (not needed for flat)
+- Show: "Flat deal — $1,800 to artist. Confirm and submit."
+- Show insurance status badge if enrolled
+
+If the switch was NOT accepted (original deal):
+- Show the existing settlement flow
+- Add a small inline reminder: "This could have been one click — offer flat next time?"
+
+---
+
+## 7. Gamification: the Settlement Shield calculator
+
+Build an **interactive calculator widget** embedded in both the show detail page and the artists page. Its job is to make the protection value concrete and memorable — not a dry insurance table.
+
+### Widget name: "What's your show worth protecting?"
+
+Place it:
+- In the show detail page, inside the Settlement Shield panel (State 1 or 2)
+- As a standalone section on the Artists tab sidebar when an artist is selected
+
+### Widget behaviour:
+
+The calculator has three display modes that animate between each other:
+
+---
+
+**Mode A — "The switch saves you this much time"**
+
+Show an animated counter:
+```
+Without switch:        With switch:
+Settlement: ~45 min    Settlement: ~4 min
+Dispute risk: 2.76%    Dispute risk: ~0%
+
+Time saved this show: 41 minutes
+Across a full season (22 shows): 15 hours
+```
+
+The "15 hours" figure should feel big. Animate it counting up.
+
+---
+
+**Mode B — "The math on your show" (personalized)**
+
+Pull actual deal data for this show. Animate a comparison bar:
+
+```
+If you keep the vs deal:
+  Artist ██████████████░░░░░ $2,058  (what they'll likely get)
+  Venue  ░░░░░░░░░░░░░░░░░░░  -$633  (what you'll likely net)
+  Settlement: complex · dispute possible
+
+If you switch to flat $2,050:
+  Artist ██████████████░░░░░ $2,050  (confirmed, no surprises)
+  Venue  ░░░░░░░░░░░░░░░░░░░  -$625  (same outcome, no ambiguity)
+  Settlement: one click
+
+Difference: $8 to you. Zero dispute risk.
+```
+
+The bars animate from the vs deal state to the flat state when you hover or tap "See the math".
+
+---
+
+**Mode C — "Your insurance protection value"**
+
+A slider labeled **"How much is a dispute worth to you?"** with stops at $0 / $150 / $300 / $500 / $750 / $1,000.
+
+As you move the slider, the display updates:
+```
+If a dispute happens (2.76% chance on your shows):
+  Expected dispute cost:    $9.65/show
+  Your P1 Tier 2 premium:  $18/show
+  You're covered up to:    $300
+  
+  Across 22 shows this season:
+    Premium paid:     $396
+    Expected claims:  $212
+    Net protection:   $184 — for complete peace of mind
+
+  One avoided dispute pays for 16 months of cover.
+```
+
+The headline number ("One avoided dispute pays for 16 months") should be the sticky takeaway. Compute it dynamically from the slider position.
+
+For door deals specifically, show a before/after bar:
+```
+Current door deal:
+  Best night (sellout):   Artist $17,387 · Venue -$1,930  ← venue always loses
+  
+Hybrid $500 floor + 60%:
+  Best night (sellout):   Artist  $9,474 · Venue +$5,983  ← both win
+  Slow night ($2,500):    Artist    $871 · Venue   +$248  ← both positive
+  Dead night ($800):      Artist    $500 · Venue  -$783   ← artist protected
+```
+
+Animate the bars transitioning from "current door deal" to "hybrid" when the user clicks "Switch to hybrid". The venue bar going from red to green should feel satisfying.
+
+---
+
+**Implementation notes for the gamification widget:**
+
+- Use Framer Motion (or CSS transitions if not available) for the bar animations
+- The widget should be self-contained: `components/settlement-shield/calculator.tsx`
+- Accept props: `deal`, `show`, `enrollment` (null if not insured)
+- The three modes are tabs: "Time" / "Math" / "Insurance"
+- On mobile, stack them vertically with a swipe gesture between modes
+- The final CTA in each mode links to either "Accept switch" or "Enroll insurance" — never just dead text
+
+---
+
+## 8. New `lib/switchMath.ts` module to create
+
+Create this alongside `lib/dealMath.ts`. It should export:
+
+```typescript
+export type SwitchSuggestion =
+  | { type: "flat"; suggestedFlat: number; confidence: "A"|"B"|"C"|"D"; bandLow?: number; bandHigh?: number; reason: string }
+  | { type: "door_hybrid"; floor: number; split: number; estimatedArtist: number; estimatedVenue: number; reason: string }
+  | { type: "none"; reason: string };
+
+export function generateSwitchSuggestion(
+  deal: Deal,
+  show: Show,
+  ticketSalesHistory: TicketSale[],  // prior shows for this artist
+  venueExpenseAvg: number,           // platform avg = 1497
+  confidenceTier: "A"|"B"|"C"|"D"
+): SwitchSuggestion
+
+export function simulateHybridDoor(
+  expectedGross: number,
+  expectedExpenses: number,
+  floor: number,     // default 500
+  split: number      // default 0.60
+): { artist: number; venue: number; venueShare: number; insuranceGap: number }
+
+export function insurancePremium(
+  product: "p1"|"p2",
+  tier: 1|2|3|4|5,
+  side: "one"|"two"
+): number
+
+export function insuranceExpectedCost(product: "p1"|"p2", tier: 1|2|3|4|5): number
+```
+
+---
+
+## 9. Key constraints to respect
+
+1. **Do not break the existing `calculateSettlement` function.** It handles `flat` and `percentage_of_gross` correctly. Add switch logic in the new `switchMath.ts` and extend the settlement page separately.
+
+2. **The switch is always opt-in.** Never auto-convert a deal. The system suggests; Mariana and the agent decide.
+
+3. **The suggestion fires at deal entry, not at settlement.** Add the trigger in the deal save API route. Do not surface it only in the settlement view — that's too late.
+
+4. **Confidence tier D**: For completely unknown artists (no platform data), always show the suggestion as a range and flag it. Do not auto-send to agent — surface to Mariana first for manual review.
+
+5. **The $5K gross boundary is hard for flat suggestions.** Do not suggest flat conversion for vs or percentage_of_net deals where expected gross ≥ $5,000. At that level the percentage calculation genuinely fires and a flat would shortchange artists. The boundary may be shown as a tooltip: "At this expected gross level, switching to flat could reduce artist pay. Switch not recommended."
+
+6. **Door hybrid applies at any gross level.** There is no upper bound for the door hybrid — even large-gross door shows (Pale Lake at $19K) benefit from restructuring.
+
+7. **The insurance is priced per-show at booking.** It is not a monthly subscription. The premium is added to the venue's Greenroom invoice for each show where insurance was enrolled.
+
+---
+
+## 10. Acceptance criteria
+
+- [ ] `generateSwitchSuggestion()` returns the correct flat for all 43 historical vs deals under $5K (avg delta ≤ $15)
+- [ ] `simulateHybridDoor()` produces venue-positive results on 20/29 historical door shows
+- [ ] Switch suggestion card appears on show detail page when deal is eligible
+- [ ] Shows list has Settlement Shield column with correct pill for each show
+- [ ] Artists list shows settlement health score (A/B/C/D) for each artist
+- [ ] Calculator widget renders with all three tabs (Time / Math / Insurance) and animated bars
+- [ ] Insurance enrollment creates a record in `insurance_enrollments` with correct price
+- [ ] Settlement page pre-fills flat amount and shows one-click confirm when switch is accepted
+- [ ] No existing functionality broken (flat and % of gross settlements still work)
