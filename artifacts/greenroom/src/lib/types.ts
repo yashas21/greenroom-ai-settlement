@@ -180,6 +180,27 @@ export interface AttentionItem {
   evidence?: string;
 }
 
+export interface InsightsCell {
+  dealType: string;
+  bucket: string;
+  count: number;
+  attentionCount: number;
+  topKind: AttentionKind | null;
+  topKindCount: number;
+  byKind: Record<AttentionKind, number>;
+  bubbles: { theme: string; count: number }[];
+  sampleSize: number;
+  llmError: string | null;
+}
+
+export interface InsightsPayload {
+  generatedAt: string;
+  enrichmentCoverage: { withSummary: number; total: number };
+  dealTypes: string[];
+  buckets: string[];
+  cells: InsightsCell[];
+}
+
 export interface ArtistRow {
   artist: Artist;
   agent: Agent | null;

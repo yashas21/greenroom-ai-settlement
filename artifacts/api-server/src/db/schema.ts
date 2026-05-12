@@ -135,6 +135,8 @@ export const settlements = sqliteTable("settlements", {
   recoupsJson: text("recoups_json"),
   signoffText: text("signoff_text"),
   notes: text("notes"),
+  positiveSummary: text("positive_summary"),
+  negativeSummary: text("negative_summary"),
 });
 
 export type User = typeof users.$inferSelect;

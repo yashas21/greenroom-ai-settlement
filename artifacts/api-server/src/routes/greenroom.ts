@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { getAllShows, getShowById, getAllArtists, getReports, getDealAnalysis, getNeedsAttention } from "../lib/queries";
 import { buildShowExport } from "../lib/showExport";
+import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insights";
 
 const router: IRouter = Router();
 
@@ -51,6 +52,26 @@ router.get("/deal-analysis", async (_req, res): Promise<void> => {
 router.get("/needs-attention", async (_req, res): Promise<void> => {
   const data = await getNeedsAttention();
   res.json(data);
+});
+
+router.post("/insights/enrich", async (req, res): Promise<void> => {
+  try {
+    const force = req.query.force === "1" || req.query.force === "true";
+    const out = await enrichSettlements({ force });
+    clearInsightsCache();
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "enrich_failed" });
+  }
+});
+
+router.get("/insights", async (_req, res): Promise<void> => {
+  try {
+    const data = await getInsights();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "insights_failed" });
+  }
 });
 
 export default router;

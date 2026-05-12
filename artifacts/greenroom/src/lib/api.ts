@@ -1,4 +1,4 @@
-import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem } from "./types";
+import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload } from "./types";
 
 const BASE = `${import.meta.env.BASE_URL}api`;
 
@@ -16,5 +16,6 @@ export const api = {
   reports: () => get<Reports>("/reports"),
   dealAnalysis: () => get<DealAnalysis>("/deal-analysis"),
   needsAttention: () => get<AttentionItem[]>("/needs-attention"),
+  insights: () => get<InsightsPayload>("/insights"),
   showExport: (id: string) => get<unknown>(`/shows/${encodeURIComponent(id)}/export`),
 };
