@@ -1,6 +1,7 @@
 import { api } from "@/lib/api";
 import { formatMoneyCompact, formatShowDate, formatShowMonth, relativeShowDate } from "@/lib/format";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
+import { classifyComplexity, classifySizeBucket } from "@/lib/dealClassify";
 import { ShowsList, type ShowRow } from "./shows-list";
 
 export default function ShowsPage() {
@@ -35,6 +36,12 @@ export default function ShowsPage() {
     month: formatShowMonth(r.show.date),
     isUnsupported: r.isUnsupportedDeal,
     isDisputed: r.isDisputed,
+    complexity: r.deal ? classifyComplexity(r.deal) : null,
+    sizeBucket: r.deal ? classifySizeBucket(r.deal) : null,
+    dealType: r.deal?.dealType ?? null,
+    expenseCategories: r.expenseCategories ?? [],
+    recoupCategories: r.recoupCategories ?? [],
+    disputedRecoupCategories: r.disputedRecoupCategories ?? [],
   }));
 
   const disputedCount = serialized.filter((r) => r.isDisputed).length;

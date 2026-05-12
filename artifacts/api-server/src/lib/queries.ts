@@ -52,11 +52,30 @@ export async function getAllShows() {
     .where(lte(shows.date, todayDateString()))
     .orderBy(asc(shows.date));
 
-  return rows.map((r) => ({
-    ...r,
-    isUnsupportedDeal: isUnsupportedDeal(r.deal),
-    isDisputed: isDisputedSettlement(r.settlement),
-  }));
+  const allExpenses = await db.select().from(expenses);
+  const expenseCategoriesByShowId = new Map<string, Set<string>>();
+  for (const e of allExpenses) {
+    if (!expenseCategoriesByShowId.has(e.showId)) {
+      expenseCategoriesByShowId.set(e.showId, new Set());
+    }
+    expenseCategoriesByShowId.get(e.showId)!.add(e.category);
+  }
+
+  return rows.map((r) => {
+    const recoups = parseRecoups(r.settlement?.recoupsJson ?? null);
+    return {
+      ...r,
+      isUnsupportedDeal: isUnsupportedDeal(r.deal),
+      isDisputed: isDisputedSettlement(r.settlement),
+      expenseCategories: Array.from(
+        expenseCategoriesByShowId.get(r.show.id) ?? [],
+      ),
+      recoupCategories: Array.from(new Set(recoups.map((x) => x.category))),
+      disputedRecoupCategories: Array.from(
+        new Set(recoups.filter((x) => x.status === "disputed").map((x) => x.category)),
+      ),
+    };
+  });
 }
 
 export async function getShowById(id: string) {

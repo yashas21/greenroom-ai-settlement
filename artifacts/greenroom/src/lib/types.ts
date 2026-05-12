@@ -142,6 +142,9 @@ export interface ShowListRow {
   settlement: Settlement | null;
   isUnsupportedDeal: boolean;
   isDisputed: boolean;
+  expenseCategories: string[];
+  recoupCategories: string[];
+  disputedRecoupCategories: string[];
 }
 
 export interface ShowDetail {

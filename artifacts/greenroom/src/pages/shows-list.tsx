@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
-import { ArrowUpRight, Search, Calendar } from "lucide-react";
+import { useMemo, useCallback } from "react";
+import { Link, useLocation, useSearch } from "wouter";
+import { ArrowUpRight, Search, Calendar, X } from "lucide-react";
 import { DealTypeBadge, PlainBadge } from "@/components/ui/badge";
 
 type Status = "booked" | "advanced" | "day_of" | "settled" | "closed";
@@ -15,6 +15,12 @@ export type ShowRow = {
   month: string;
   isUnsupported: boolean;
   isDisputed: boolean;
+  complexity: "simple" | "medium" | "complex" | null;
+  sizeBucket: string | null;
+  dealType: string | null;
+  expenseCategories: string[];
+  recoupCategories: string[];
+  disputedRecoupCategories: string[];
 };
 
 const lifecycleStatusVariants: Record<
@@ -30,6 +36,40 @@ const lifecycleStatusVariants: Record<
   finalized: { variant: "brand", label: "Finalized" },
   paid: { variant: "brand", label: "Paid" },
   voided: { variant: "default", label: "Voided" },
+};
+
+const COMPLEXITY_LABELS: Record<string, string> = {
+  simple: "Simple",
+  medium: "Medium",
+  complex: "Complex",
+};
+
+const DEAL_TYPE_LABELS: Record<string, string> = {
+  flat: "Flat",
+  percentage_of_gross: "% of gross",
+  percentage_of_net: "% of net",
+  vs: "Vs deal",
+  door: "Door deal",
+};
+
+const EXPENSE_CAT_LABELS: Record<string, string> = {
+  production: "Production",
+  sound: "Sound",
+  lights: "Lights",
+  hospitality: "Hospitality",
+  marketing: "Marketing",
+  backline: "Backline",
+  security: "Security",
+  other: "Other",
+};
+
+const RECOUP_CAT_LABELS: Record<string, string> = {
+  marketing: "Marketing",
+  hospitality_overage: "Hospitality overage",
+  production_overage: "Production overage",
+  prior_advance: "Prior advance",
+  damages: "Damages",
+  other: "Other",
 };
 
 function getAccentColor(row: ShowRow): string {
@@ -53,20 +93,111 @@ function groupByMonth(rows: ShowRow[]): { month: string; rows: ShowRow[] }[] {
   return Array.from(groups.entries()).map(([month, rows]) => ({ month, rows }));
 }
 
+type Filters = {
+  query: string;
+  unsupportedOnly: boolean;
+  disputedOnly: boolean;
+  complexity: string | null;
+  size: string | null;
+  dealType: string | null;
+  expenseCategory: string | null;
+  recoupCategory: string | null;
+  recoupDisputedOnly: boolean;
+};
+
+const EMPTY_FILTERS: Filters = {
+  query: "",
+  unsupportedOnly: false,
+  disputedOnly: false,
+  complexity: null,
+  size: null,
+  dealType: null,
+  expenseCategory: null,
+  recoupCategory: null,
+  recoupDisputedOnly: false,
+};
+
+function parseFilters(search: string): Filters {
+  const params = new URLSearchParams(search);
+  return {
+    query: params.get("q") ?? "",
+    unsupportedOnly: params.get("unsupported") === "1",
+    disputedOnly: params.get("disputed") === "1",
+    complexity: params.get("complexity"),
+    size: params.get("size"),
+    dealType: params.get("dealType"),
+    expenseCategory: params.get("expense"),
+    recoupCategory: params.get("recoup"),
+    recoupDisputedOnly: params.get("recoupDisputed") === "1",
+  };
+}
+
+function buildQueryString(f: Filters): string {
+  const params = new URLSearchParams();
+  if (f.query.trim()) params.set("q", f.query.trim());
+  if (f.unsupportedOnly) params.set("unsupported", "1");
+  if (f.disputedOnly) params.set("disputed", "1");
+  if (f.complexity) params.set("complexity", f.complexity);
+  if (f.size) params.set("size", f.size);
+  if (f.dealType) params.set("dealType", f.dealType);
+  if (f.expenseCategory) params.set("expense", f.expenseCategory);
+  if (f.recoupCategory) params.set("recoup", f.recoupCategory);
+  if (f.recoupDisputedOnly) params.set("recoupDisputed", "1");
+  const s = params.toString();
+  return s ? `?${s}` : "";
+}
+
+function isFilterActive(f: Filters): boolean {
+  return (
+    !!f.query ||
+    f.unsupportedOnly ||
+    f.disputedOnly ||
+    !!f.complexity ||
+    !!f.size ||
+    !!f.dealType ||
+    !!f.expenseCategory ||
+    !!f.recoupCategory ||
+    f.recoupDisputedOnly
+  );
+}
+
 export function ShowsList({ rows }: { rows: ShowRow[] }) {
-  const [query, setQuery] = useState("");
-  const [unsupportedOnly, setUnsupportedOnly] = useState(false);
-  const [disputedOnly, setDisputedOnly] = useState(false);
+  const search = useSearch();
+  const [, setLocation] = useLocation();
+  const filters = useMemo(() => parseFilters(search), [search]);
+
+  const update = useCallback(
+    (patch: Partial<Filters>) => {
+      const next = { ...filters, ...patch };
+      setLocation(`/shows${buildQueryString(next)}`, { replace: true });
+    },
+    [filters, setLocation],
+  );
 
   const unsupportedCount = useMemo(() => rows.filter((r) => r.isUnsupported).length, [rows]);
   const disputedCount = useMemo(() => rows.filter((r) => r.isDisputed).length, [rows]);
 
   const filtered = useMemo(() => {
     let out = rows;
-    if (unsupportedOnly) out = out.filter((r) => r.isUnsupported);
-    if (disputedOnly) out = out.filter((r) => r.isDisputed);
-    if (query.trim()) {
-      const q = query.toLowerCase();
+    if (filters.unsupportedOnly) out = out.filter((r) => r.isUnsupported);
+    if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
+    if (filters.complexity) out = out.filter((r) => r.complexity === filters.complexity);
+    if (filters.size) out = out.filter((r) => r.sizeBucket === filters.size);
+    if (filters.dealType) out = out.filter((r) => r.dealType === filters.dealType);
+    if (filters.expenseCategory)
+      out = out.filter((r) => r.expenseCategories.includes(filters.expenseCategory!));
+    if (filters.recoupCategory) {
+      const cat = filters.recoupCategory;
+      out = out.filter((r) =>
+        filters.recoupDisputedOnly
+          ? r.disputedRecoupCategories.includes(cat)
+          : r.recoupCategories.includes(cat),
+      );
+    } else if (filters.recoupDisputedOnly) {
+      out = out.filter((r) => r.disputedRecoupCategories.length > 0);
+    }
+    if (filters.query.trim()) {
+      const q = filters.query.toLowerCase();
       out = out.filter(
         (r) =>
           r.artist?.name.toLowerCase().includes(q) ||
@@ -75,9 +206,17 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
       );
     }
     return out;
-  }, [rows, query, unsupportedOnly, disputedOnly]);
+  }, [rows, filters]);
 
   const months = useMemo(() => groupByMonth(filtered), [filtered]);
+
+  const drillFiltersActive =
+    !!filters.complexity ||
+    !!filters.size ||
+    !!filters.dealType ||
+    !!filters.expenseCategory ||
+    !!filters.recoupCategory ||
+    filters.recoupDisputedOnly;
 
   return (
     <div>
@@ -87,39 +226,90 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           <input
             type="text"
             placeholder="Search artists, deals…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={filters.query}
+            onChange={(e) => update({ query: e.target.value })}
             className="w-64 pl-9 pr-3 py-2 text-[13px] bg-white border border-ink-200/60 rounded-lg text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-300 transition-all"
           />
         </div>
         <FilterToggle
-          active={unsupportedOnly}
-          onClick={() => setUnsupportedOnly((v) => !v)}
+          active={filters.unsupportedOnly}
+          onClick={() => update({ unsupportedOnly: !filters.unsupportedOnly })}
           variant="amber"
           label="Unsupported only"
           count={unsupportedCount}
         />
         <FilterToggle
-          active={disputedOnly}
-          onClick={() => setDisputedOnly((v) => !v)}
+          active={filters.disputedOnly}
+          onClick={() => update({ disputedOnly: !filters.disputedOnly })}
           variant="rose"
           label="Disputed only"
           count={disputedCount}
         />
+        {isFilterActive(filters) && (
+          <button
+            type="button"
+            onClick={() => setLocation("/shows", { replace: true })}
+            className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] text-ink-500 hover:text-ink-800 transition-colors"
+          >
+            Clear all
+          </button>
+        )}
       </div>
+
+      {drillFiltersActive && (
+        <div className="mb-5 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] eyebrow text-ink-400">Drill-down:</span>
+          {filters.complexity && (
+            <DrillChip
+              label={`Complexity: ${COMPLEXITY_LABELS[filters.complexity] ?? filters.complexity}`}
+              onClear={() => update({ complexity: null })}
+            />
+          )}
+          {filters.size && (
+            <DrillChip
+              label={`Size: ${filters.size}`}
+              onClear={() => update({ size: null })}
+            />
+          )}
+          {filters.dealType && (
+            <DrillChip
+              label={`Deal type: ${DEAL_TYPE_LABELS[filters.dealType] ?? filters.dealType}`}
+              onClear={() => update({ dealType: null })}
+            />
+          )}
+          {filters.expenseCategory && (
+            <DrillChip
+              label={`Expense: ${EXPENSE_CAT_LABELS[filters.expenseCategory] ?? filters.expenseCategory}`}
+              onClear={() => update({ expenseCategory: null })}
+            />
+          )}
+          {filters.recoupCategory && (
+            <DrillChip
+              label={`Recoup: ${RECOUP_CAT_LABELS[filters.recoupCategory] ?? filters.recoupCategory}${filters.recoupDisputedOnly ? " (disputed)" : ""}`}
+              onClear={() => update({ recoupCategory: null, recoupDisputedOnly: false })}
+            />
+          )}
+          {filters.recoupDisputedOnly && !filters.recoupCategory && (
+            <DrillChip
+              label="Recoup: any disputed"
+              onClear={() => update({ recoupDisputedOnly: false })}
+            />
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="py-20 text-center">
           <Calendar className="h-8 w-8 text-ink-200 mx-auto mb-3" />
           <div className="text-[14px] text-ink-500">
-            {query ? `No shows matching "${query}"` : "No shows yet."}
+            {filters.query ? `No shows matching "${filters.query}"` : "No shows match these filters."}
           </div>
-          {query && (
+          {isFilterActive(filters) && (
             <button
-              onClick={() => setQuery("")}
+              onClick={() => setLocation("/shows", { replace: true })}
               className="mt-2 text-[12px] text-brand-700 hover:text-brand-800 font-medium"
             >
-              Clear search
+              Clear filters
             </button>
           )}
         </div>
@@ -145,7 +335,7 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
         </div>
       )}
 
-      {query && filtered.length > 0 && (
+      {isFilterActive(filters) && filtered.length > 0 && (
         <div className="mt-4 text-center">
           <span className="text-[12px] text-ink-400">
             {filtered.length} of {rows.length} shows
@@ -153,6 +343,22 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+function DrillChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-brand-50 text-brand-800 text-[11px] font-medium ring-1 ring-inset ring-brand-200">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        className="rounded-full p-0.5 hover:bg-brand-100 transition-colors"
+        aria-label={`Clear ${label}`}
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   );
 }
 

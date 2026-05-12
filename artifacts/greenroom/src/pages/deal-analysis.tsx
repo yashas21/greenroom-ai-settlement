@@ -1,3 +1,4 @@
+import { Link, useLocation } from "wouter";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/lib/format";
@@ -6,7 +7,7 @@ import type { DealAnalysis } from "@/lib/types";
 
 const COMPLEXITY_META: Record<
   "simple" | "medium" | "complex",
-  { label: string; blurb: string; bar: string; ring: string; bg: string; fg: string }
+  { label: string; blurb: string; bar: string; ring: string; bg: string; fg: string; hover: string }
 > = {
   simple: {
     label: "Simple",
@@ -15,6 +16,7 @@ const COMPLEXITY_META: Record<
     ring: "ring-brand-200/60",
     bg: "bg-brand-50/30",
     fg: "text-brand-800",
+    hover: "hover:bg-brand-50/60 hover:ring-brand-300",
   },
   medium: {
     label: "Medium",
@@ -23,6 +25,7 @@ const COMPLEXITY_META: Record<
     ring: "ring-sky-200/60",
     bg: "bg-sky-50/30",
     fg: "text-sky-800",
+    hover: "hover:bg-sky-50/60 hover:ring-sky-300",
   },
   complex: {
     label: "Complex",
@@ -31,6 +34,7 @@ const COMPLEXITY_META: Record<
     ring: "ring-amber-200/60",
     bg: "bg-amber-50/30",
     fg: "text-amber-800",
+    hover: "hover:bg-amber-50/60 hover:ring-amber-300",
   },
 };
 
@@ -62,6 +66,15 @@ const EXPENSE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+function showsHref(params: Record<string, string | undefined>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null && v !== "") sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return `/shows${qs ? `?${qs}` : ""}`;
+}
+
 export default function DealAnalysisPage() {
   const state = useApiData(() => api.dealAnalysis(), []);
 
@@ -82,7 +95,8 @@ export default function DealAnalysisPage() {
         </h1>
         <p className="text-[14px] text-ink-500 mt-3 max-w-xl leading-relaxed">
           {d.totalDeals} past deals at The Crescent, broken down by what they
-          cost the venue to handle and what they returned.
+          cost the venue to handle and what they returned. Click any row or bar
+          to see the shows behind it.
         </p>
       </div>
 
@@ -124,9 +138,11 @@ function ComplexitySection({ data }: { data: DealAnalysis }) {
           const meta = COMPLEXITY_META[c.bucket];
           const inToolPct = c.count > 0 ? (c.inToolCount / c.count) * 100 : 0;
           return (
-            <div
+            <Link
               key={c.bucket}
-              className={`relative rounded-xl border border-ink-200/60 ${meta.bg} p-5 ring-1 ring-inset ${meta.ring}`}
+              href={showsHref({ complexity: c.bucket })}
+              className={`block relative rounded-xl border border-ink-200/60 ${meta.bg} p-5 ring-1 ring-inset ${meta.ring} ${meta.hover} transition-all cursor-pointer`}
+              title={`Show ${c.count} ${meta.label.toLowerCase()} deals`}
             >
               <div className={`eyebrow text-[10px] mb-2 ${meta.fg}`}>
                 {meta.label}
@@ -162,7 +178,7 @@ function ComplexitySection({ data }: { data: DealAnalysis }) {
                   {(100 - inToolPct).toFixed(0)}% spreadsheet
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
@@ -171,6 +187,7 @@ function ComplexitySection({ data }: { data: DealAnalysis }) {
 }
 
 function SizeSection({ data }: { data: DealAnalysis }) {
+  const [, setLocation] = useLocation();
   const maxCount = Math.max(...data.bySize.map((b) => b.count), 1);
   return (
     <section className="mb-16">
@@ -204,13 +221,16 @@ function SizeSection({ data }: { data: DealAnalysis }) {
               {data.bySize.map((b) => {
                 const barWidth = (b.count / maxCount) * 100;
                 const alarming = b.disputeRate >= 0.1;
-                return (
-                  <tr key={b.bucket}>
+                const disabled = b.count === 0;
+                const baseClass =
+                  "table-row align-middle transition-colors cursor-pointer hover:bg-brand-50/40";
+                const inner = (
+                  <>
                     <td className="py-3 font-medium text-ink-900">{b.bucket}</td>
                     <td className="py-3 pr-6">
                       <div className="flex items-center gap-2 max-w-xs">
                         <div
-                          className="h-5 rounded-[3px] bg-ink-300/80 flex items-center min-w-[24px]"
+                          className="h-5 rounded-[3px] bg-ink-300/80 group-hover:bg-brand-600 flex items-center min-w-[24px] transition-colors"
                           style={{ width: `${Math.max(barWidth, 3)}%` }}
                         >
                           <span className="text-[10px] font-mono tabular font-medium text-white px-1.5">
@@ -235,6 +255,30 @@ function SizeSection({ data }: { data: DealAnalysis }) {
                     >
                       {(b.disputeRate * 100).toFixed(1)}%
                     </td>
+                  </>
+                );
+                if (disabled) {
+                  return (
+                    <tr key={b.bucket} className="opacity-60">
+                      {inner}
+                    </tr>
+                  );
+                }
+                const params = new URLSearchParams({ size: b.bucket });
+                if (alarming) params.set("disputed", "1");
+                const target = `/shows?${params.toString()}`;
+                return (
+                  <tr
+                    key={b.bucket}
+                    onClick={() => setLocation(target)}
+                    className={`group ${baseClass}`}
+                    title={
+                      alarming
+                        ? `Show ${b.count} disputed ${b.bucket} deals`
+                        : `Show ${b.count} ${b.bucket} deals`
+                    }
+                  >
+                    {inner}
                   </tr>
                 );
               })}
@@ -282,26 +326,31 @@ function CostsSection({ data }: { data: DealAnalysis }) {
             {expenseEntries.length === 0 ? (
               <div className="text-[13px] text-ink-400">No expenses recorded.</div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {expenseEntries.map(([cat, amount]) => {
                   const pct = (amount / maxExpense) * 100;
                   return (
-                    <div key={cat} className="flex items-center gap-3">
+                    <Link
+                      key={cat}
+                      href={showsHref({ expense: cat })}
+                      className="group flex items-center gap-3 px-2 py-1 -mx-2 rounded-md hover:bg-brand-50/50 transition-colors cursor-pointer"
+                      title={`Shows with ${EXPENSE_LABELS[cat] ?? cat} expenses`}
+                    >
                       <div className="w-28 text-right">
-                        <span className="text-[12px] text-ink-700">
+                        <span className="text-[12px] text-ink-700 group-hover:text-brand-800">
                           {EXPENSE_LABELS[cat] ?? cat}
                         </span>
                       </div>
                       <div className="flex-1 flex items-center gap-2">
                         <div
-                          className="h-6 rounded-[3px] bg-ink-300/80 flex items-center min-w-[24px]"
+                          className="h-6 rounded-[3px] bg-ink-300/80 group-hover:bg-brand-600 flex items-center min-w-[24px] transition-colors"
                           style={{ width: `${Math.max(pct, 3)}%` }}
                         />
                         <span className="text-[11px] font-mono tabular text-ink-600 whitespace-nowrap">
                           {formatMoneyCompact(amount)}
                         </span>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -316,15 +365,28 @@ function CostsSection({ data }: { data: DealAnalysis }) {
             {recoupEntries.length === 0 ? (
               <div className="text-[13px] text-ink-400">No recoups recorded.</div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {recoupEntries.map(([cat, v]) => {
                   const pct = (v.amount / maxRecoup) * 100;
                   const disputedPct =
                     v.amount > 0 ? (v.disputedAmount / v.amount) * 100 : 0;
+                  const isDisputed = v.disputedAmount > 0;
                   return (
-                    <div key={cat} className="flex items-center gap-3">
+                    <Link
+                      key={cat}
+                      href={showsHref({
+                        recoup: cat,
+                        ...(isDisputed ? { recoupDisputed: "1" } : {}),
+                      })}
+                      className="group flex items-center gap-3 px-2 py-1 -mx-2 rounded-md hover:bg-rose-50/50 transition-colors cursor-pointer"
+                      title={
+                        isDisputed
+                          ? `Shows with disputed ${RECOUP_LABELS[cat] ?? cat} recoups`
+                          : `Shows with ${RECOUP_LABELS[cat] ?? cat} recoups`
+                      }
+                    >
                       <div className="w-32 text-right">
-                        <span className="text-[12px] text-ink-700">
+                        <span className="text-[12px] text-ink-700 group-hover:text-rose-800">
                           {RECOUP_LABELS[cat] ?? cat}
                         </span>
                       </div>
@@ -349,7 +411,7 @@ function CostsSection({ data }: { data: DealAnalysis }) {
                           </span>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -362,6 +424,7 @@ function CostsSection({ data }: { data: DealAnalysis }) {
 }
 
 function RevenueSection({ data }: { data: DealAnalysis }) {
+  const [, setLocation] = useLocation();
   const { revenue } = data;
   const dealTypes = Object.keys(revenue.byDealType).sort(
     (a, b) => revenue.byDealType[b].gross - revenue.byDealType[a].gross,
@@ -409,9 +472,14 @@ function RevenueSection({ data }: { data: DealAnalysis }) {
                 const monthGross = revenue.months.map((m) => m.byType[t] ?? 0);
                 const peak = Math.max(...monthGross, 1);
                 return (
-                  <tr key={t}>
+                  <tr
+                    key={t}
+                    onClick={() => setLocation(`/shows?dealType=${encodeURIComponent(t)}`)}
+                    className="group cursor-pointer hover:bg-brand-50/40 transition-colors"
+                    title={`Show ${r.count} ${DEAL_LABELS[t] ?? t} deals`}
+                  >
                     <td className="py-2.5">
-                      <span className="text-ink-900 font-medium">
+                      <span className="text-ink-900 font-medium group-hover:text-brand-800 transition-colors">
                         {DEAL_LABELS[t] ?? t}
                       </span>
                       {!supported && (
