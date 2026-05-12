@@ -171,6 +171,14 @@ export function classifySizeBucket(d: typeof deals.$inferSelect): string {
 const SIZE_ORDER = ["$0–1K", "$1–5K", "$5–15K", "$15K+", "Uncapped %"];
 
 export async function getDealAnalysis() {
+  const attentionItems = await getNeedsAttention();
+  const attentionByShowId = new Map<string, Set<AttentionKind>>();
+  for (const it of attentionItems) {
+    let s = attentionByShowId.get(it.showId);
+    if (!s) { s = new Set(); attentionByShowId.set(it.showId, s); }
+    s.add(it.kind);
+  }
+
   const today = todayDateString();
   const allShowsRows = await db.select().from(shows);
   const pastShowIds = new Set(
@@ -220,20 +228,37 @@ export async function getDealAnalysis() {
     unprofitable: { count: 0, disputed: 0 },
   };
 
+  const ATTENTION_KINDS: AttentionKind[] = [
+    "notes_say_closed_but_status_open",
+    "show_settled_no_settlement",
+    "disputed_recoups_but_signed",
+    "stale_disputed",
+  ];
   type CrossCell = {
     count: number;
     settledN: number;
     profitN: number;
     losingMoney: number;
     disputed: number;
+    attentionCount: number;
+    attentionByKind: Record<AttentionKind, number>;
   };
+  const emptyKindCounts = (): Record<AttentionKind, number> => ({
+    notes_say_closed_but_status_open: 0,
+    show_settled_no_settlement: 0,
+    disputed_recoups_but_signed: 0,
+    stale_disputed: 0,
+  });
   const crossAcc: Map<string, Map<string, CrossCell>> = new Map();
   const dealTypesSeen = new Set<string>();
   function crossCell(dealType: string, bucket: string): CrossCell {
     let row = crossAcc.get(dealType);
     if (!row) { row = new Map(); crossAcc.set(dealType, row); }
     let cell = row.get(bucket);
-    if (!cell) { cell = { count: 0, settledN: 0, profitN: 0, losingMoney: 0, disputed: 0 }; row.set(bucket, cell); }
+    if (!cell) {
+      cell = { count: 0, settledN: 0, profitN: 0, losingMoney: 0, disputed: 0, attentionCount: 0, attentionByKind: emptyKindCounts() };
+      row.set(bucket, cell);
+    }
     return cell;
   }
 
@@ -253,6 +278,11 @@ export async function getDealAnalysis() {
     dealTypesSeen.add(d.dealType);
     const cc = crossCell(d.dealType, bucket);
     cc.count++;
+    const kinds = attentionByShowId.get(d.showId);
+    if (kinds && kinds.size > 0) {
+      cc.attentionCount++;
+      for (const k of kinds) cc.attentionByKind[k]++;
+    }
     if (s) {
       sizeAcc[bucket].settledN++;
       const disputed = isDisputedSettlement(s);
@@ -290,10 +320,13 @@ export async function getDealAnalysis() {
   const crossTabBySizeAndType = {
     dealTypes: Array.from(dealTypesSeen).sort(),
     buckets: SIZE_ORDER,
+    attentionKinds: ATTENTION_KINDS,
     cells: [] as Array<{
       dealType: string; bucket: string; count: number; settledN: number;
       profitN: number; losingMoneyCount: number; disputed: number;
       losingMoneyRate: number; disputeRate: number;
+      attentionCount: number; attentionRate: number;
+      attentionByKind: Record<AttentionKind, number>;
     }>,
   };
   for (const dealType of crossTabBySizeAndType.dealTypes) {
@@ -306,6 +339,9 @@ export async function getDealAnalysis() {
         profitN: c.profitN, losingMoneyCount: c.losingMoney, disputed: c.disputed,
         losingMoneyRate: c.profitN > 0 ? c.losingMoney / c.profitN : 0,
         disputeRate: c.settledN > 0 ? c.disputed / c.settledN : 0,
+        attentionCount: c.attentionCount,
+        attentionRate: c.count > 0 ? c.attentionCount / c.count : 0,
+        attentionByKind: c.attentionByKind,
       });
     }
   }

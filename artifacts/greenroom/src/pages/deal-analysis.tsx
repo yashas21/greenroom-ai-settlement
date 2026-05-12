@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/lib/format";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
-import type { DealAnalysis } from "@/lib/types";
+import type { DealAnalysis, AttentionKind } from "@/lib/types";
 
 const COMPLEXITY_META: Record<
   "simple" | "medium" | "complex",
@@ -651,6 +651,19 @@ function RevenueSection({ data }: { data: DealAnalysis }) {
   );
 }
 
+const ATTENTION_KIND_ORDER: AttentionKind[] = [
+  "stale_disputed",
+  "disputed_recoups_but_signed",
+  "show_settled_no_settlement",
+  "notes_say_closed_but_status_open",
+];
+const ATTENTION_KIND_SHORT: Record<AttentionKind, string> = {
+  stale_disputed: "stale dispute",
+  disputed_recoups_but_signed: "disputed recoup",
+  show_settled_no_settlement: "missing settlement",
+  notes_say_closed_but_status_open: "notes vs status",
+};
+
 function CrossTabCard({ data }: { data: DealAnalysis }) {
   const [, setLocation] = useLocation();
   const ct = data.revenue.crossTabBySizeAndType;
@@ -665,7 +678,7 @@ function CrossTabCard({ data }: { data: DealAnalysis }) {
       <CardContent>
         <div className="flex items-baseline justify-between mb-4">
           <div className="eyebrow text-[10px] text-ink-500">
-            Deal type × deal size · losing money / dispute rate
+            Deal type × deal size · losing money / disputed / needs attention
           </div>
           <div className="flex items-center gap-3 text-[10px] text-ink-400">
             <span className="flex items-center gap-1">
@@ -675,6 +688,10 @@ function CrossTabCard({ data }: { data: DealAnalysis }) {
             <span className="flex items-center gap-1">
               <span className="inline-block w-2 h-2 rounded-sm bg-amber-500/80" />
               disputed
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-violet-500/80" />
+              needs attention
             </span>
           </div>
         </div>
@@ -723,22 +740,33 @@ function CrossTabCard({ data }: { data: DealAnalysis }) {
                     }
                     const losingHot = cell.losingMoneyRate >= 0.5;
                     const disputeHot = cell.disputeRate >= 0.1;
+                    const attentionHot = cell.attentionRate >= 0.1;
                     const params = new URLSearchParams({
                       dealType: dt,
                       size: b,
                     });
+                    const kindBreakdown = ATTENTION_KIND_ORDER
+                      .map((k) => {
+                        const n = cell.attentionByKind[k] ?? 0;
+                        return n > 0 ? `${ATTENTION_KIND_SHORT[k]}: ${n}` : null;
+                      })
+                      .filter(Boolean)
+                      .join(", ");
+                    const attentionTitle = cell.attentionCount > 0
+                      ? `${cell.attentionCount}/${cell.count} flagged (${kindBreakdown})`
+                      : "No attention flags";
                     return (
                       <td
                         key={b}
                         onClick={() => setLocation(`/shows?${params.toString()}`)}
                         className="py-2 px-2 cursor-pointer hover:bg-brand-50/40 transition-colors"
-                        title={`${cell.count} ${DEAL_LABELS[dt] ?? dt} deals in ${b} · ${cell.losingMoneyCount}/${cell.profitN} losing money · ${cell.disputed}/${cell.settledN} disputed`}
+                        title={`${cell.count} ${DEAL_LABELS[dt] ?? dt} deals in ${b} · ${cell.losingMoneyCount}/${cell.profitN} losing money · ${cell.disputed}/${cell.settledN} disputed · ${attentionTitle}`}
                       >
                         <div className="text-center">
                           <div className="text-[10px] font-mono tabular text-ink-400 mb-0.5">
                             n={cell.count}
                           </div>
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-1.5">
                             <span
                               className={`font-mono tabular text-[12px] ${
                                 losingHot ? "text-rose-700 font-semibold" : "text-ink-700"
@@ -760,6 +788,15 @@ function CrossTabCard({ data }: { data: DealAnalysis }) {
                                 ? `${(cell.disputeRate * 100).toFixed(0)}%`
                                 : "—"}
                             </span>
+                            <span className="text-ink-300">·</span>
+                            <span
+                              className={`font-mono tabular text-[12px] ${
+                                attentionHot ? "text-violet-700 font-semibold" : "text-ink-500"
+                              }`}
+                              title={attentionTitle}
+                            >
+                              {`${(cell.attentionRate * 100).toFixed(0)}%`}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -771,10 +808,10 @@ function CrossTabCard({ data }: { data: DealAnalysis }) {
           </tbody>
         </table>
         <p className="text-[11px] text-ink-400 mt-3 leading-relaxed">
-          Each cell shows the count of deals (n=), then the share losing
-          money and the share disputed. Cells with ≥50% losing money are
-          red; cells with ≥10% disputed are amber. Click a cell to see the
-          shows behind it.
+          Each cell shows count of deals (n=), then losing-money rate ·
+          dispute rate · needs-attention rate. Thresholds: ≥50% losing
+          money (red), ≥10% disputed (amber), ≥10% needs attention
+          (violet). Hover for the kind breakdown; click to see the shows.
         </p>
       </CardContent>
     </Card>

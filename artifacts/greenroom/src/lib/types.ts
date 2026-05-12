@@ -255,6 +255,7 @@ export interface DealAnalysis {
     crossTabBySizeAndType: {
       dealTypes: string[];
       buckets: string[];
+      attentionKinds: AttentionKind[];
       cells: {
         dealType: string;
         bucket: string;
@@ -265,6 +266,9 @@ export interface DealAnalysis {
         disputed: number;
         losingMoneyRate: number;
         disputeRate: number;
+        attentionCount: number;
+        attentionRate: number;
+        attentionByKind: Record<AttentionKind, number>;
       }[];
     };
   };
