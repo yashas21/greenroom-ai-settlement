@@ -246,6 +246,58 @@ export interface InsightsCell {
   llmError: string | null;
 }
 
+export interface SwitchSavingsItem {
+  showId: string;
+  date: string;
+  artistName: string | null;
+  dealType: DealType;
+  switchShape: "flat" | "door_hybrid";
+  confidenceTier: ConfidenceTier;
+  actualToArtist: number;
+  counterfactualToArtist: number;
+  moneySavedToVenue: number;
+  estimatedMinutesSpent: number;
+  estimatedMinutesUnderSwitch: number;
+  minutesSaved: number;
+  hadDispute: boolean;
+  disputedRecoupCount: number;
+  notesParagraphs: number;
+  signoffParagraphs: number;
+  totalRecoups: number;
+  grossBoxOffice: number;
+  totalExpenses: number;
+  breakdown: {
+    actual: {
+      gross: number;
+      expenses: number;
+      recoupTotal: number;
+      recoupLines: { label: string; amount: number; status: string }[];
+      payout: number;
+      settlementStatus: string;
+    };
+    counterfactual: {
+      shape: "flat" | "door_hybrid";
+      flat: number | null;
+      doorFloor: number | null;
+      doorSplitPct: number | null;
+      doorExpenseCap: number | null;
+      projectedPayout: number;
+      basis: string;
+    };
+    timeSavedRationale: string;
+    moneyRationale: string;
+  };
+}
+
+export interface SwitchSavingsPayload {
+  generatedAt: string;
+  windowMonths: number;
+  totalCandidates: number;
+  totalMoneySavedToVenue: number;
+  totalMinutesSaved: number;
+  items: SwitchSavingsItem[];
+}
+
 export interface InsightsPayload {
   generatedAt: string;
   enrichmentCoverage: { withSummary: number; total: number };

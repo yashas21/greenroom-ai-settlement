@@ -1,9 +1,10 @@
-import { useLocation } from "wouter";
-import { Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
-import type { InsightsCell, AttentionKind } from "@/lib/types";
+import type { InsightsCell, AttentionKind, SwitchSavingsItem } from "@/lib/types";
 
 const DEAL_LABELS: Record<string, string> = {
   flat: "Flat",
@@ -32,7 +33,18 @@ export default function InsightsPage() {
 
   if (state.status === "loading")
     return (
-      <LoadingState label="Clustering complaint themes... this can take a minute on first load." />
+      <section className="px-12 py-10 max-w-[1280px]">
+        <div className="eyebrow text-[10px] text-brand-700 mb-2">
+          Deal anatomy · qualitative
+        </div>
+        <h1 className="text-4xl font-serif text-ink-900 mb-2 tracking-tight">Insights</h1>
+        <p className="text-[14px] text-ink-600 max-w-2xl mb-6 leading-relaxed">
+          Same Deal type × deal size grid as Deal Analysis, but each cell names the dominant
+          friction kind for those deals and clusters the actual recurring complaints behind it.
+        </p>
+        <SwitchSavingsSection />
+        <LoadingState label="Clustering complaint themes... this can take a minute on first load." />
+      </section>
     );
   if (state.status === "error")
     return <LoadingState label={`Error: ${state.error.message}`} />;
@@ -69,6 +81,8 @@ export default function InsightsPage() {
         <code className="text-[11px] bg-ink-50 px-1 py-0.5 rounded">POST /api/insights/enrich</code>{" "}
         to extend coverage.
       </p>
+
+      <SwitchSavingsSection />
 
       <Card>
         <CardContent>
@@ -118,6 +132,340 @@ export default function InsightsPage() {
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function fmtMoney(n: number): string {
+  const sign = n < 0 ? "-" : "";
+  const v = Math.abs(Math.round(n));
+  if (v >= 1000) return `${sign}$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K`;
+  return `${sign}$${v.toLocaleString()}`;
+}
+
+function fmtMinutes(n: number): string {
+  if (n < 60) return `${n} min`;
+  const h = Math.floor(n / 60);
+  const m = n % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+const TIER_TONE: Record<string, string> = {
+  A: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  B: "bg-sky-50 text-sky-700 ring-sky-200",
+  C: "bg-amber-50 text-amber-700 ring-amber-200",
+  D: "bg-ink-50 text-ink-600 ring-ink-200",
+};
+
+const SHAPE_LABEL: Record<string, string> = {
+  flat: "Flat",
+  door_hybrid: "Door hybrid",
+};
+
+const DEAL_TYPE_LABEL: Record<string, string> = {
+  vs: "Vs",
+  percentage_of_net: "% of net",
+  door: "Door",
+};
+
+function SwitchSavingsSection() {
+  const state = useApiData(() => api.switchSavings(3), []);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (state.status === "loading")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-ink-400">Loading Smart Switch savings…</div>
+        </CardContent>
+      </Card>
+    );
+  if (state.status === "error")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-rose-600">
+            Couldn't load savings: {state.error.message}
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+  const data = state.data;
+  if (data.items.length === 0) {
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="h-4 w-4 text-brand-700" />
+            <span className="eyebrow text-[10px] text-ink-500">
+              Smart Switch · last {data.windowMonths} months
+            </span>
+          </div>
+          <div className="text-[13px] text-ink-500">
+            No vs / % of net / door deals settled in the last {data.windowMonths} months — nothing
+            for Smart Switch to compare against.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalDollars = data.totalMoneySavedToVenue;
+  const totalMins = data.totalMinutesSaved;
+
+  return (
+    <Card className="mb-6">
+      <CardContent>
+        <div className="flex items-baseline justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-brand-700" />
+            <h2 className="text-[15px] font-semibold text-ink-900">
+              Smart Switch could have helped
+            </h2>
+            <span className="eyebrow text-[10px] text-ink-400">
+              · last {data.windowMonths} months
+            </span>
+          </div>
+          <div className="text-[11px] text-ink-400 font-mono tabular">
+            {data.items.length} of {data.totalCandidates} eligible deals shown
+          </div>
+        </div>
+        <p className="text-[12px] text-ink-500 mb-4 leading-relaxed">
+          Past settled <span className="font-mono">vs / % of net / door</span> deals re-scored
+          against the Smart Switch counterfactual. Money is venue payout delta; time is a
+          back-of-the-envelope estimate from recoups + sign-off thread length.
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="rounded-md ring-1 ring-emerald-200/60 bg-emerald-50/40 p-3">
+            <div className="flex items-center gap-1.5 eyebrow text-[10px] text-emerald-700 mb-1">
+              <DollarSign className="h-3 w-3" />
+              Money saved (top {data.items.length})
+            </div>
+            <div className="text-[22px] font-serif text-ink-900 tabular">
+              {fmtMoney(totalDollars)}
+            </div>
+            <div className="text-[10px] text-ink-400">
+              cumulative venue-side payout reduction vs. actual
+            </div>
+          </div>
+          <div className="rounded-md ring-1 ring-sky-200/60 bg-sky-50/40 p-3">
+            <div className="flex items-center gap-1.5 eyebrow text-[10px] text-sky-700 mb-1">
+              <Clock className="h-3 w-3" />
+              Time saved (top {data.items.length})
+            </div>
+            <div className="text-[22px] font-serif text-ink-900 tabular">
+              {fmtMinutes(totalMins)}
+            </div>
+            <div className="text-[10px] text-ink-400">
+              fewer minutes spent on settlement-night arithmetic + back-and-forth
+            </div>
+          </div>
+        </div>
+
+        <ul className="space-y-1.5">
+          {data.items.map((it) => (
+            <SavingsRow
+              key={it.showId}
+              item={it}
+              expanded={expandedId === it.showId}
+              onToggle={() =>
+                setExpandedId(expandedId === it.showId ? null : it.showId)
+              }
+            />
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SavingsRow({
+  item,
+  expanded,
+  onToggle,
+}: {
+  item: SwitchSavingsItem;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const tierClass = TIER_TONE[item.confidenceTier] ?? TIER_TONE.D;
+  const moneyPositive = item.moneySavedToVenue > 0;
+  return (
+    <li className="rounded-md ring-1 ring-ink-200/60 bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-ink-50/60 rounded-md transition-colors"
+        aria-expanded={expanded}
+      >
+        <ChevronRight
+          className={`h-3.5 w-3.5 text-ink-400 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-medium text-ink-900 truncate">
+              {item.artistName ?? "—"}
+            </span>
+            <span className="text-[10px] font-mono tabular text-ink-400">{item.date}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-600 ring-1 ring-ink-200">
+              {DEAL_TYPE_LABEL[item.dealType] ?? item.dealType} → {SHAPE_LABEL[item.switchShape]}
+            </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded font-mono ring-1 ${tierClass}`}
+              title="Confidence tier"
+            >
+              Tier {item.confidenceTier}
+            </span>
+            {item.hadDispute && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                disputed
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="text-right">
+            <div
+              className={`text-[13px] font-mono tabular font-semibold ${moneyPositive ? "text-emerald-700" : "text-ink-500"}`}
+            >
+              {moneyPositive ? "+" : ""}
+              {fmtMoney(item.moneySavedToVenue)}
+            </div>
+            <div className="text-[9px] text-ink-400 uppercase tracking-[0.06em]">money</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[13px] font-mono tabular font-semibold text-sky-700">
+              {fmtMinutes(item.minutesSaved)}
+            </div>
+            <div className="text-[9px] text-ink-400 uppercase tracking-[0.06em]">time</div>
+          </div>
+        </div>
+      </button>
+
+      {expanded && <SavingsBreakdown item={item} />}
+    </li>
+  );
+}
+
+function SavingsBreakdown({ item }: { item: SwitchSavingsItem }) {
+  const a = item.breakdown.actual;
+  const c = item.breakdown.counterfactual;
+  return (
+    <div className="border-t border-ink-200/50 px-3 py-3 bg-ink-50/30 rounded-b-md text-[12px] leading-relaxed space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded ring-1 ring-ink-200/60 bg-white p-2.5">
+          <div className="eyebrow text-[10px] text-ink-500 mb-1.5">What actually happened</div>
+          <div className="font-mono tabular text-[11px] text-ink-700 space-y-0.5">
+            <div className="flex justify-between">
+              <span>Gross box office</span>
+              <span>${a.gross.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Expenses</span>
+              <span>${a.expenses.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Recoups ({a.recoupLines.length})</span>
+              <span>${a.recoupTotal.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-ink-900 pt-1 border-t border-ink-200/60 mt-1">
+              <span>Paid to artist</span>
+              <span>${a.payout.toLocaleString()}</span>
+            </div>
+            <div className="text-[10px] text-ink-400 pt-1">
+              Settlement status: <span className="font-medium">{a.settlementStatus}</span>
+            </div>
+          </div>
+          {a.recoupLines.length > 0 && (
+            <ul className="mt-2 space-y-0.5">
+              {a.recoupLines.slice(0, 4).map((rl, i) => (
+                <li
+                  key={i}
+                  className="text-[10.5px] flex justify-between gap-2 truncate"
+                  title={rl.label}
+                >
+                  <span
+                    className={`truncate ${rl.status === "disputed" ? "text-rose-700" : "text-ink-500"}`}
+                  >
+                    {rl.status === "disputed" ? "✗ " : "· "}
+                    {rl.label}
+                  </span>
+                  <span className="font-mono tabular text-ink-500 shrink-0">
+                    ${rl.amount.toLocaleString()}
+                  </span>
+                </li>
+              ))}
+              {a.recoupLines.length > 4 && (
+                <li className="text-[10px] text-ink-400 italic">
+                  +{a.recoupLines.length - 4} more
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+        <div className="rounded ring-1 ring-brand-200 bg-brand-50/30 p-2.5">
+          <div className="eyebrow text-[10px] text-brand-700 mb-1.5">
+            Smart Switch counterfactual
+          </div>
+          <div className="font-mono tabular text-[11px] text-ink-700 space-y-0.5">
+            <div className="flex justify-between">
+              <span>Shape</span>
+              <span>{SHAPE_LABEL[c.shape]}</span>
+            </div>
+            {c.shape === "flat" ? (
+              <div className="flex justify-between">
+                <span>Suggested flat</span>
+                <span>${(c.flat ?? 0).toLocaleString()}</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span>Floor</span>
+                  <span>${(c.doorFloor ?? 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Split above cap</span>
+                  <span>{Math.round((c.doorSplitPct ?? 0) * 100)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Expense cap</span>
+                  <span>${(c.doorExpenseCap ?? 0).toLocaleString()}</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between font-semibold text-ink-900 pt-1 border-t border-brand-200/60 mt-1">
+              <span>Projected payout</span>
+              <span>${c.projectedPayout.toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="text-[10.5px] text-ink-600 mt-2 leading-snug">{c.basis}</div>
+        </div>
+      </div>
+
+      <div className="rounded ring-1 ring-ink-200/60 bg-white p-2.5">
+        <div className="eyebrow text-[10px] text-ink-500 mb-1">Why money</div>
+        <div className="text-[11.5px] text-ink-700">{item.breakdown.moneyRationale}</div>
+      </div>
+
+      <div className="rounded ring-1 ring-ink-200/60 bg-white p-2.5">
+        <div className="eyebrow text-[10px] text-ink-500 mb-1">Why time</div>
+        <div className="text-[11.5px] text-ink-700">{item.breakdown.timeSavedRationale}</div>
+        <div className="mt-1.5 text-[10.5px] text-ink-500 font-mono tabular">
+          ~{item.estimatedMinutesSpent} min actual → ~{item.estimatedMinutesUnderSwitch} min under
+          Smart Switch = <span className="text-sky-700 font-semibold">{fmtMinutes(item.minutesSaved)}</span> saved
+        </div>
+      </div>
+
+      <div className="text-right">
+        <Link
+          href={`/shows/${item.showId}`}
+          className="inline-flex items-center gap-1 text-[11px] text-brand-700 hover:text-brand-800 font-medium"
+        >
+          Open show <ArrowUpRight className="h-3 w-3" />
+        </Link>
+      </div>
+    </div>
   );
 }
 

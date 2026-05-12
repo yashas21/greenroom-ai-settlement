@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { db } from "../db";
 import {
   deals, settlements, shows, expenses, switchSuggestions,
@@ -21,11 +21,20 @@ type CellStats = {
   payouts: number[];
 };
 
-function tierFromSampleSize(n: number): ConfidenceTier {
-  if (n >= 20) return "A";
-  if (n >= 8) return "B";
-  if (n >= 3) return "C";
-  return "D";
+function computeTier(cellN: number, artistShowsAtVenue: number): ConfidenceTier {
+  // Cell sample size sets the ceiling.
+  let tier: ConfidenceTier;
+  if (cellN >= 20) tier = "A";
+  else if (cellN >= 8) tier = "B";
+  else if (cellN >= 3) tier = "C";
+  else tier = "D";
+
+  // First-time / one-time artists at this venue demote the ceiling: even
+  // with abundant comparable deals, we don't know how THIS artist behaves
+  // on settlement night. Cap at B until we have at least 2 prior shows.
+  if (artistShowsAtVenue < 2 && tier === "A") tier = "B";
+
+  return tier;
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -136,14 +145,21 @@ const DOOR_EXPENSE_CAP = 1500;
 
 export async function generateSuggestion(
   deal: Deal,
+  artistShowsAtVenue = 0,
 ): Promise<GeneratedSuggestion | null> {
   const stats = await getCellStats();
   const bucket = classifySizeBucket(deal);
+  const familiarity =
+    artistShowsAtVenue === 0
+      ? "first-time"
+      : artistShowsAtVenue === 1
+        ? "1 prior show at the venue"
+        : `${artistShowsAtVenue} prior shows at the venue`;
 
   if (deal.dealType === "vs" || deal.dealType === "percentage_of_net") {
     const cell = stats.get(`${deal.dealType}::${bucket}`);
     if (!cell || cell.n < 3) return null;
-    const tier = tierFromSampleSize(cell.n);
+    const tier = computeTier(cell.n, artistShowsAtVenue);
     const flat = roundTo50(cell.avgPayout);
     const bandLow = roundTo50(cell.p10Payout);
     const bandHigh = roundTo50(cell.p90Payout);
@@ -164,14 +180,15 @@ export async function generateSuggestion(
         `was paid ${formatMoney(cell.avgPayout)} on average ` +
         `(P10 ${formatMoney(cell.p10Payout)} – P90 ${formatMoney(cell.p90Payout)}). ` +
         `A flat at ${formatMoney(flat)} matches the historical expected payout, ` +
-        `removing the post-show recoup arithmetic that drives most disputes.`,
+        `removing the post-show recoup arithmetic that drives most disputes. ` +
+        `Confidence tier ${tier} (${familiarity}).`,
     };
   }
 
   if (deal.dealType === "door") {
     const cell = stats.get(`door::${bucket}`);
     const sampleSize = cell?.n ?? 0;
-    const tier = tierFromSampleSize(sampleSize);
+    const tier = computeTier(sampleSize, artistShowsAtVenue);
     const avgGross = cell?.avgGross ?? 0;
     const avgExp = cell?.avgExpenses ?? DOOR_EXPENSE_CAP;
     const cap = Math.min(DOOR_EXPENSE_CAP, Math.round(avgExp));
@@ -194,11 +211,29 @@ export async function generateSuggestion(
         `of walk-up, then ${Math.round(DOOR_SPLIT_PCT * 100)}% of the pool above an ` +
         `$${cap} expense cap. Projected artist payout ~${formatMoney(projectedArtist)} ` +
         `at the cell-average gross of ${formatMoney(avgGross)}; venue stops eating ` +
-        `expense overruns on slow nights.`,
+        `expense overruns on slow nights. Confidence tier ${tier} (${familiarity}).`,
     };
   }
 
   return null;
+}
+
+async function countPriorShowsAtVenue(
+  artistId: string,
+  venueId: string,
+  beforeDate: string,
+): Promise<number> {
+  const rows = await db
+    .select({ id: shows.id })
+    .from(shows)
+    .where(
+      and(
+        eq(shows.artistId, artistId),
+        eq(shows.venueId, venueId),
+        lt(shows.date, beforeDate),
+      ),
+    );
+  return rows.length;
 }
 
 function formatMoney(n: number): string {
@@ -221,7 +256,13 @@ export async function generateAndPersist(showId: string): Promise<{
   const existing = await getSuggestionForShow(showId);
   if (existing) return { suggestion: existing };
 
-  const generated = await generateSuggestion(deal);
+  const showRows = await db.select().from(shows).where(eq(shows.id, showId));
+  const show = showRows[0];
+  const artistShowsAtVenue = show
+    ? await countPriorShowsAtVenue(show.artistId, show.venueId, show.date)
+    : 0;
+
+  const generated = await generateSuggestion(deal, artistShowsAtVenue);
   if (!generated) {
     return { suggestion: null, reason: "not_eligible" };
   }
