@@ -1,0 +1,185 @@
+export type Status = "booked" | "advanced" | "day_of" | "settled" | "closed";
+
+export type DealType = "flat" | "percentage_of_gross" | "percentage_of_net" | "vs" | "door";
+
+export type SettlementStage =
+  | "draft" | "submitted" | "in_review" | "signed" | "disputed"
+  | "revised" | "finalized" | "paid" | "voided";
+
+export interface Show {
+  id: string;
+  venueId: string;
+  artistId: string;
+  date: string;
+  status: Status;
+  doorsTime: string | null;
+  setTime: string | null;
+  openerArtistId: string | null;
+  roomConfig: "standing" | "seated" | "mixed";
+  internalNotes: string | null;
+  createdAt: string;
+}
+
+export interface Artist {
+  id: string;
+  name: string;
+  agentId: string | null;
+  managerEmail: string | null;
+  genre: string | null;
+  priorShowCount: number;
+}
+
+export interface Agent {
+  id: string;
+  name: string;
+  agencyId: string | null;
+  email: string;
+  phone: string | null;
+  preferencesNotes: string | null;
+}
+
+export interface Agency {
+  id: string;
+  name: string;
+}
+
+export interface Venue {
+  id: string;
+  name: string;
+  capacity: number;
+  city: string;
+  state: string;
+}
+
+export interface Deal {
+  id: string;
+  showId: string;
+  dealType: DealType;
+  guaranteeAmount: number | null;
+  percentage: number | null;
+  percentageBasis: "gross" | "net" | null;
+  expenseCap: number | null;
+  hospitalityCap: number | null;
+  bonusesJson: string | null;
+  dealNotesFreetext: string | null;
+  createdAt: string;
+}
+
+export interface TicketSale {
+  id: string;
+  showId: string;
+  qty: number;
+  gross: number;
+  fees: number;
+  capturedAt: string;
+}
+
+export interface Comp {
+  id: string;
+  showId: string;
+  category: "artist_gl" | "label" | "press" | "venue_staff" | "sponsor" | "promo" | "other";
+  count: number;
+  faceValue: number;
+  countsTowardGross: boolean;
+  notes: string | null;
+}
+
+export interface Expense {
+  id: string;
+  showId: string;
+  category: "production" | "sound" | "lights" | "hospitality" | "marketing" | "backline" | "security" | "other";
+  amount: number;
+  description: string | null;
+  approved: boolean;
+  absorbedByVenue: boolean;
+  enteredByUserId: string | null;
+  enteredAt: string;
+}
+
+export interface Settlement {
+  id: string;
+  showId: string;
+  status: SettlementStage;
+  draftedAt: string | null;
+  submittedAt: string | null;
+  reviewStartedAt: string | null;
+  signedAt: string | null;
+  disputedAt: string | null;
+  revisedAt: string | null;
+  finalizedAt: string | null;
+  paidAt: string | null;
+  completedAt: string | null;
+  completedByUserId: string | null;
+  grossBoxOffice: number | null;
+  netBoxOffice: number | null;
+  totalExpenses: number | null;
+  totalToArtist: number | null;
+  calculationJson: string | null;
+  recoupsJson: string | null;
+  signoffText: string | null;
+  notes: string | null;
+}
+
+export type Bonus =
+  | { type: "gross_threshold"; label: string; threshold: number; amount: number; stacks?: boolean }
+  | { type: "sellout"; label: string; amount: number }
+  | { type: "attendance_threshold"; label: string; threshold: number; amount: number }
+  | { type: "tier_ratchet"; label: string; tiers: { from: number; to: number | null; percentage: number }[] };
+
+export type Recoup = {
+  id: string;
+  category: "marketing" | "hospitality_overage" | "production_overage" | "prior_advance" | "damages" | "other";
+  label: string;
+  amount: number;
+  status: "agreed" | "disputed" | "withdrawn";
+};
+
+export interface ShowListRow {
+  show: Show;
+  artist: Artist | null;
+  agent: Agent | null;
+  deal: Deal | null;
+  settlement: Settlement | null;
+}
+
+export interface ShowDetail {
+  show: Show;
+  artist: Artist | null;
+  agent: Agent | null;
+  agency: Agency | null;
+  deal: Deal | null;
+  settlement: Settlement | null;
+  venue: Venue | null;
+  ticketSales: TicketSale[];
+  expenses: Expense[];
+  comps: Comp[];
+  recoups: Recoup[];
+}
+
+export interface ArtistRow {
+  artist: Artist;
+  agent: Agent | null;
+  agency: Agency | null;
+  showCount: number;
+  lastShowDate: string | null;
+}
+
+export interface Reports {
+  dealTypeCounts: Record<string, number>;
+  totalDeals: number;
+  inAppToolUsageRate: number;
+  settlementStatus: Record<string, number>;
+  totalSettlements: number;
+  disputedRate: number;
+  totalGross: number;
+  totalToArtists: number;
+  showCount: number;
+  settledCount: number;
+  dealsWithBonuses: number;
+  totalRecoupValue: number;
+  disputedRecoupValue: number;
+  settlementsWithRecoups: number;
+  totalCompTickets: number;
+  totalCompFaceValue: number;
+  compsByCategory: Record<string, number>;
+}
