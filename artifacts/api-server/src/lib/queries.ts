@@ -40,6 +40,7 @@ export function isDisputedSettlement(
 }
 
 export async function getAllShows() {
+  const today = todayDateString();
   const rows = await db
     .select({
       show: shows, artist: artists, agent: agents, deal: deals, settlement: settlements,
@@ -49,7 +50,6 @@ export async function getAllShows() {
     .leftJoin(agents, eq(artists.agentId, agents.id))
     .leftJoin(deals, eq(deals.showId, shows.id))
     .leftJoin(settlements, eq(settlements.showId, shows.id))
-    .where(lte(shows.date, todayDateString()))
     .orderBy(asc(shows.date));
 
   const allExpenses = await db.select().from(expenses);
@@ -71,6 +71,7 @@ export async function getAllShows() {
       ...r,
       isUnsupportedDeal: isUnsupportedDeal(r.deal),
       isDisputed: isDisputedSettlement(r.settlement),
+      tense: (r.show.date > today ? "upcoming" : "past") as "past" | "upcoming",
       switchStatus: switchStatusByShowId.get(r.show.id) ?? null,
       expenseCategories: Array.from(
         expenseCategoriesByShowId.get(r.show.id) ?? [],

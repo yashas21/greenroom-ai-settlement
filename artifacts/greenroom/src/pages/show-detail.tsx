@@ -496,8 +496,10 @@ function SmartSwitchPanel({
             Smart Switch
           </CardTitle>
           <CardDescription>
-            Convert this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal
-            into a structure the in-app settle wizard can close cleanly, using historical payouts from comparable shows.
+            {settlement
+              ? <>Convert this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal into a structure the in-app settle wizard can close cleanly, using historical payouts from comparable shows.</>
+              : <>This show hasn't happened yet. Use the suggestion as a <strong>negotiation lever</strong> the next time you're on the phone with the agent — historical payouts on comparable past <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deals at this venue, rounded into a clean flat or hybrid.</>
+            }
           </CardDescription>
         </div>
         {sug && (
@@ -510,9 +512,10 @@ function SmartSwitchPanel({
         {!sug && (
           <div className="flex items-center justify-between gap-4">
             <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
-              Generate a suggestion based on every comparable past deal at this venue.
-              Suggestions are advisory — accepting marks intent to use it on the next
-              renegotiation; declining records why this deal stays as-is.
+              {settlement
+                ? <>Generate a suggestion based on every comparable past deal at this venue. Hindsight will compare it to what the show actually paid.</>
+                : <>Generate a suggestion based on every comparable past deal at this venue. Accept to mark intent to push the agent toward this structure; decline to record why this deal stays as-is.</>
+              }
             </div>
             <Button variant="brand" onClick={generate} disabled={busy}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}

@@ -11,6 +11,7 @@ export default function ShowsPage() {
   if (state.status === "error") return <LoadingState label={`Error: ${state.error.message}`} />;
 
   const reversed = [...state.data].reverse();
+  const upcomingCount = reversed.filter((r) => r.tense === "upcoming").length;
   const settledCount = reversed.filter((r) => r.settlement).length;
   const totalToArtists = reversed.reduce(
     (sum, r) => sum + (r.settlement?.totalToArtist ?? 0), 0);
@@ -36,6 +37,7 @@ export default function ShowsPage() {
     month: formatShowMonth(r.show.date),
     isUnsupported: r.isUnsupportedDeal,
     isDisputed: r.isDisputed,
+    tense: r.tense,
     switchStatus: r.switchStatus ?? null,
     complexity: r.deal ? classifyComplexity(r.deal) : null,
     sizeBucket: r.deal ? classifySizeBucket(r.deal) : null,
@@ -63,13 +65,17 @@ export default function ShowsPage() {
           {disputedCount > 0 && (
             <>, <span className="text-rose-700">{disputedCount} disputed</span></>
           )}
+          {upcomingCount > 0 && (
+            <>, <span className="text-brand-700">{upcomingCount} upcoming</span></>
+          )}
           .
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-px bg-ink-200/40 rounded-xl overflow-hidden mb-14">
+      <div className="grid grid-cols-4 gap-px bg-ink-200/40 rounded-xl overflow-hidden mb-14">
         <StatCard label="Shows" value={String(reversed.length)} />
-        <StatCard label="Settled" value={String(settledCount)} accent />
+        <StatCard label="Upcoming" value={String(upcomingCount)} accent />
+        <StatCard label="Settled" value={String(settledCount)} />
         <StatCard label="Paid to artists" value={formatMoneyCompact(totalToArtists)} mono />
       </div>
 

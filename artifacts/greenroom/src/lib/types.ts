@@ -134,6 +134,8 @@ export type Recoup = {
   status: "agreed" | "disputed" | "withdrawn";
 };
 
+export type ShowTense = "past" | "upcoming";
+
 export interface ShowListRow {
   show: Show;
   artist: Artist | null;
@@ -142,6 +144,7 @@ export interface ShowListRow {
   settlement: Settlement | null;
   isUnsupportedDeal: boolean;
   isDisputed: boolean;
+  tense: ShowTense;
   switchStatus: SwitchStatus | null;
   expenseCategories: string[];
   recoupCategories: string[];

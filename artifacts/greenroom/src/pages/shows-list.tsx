@@ -5,6 +5,7 @@ import { DealTypeBadge, PlainBadge } from "@/components/ui/badge";
 
 type Status = "booked" | "advanced" | "day_of" | "settled" | "closed";
 type SwitchStatus = "suggested" | "accepted" | "declined";
+type Tense = "past" | "upcoming";
 
 export type ShowRow = {
   show: { id: string; status: Status };
@@ -16,6 +17,7 @@ export type ShowRow = {
   month: string;
   isUnsupported: boolean;
   isDisputed: boolean;
+  tense: Tense;
   switchStatus: SwitchStatus | null;
   complexity: "simple" | "medium" | "complex" | null;
   sizeBucket: string | null;
@@ -75,6 +77,7 @@ const RECOUP_CAT_LABELS: Record<string, string> = {
 };
 
 function getAccentColor(row: ShowRow): string {
+  if (row.tense === "upcoming") return "bg-brand-300";
   if (row.settlement) {
     const s = row.settlement.status;
     if (s === "paid" || s === "finalized" || s === "signed") return "bg-brand-500";
@@ -100,6 +103,7 @@ type Filters = {
   unsupportedOnly: boolean;
   disputedOnly: boolean;
   switchSuggestedOnly: boolean;
+  upcomingOnly: boolean;
   complexity: string | null;
   size: string | null;
   dealType: string | null;
@@ -113,6 +117,7 @@ const EMPTY_FILTERS: Filters = {
   unsupportedOnly: false,
   disputedOnly: false,
   switchSuggestedOnly: false,
+  upcomingOnly: false,
   complexity: null,
   size: null,
   dealType: null,
@@ -128,6 +133,7 @@ function parseFilters(search: string): Filters {
     unsupportedOnly: params.get("unsupported") === "1",
     disputedOnly: params.get("disputed") === "1",
     switchSuggestedOnly: params.get("switch") === "1",
+    upcomingOnly: params.get("upcoming") === "1",
     complexity: params.get("complexity"),
     size: params.get("size"),
     dealType: params.get("dealType"),
@@ -143,6 +149,7 @@ function buildQueryString(f: Filters): string {
   if (f.unsupportedOnly) params.set("unsupported", "1");
   if (f.disputedOnly) params.set("disputed", "1");
   if (f.switchSuggestedOnly) params.set("switch", "1");
+  if (f.upcomingOnly) params.set("upcoming", "1");
   if (f.complexity) params.set("complexity", f.complexity);
   if (f.size) params.set("size", f.size);
   if (f.dealType) params.set("dealType", f.dealType);
@@ -159,6 +166,7 @@ function isFilterActive(f: Filters): boolean {
     f.unsupportedOnly ||
     f.disputedOnly ||
     f.switchSuggestedOnly ||
+    f.upcomingOnly ||
     !!f.complexity ||
     !!f.size ||
     !!f.dealType ||
@@ -183,6 +191,11 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
 
   const unsupportedCount = useMemo(() => rows.filter((r) => r.isUnsupported).length, [rows]);
   const disputedCount = useMemo(() => rows.filter((r) => r.isDisputed).length, [rows]);
+  const upcomingCount = useMemo(() => rows.filter((r) => r.tense === "upcoming").length, [rows]);
+  const upcomingEligibleCount = useMemo(
+    () => rows.filter((r) => r.tense === "upcoming" && r.dealType && ["vs", "percentage_of_net", "door"].includes(r.dealType)).length,
+    [rows],
+  );
   const switchSuggestedCount = useMemo(
     () => rows.filter((r) => r.switchStatus === "suggested").length,
     [rows],
@@ -190,6 +203,7 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
 
   const filtered = useMemo(() => {
     let out = rows;
+    if (filters.upcomingOnly) out = out.filter((r) => r.tense === "upcoming");
     if (filters.unsupportedOnly) out = out.filter((r) => r.isUnsupported);
     if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
     if (filters.switchSuggestedOnly)
@@ -245,6 +259,13 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           />
         </div>
         <FilterToggle
+          active={filters.upcomingOnly}
+          onClick={() => update({ upcomingOnly: !filters.upcomingOnly })}
+          variant="brand"
+          label="Upcoming only"
+          count={upcomingCount}
+        />
+        <FilterToggle
           active={filters.unsupportedOnly}
           onClick={() => update({ unsupportedOnly: !filters.unsupportedOnly })}
           variant="amber"
@@ -265,6 +286,12 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           label="Smart Switch pending"
           count={switchSuggestedCount}
         />
+        {filters.upcomingOnly && upcomingEligibleCount > 0 && (
+          <span className="text-[11px] text-brand-700 bg-brand-50/50 px-2 py-1 rounded ring-1 ring-brand-200/60">
+            <Shield className="h-2.5 w-2.5 mr-1 inline-block" />
+            {upcomingEligibleCount} upcoming deal{upcomingEligibleCount === 1 ? "" : "s"} eligible for Smart Switch
+          </span>
+        )}
         {isFilterActive(filters) && (
           <button
             type="button"
@@ -408,6 +435,7 @@ function ShowListRow({ row }: { row: ShowRow }) {
           </div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {deal && <DealTypeBadge type={deal.dealType} />}
+            {row.tense === "upcoming" && <PlainBadge variant="brand">Upcoming</PlainBadge>}
             {row.isUnsupported && <PlainBadge variant="amber">Unsupported</PlainBadge>}
             {row.isDisputed && <PlainBadge variant="rose">Disputed</PlainBadge>}
             {row.switchStatus && <SwitchPill status={row.switchStatus} />}
