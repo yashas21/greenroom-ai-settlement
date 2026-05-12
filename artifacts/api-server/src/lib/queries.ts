@@ -117,8 +117,17 @@ export async function getShowById(id: string) {
   };
 }
 
+function firstSentence(text: string, maxLen = 90): string {
+  const t = text.trim();
+  if (!t) return "";
+  const m = t.match(/^[^.!?\n]+[.!?]?/);
+  const head = (m ? m[0] : t).trim();
+  if (head.length <= maxLen) return head;
+  return head.slice(0, maxLen - 1).trimEnd() + "…";
+}
+
 export async function getAllArtists() {
-  return db
+  const baseRows = await db
     .select({
       artist: artists, agent: agents, agency: agencies,
       showCount: sql<number>`count(${shows.id})`.as("show_count"),
@@ -130,6 +139,83 @@ export async function getAllArtists() {
     .leftJoin(shows, eq(shows.artistId, artists.id))
     .groupBy(artists.id, agents.id, agencies.id)
     .orderBy(desc(sql`count(${shows.id})`), asc(artists.name));
+
+  const dealRows = await db
+    .select({ artistId: shows.artistId, dealType: deals.dealType })
+    .from(deals)
+    .innerJoin(shows, eq(deals.showId, shows.id));
+
+  const settlementRows = await db
+    .select({
+      artistId: shows.artistId,
+      date: shows.date,
+      pos: settlements.positiveSummary,
+      neg: settlements.negativeSummary,
+    })
+    .from(settlements)
+    .innerJoin(shows, eq(settlements.showId, shows.id));
+
+  const attentionItems = await getNeedsAttention();
+  const showToArtist = new Map<string, string>();
+  const allShowsRows = await db.select({ id: shows.id, artistId: shows.artistId }).from(shows);
+  for (const s of allShowsRows) showToArtist.set(s.id, s.artistId);
+
+  const dealCounts = new Map<string, Map<string, number>>();
+  for (const d of dealRows) {
+    let m = dealCounts.get(d.artistId);
+    if (!m) { m = new Map(); dealCounts.set(d.artistId, m); }
+    m.set(d.dealType, (m.get(d.dealType) ?? 0) + 1);
+  }
+
+  type SumRow = { date: string; pos: string | null; neg: string | null };
+  const summariesByArtist = new Map<string, SumRow[]>();
+  for (const s of settlementRows) {
+    let arr = summariesByArtist.get(s.artistId);
+    if (!arr) { arr = []; summariesByArtist.set(s.artistId, arr); }
+    arr.push({ date: s.date, pos: s.pos, neg: s.neg });
+  }
+
+  const attentionByArtist = new Map<string, number>();
+  for (const a of attentionItems) {
+    const aid = showToArtist.get(a.showId);
+    if (!aid) continue;
+    attentionByArtist.set(aid, (attentionByArtist.get(aid) ?? 0) + 1);
+  }
+
+  return baseRows.map((row) => {
+    const aid = row.artist.id;
+    const dm = dealCounts.get(aid);
+    let topDealType: string | null = null;
+    let topDealTypeCount = 0;
+    if (dm) {
+      for (const [dt, n] of dm) {
+        if (n > topDealTypeCount) { topDealType = dt; topDealTypeCount = n; }
+      }
+    }
+    const dealTypes = dm
+      ? Array.from(dm.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([dt, count]) => ({ dealType: dt, count }))
+      : [];
+
+    const sums = (summariesByArtist.get(aid) ?? []).slice().sort((a, b) => b.date.localeCompare(a.date));
+    let topPositive: string | null = null;
+    let topNegative: string | null = null;
+    for (const s of sums) {
+      if (!topPositive && s.pos && s.pos.trim()) topPositive = firstSentence(s.pos);
+      if (!topNegative && s.neg && s.neg.trim()) topNegative = firstSentence(s.neg);
+      if (topPositive && topNegative) break;
+    }
+
+    return {
+      ...row,
+      topDealType,
+      dealTypes,
+      topPositive,
+      topNegative,
+      attentionCount: attentionByArtist.get(aid) ?? 0,
+    };
+  });
 }
 
 type ComplexityBucket = "simple" | "medium" | "complex";

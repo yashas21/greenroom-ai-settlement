@@ -207,6 +207,11 @@ export interface ArtistRow {
   agency: Agency | null;
   showCount: number;
   lastShowDate: string | null;
+  topDealType: string | null;
+  dealTypes: { dealType: string; count: number }[];
+  topPositive: string | null;
+  topNegative: string | null;
+  attentionCount: number;
 }
 
 export interface Reports {
