@@ -1,8 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { getShowById, parseRecoups } from "./queries";
 import { db } from "../db";
 import { agents, agencies, venues } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { llmGenerateText, llmIsConfigured, getLlmConfig } from "./llm";
 
 type SummaryShape = {
   reason: string;
@@ -11,14 +11,6 @@ type SummaryShape = {
   netToVenue: number | null;
   netToArtist: number | null;
 };
-
-const baseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
-const apiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
-
-const client: Anthropic | null =
-  baseUrl && apiKey
-    ? new Anthropic({ baseURL: baseUrl, apiKey })
-    : null;
 
 function buildSpreadsheetSection(detail: Awaited<ReturnType<typeof getShowById>>) {
   if (!detail) return null;
@@ -152,8 +144,8 @@ async function callLLM(
   spreadsheet: ReturnType<typeof buildSpreadsheetSection>,
   notes: { source: string; text: string }[],
 ): Promise<{ summary: SummaryShape | null; error?: string }> {
-  if (!client) {
-    return { summary: null, error: "anthropic_not_configured" };
+  if (!(await llmIsConfigured())) {
+    return { summary: null, error: "llm_not_configured" };
   }
 
   const prompt = `You are an analyst for a small live-music venue. Analyse one show's settlement.
@@ -184,13 +176,9 @@ ${notes.length === 0 ? "(none)" : notes.map((n) => `[${n.source}] ${n.text}`).jo
 `;
 
   try {
-    const resp = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8192,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const block = resp.content[0];
-    const text = block && block.type === "text" ? block.text : "";
+    const cfg = await getLlmConfig();
+    const heavyModel = cfg.provider === "anthropic" ? "claude-sonnet-4-6" : "gpt-4o";
+    const text = await llmGenerateText({ prompt, modelOverride: heavyModel });
     const cleaned = text.trim().replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
     const parsed = JSON.parse(cleaned) as SummaryShape;
     return { summary: parsed };

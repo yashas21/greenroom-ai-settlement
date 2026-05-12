@@ -1,4 +1,4 @@
-import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload } from "./types";
+import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, LlmStatus, SaveLlmSettingsInput } from "./types";
 
 const BASE = `${import.meta.env.BASE_URL}api`;
 
@@ -18,4 +18,17 @@ export const api = {
   needsAttention: () => get<AttentionItem[]>("/needs-attention"),
   insights: () => get<InsightsPayload>("/insights"),
   showExport: (id: string) => get<unknown>(`/shows/${encodeURIComponent(id)}/export`),
+  llmSettings: () => get<LlmStatus>("/settings/llm"),
+  saveLlmSettings: async (input: SaveLlmSettingsInput): Promise<LlmStatus> => {
+    const res = await fetch(`${BASE}/settings/llm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`API error ${res.status}: ${txt}`);
+    }
+    return res.json() as Promise<LlmStatus>;
+  },
 };

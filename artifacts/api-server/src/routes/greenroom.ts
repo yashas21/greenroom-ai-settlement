@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { getAllShows, getShowById, getAllArtists, getReports, getDealAnalysis, getNeedsAttention } from "../lib/queries";
 import { buildShowExport } from "../lib/showExport";
 import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insights";
+import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
 
 const router: IRouter = Router();
 
@@ -71,6 +72,25 @@ router.get("/insights", async (_req, res): Promise<void> => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "insights_failed" });
+  }
+});
+
+router.get("/settings/llm", async (_req, res): Promise<void> => {
+  try {
+    res.json(await getLlmStatus());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "llm_status_failed" });
+  }
+});
+
+router.post("/settings/llm", async (req, res): Promise<void> => {
+  try {
+    const body = (req.body ?? {}) as SaveLlmSettingsInput;
+    await saveLlmSettings(body);
+    clearInsightsCache();
+    res.json(await getLlmStatus());
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : "llm_save_failed" });
   }
 });
 

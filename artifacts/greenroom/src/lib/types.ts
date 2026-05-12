@@ -180,6 +180,31 @@ export interface AttentionItem {
   evidence?: string;
 }
 
+export type LlmProvider = "anthropic" | "openai";
+
+export interface LlmProviderStatus {
+  configured: boolean;
+  source: "settings" | "env" | "none";
+  model: string;
+}
+
+export interface LlmStatus {
+  activeProvider: LlmProvider;
+  activeModel: string;
+  source: "settings" | "env" | "none";
+  hasKey: boolean;
+  providers: Record<LlmProvider, LlmProviderStatus>;
+  models: Record<LlmProvider, string[]>;
+}
+
+export interface SaveLlmSettingsInput {
+  provider?: LlmProvider;
+  anthropicApiKey?: string | null;
+  anthropicModel?: string;
+  openaiApiKey?: string | null;
+  openaiModel?: string;
+}
+
 export interface InsightsCell {
   dealType: string;
   bucket: string;

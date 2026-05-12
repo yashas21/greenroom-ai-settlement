@@ -9,6 +9,7 @@ import ReportsPage from "@/pages/reports";
 import DealAnalysisPage from "@/pages/deal-analysis";
 import NeedsAttentionPage from "@/pages/needs-attention";
 import InsightsPage from "@/pages/insights";
+import SettingsPage from "@/pages/settings";
 import ContextPage from "@/pages/context";
 import NotFound from "@/pages/not-found";
 
@@ -24,6 +25,7 @@ function AppRoutes() {
       <Route path="/deal-analysis" component={DealAnalysisPage} />
       <Route path="/needs-attention" component={NeedsAttentionPage} />
       <Route path="/insights" component={InsightsPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route path="/context" component={ContextPage} />
       <Route component={NotFound} />
     </Switch>

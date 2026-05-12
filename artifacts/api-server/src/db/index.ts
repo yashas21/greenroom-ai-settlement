@@ -23,4 +23,7 @@ async function ensureColumn(table: string, column: string, decl: string) {
 export const migrationsReady = (async () => {
   await ensureColumn("settlements", "positive_summary", "TEXT");
   await ensureColumn("settlements", "negative_summary", "TEXT");
+  await client.execute(
+    "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
+  );
 })();

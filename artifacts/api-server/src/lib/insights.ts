@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { eq } from "drizzle-orm";
 import { db, migrationsReady } from "../db";
 import { settlements, deals, shows } from "../db/schema";
@@ -9,14 +8,7 @@ import {
   type AttentionKind,
 } from "./queries";
 import { logger } from "./logger";
-
-const baseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
-const apiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
-const client: Anthropic | null =
-  baseUrl && apiKey ? new Anthropic({ baseURL: baseUrl, apiKey }) : null;
-
-const SUMMARY_MODEL = "claude-haiku-4-5";
-const CLUSTER_MODEL = "claude-haiku-4-5";
+import { llmGenerateJson, llmIsConfigured } from "./llm";
 
 const SIZE_ORDER = ["$0–1K", "$1–5K", "$5–15K", "$15K+", "Uncapped %"];
 
@@ -26,17 +18,6 @@ const KIND_PRIORITY: AttentionKind[] = [
   "show_settled_no_settlement",
   "notes_say_closed_but_status_open",
 ];
-
-function extractJson(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced && fenced[1]) return fenced[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start !== -1 && end !== -1 && end > start) {
-    return text.slice(start, end + 1);
-  }
-  return text.trim();
-}
 
 type EnrichOutcome = {
   totalCandidates: number;
@@ -61,15 +42,9 @@ ${JSON.stringify(payload, null, 2)}
 }
 
 async function summarizeOne(payload: unknown): Promise<{ positive: string; negative: string } | null> {
-  if (!client) return null;
-  const resp = await client.messages.create({
-    model: SUMMARY_MODEL,
-    max_tokens: 8192,
-    messages: [{ role: "user", content: buildSummaryPrompt(payload) }],
+  const parsed = await llmGenerateJson<{ positive?: string; negative?: string }>({
+    prompt: buildSummaryPrompt(payload),
   });
-  const block = resp.content[0];
-  const text = block && block.type === "text" ? block.text : "";
-  const parsed = JSON.parse(extractJson(text)) as { positive?: string; negative?: string };
   return {
     positive: typeof parsed.positive === "string" ? parsed.positive : "",
     negative: typeof parsed.negative === "string" ? parsed.negative : "",
@@ -79,7 +54,7 @@ async function summarizeOne(payload: unknown): Promise<{ positive: string; negat
 export async function enrichSettlements(opts: { force?: boolean } = {}): Promise<EnrichOutcome> {
   await migrationsReady;
   const out: EnrichOutcome = { totalCandidates: 0, enriched: 0, skippedExisting: 0, failed: 0 };
-  if (!client) return out;
+  if (!(await llmIsConfigured())) return out;
 
   const allSettlements = await db.select().from(settlements);
   const allDeals = await db.select().from(deals);
@@ -182,7 +157,8 @@ async function clusterComplaints(
   kind: AttentionKind,
   summaries: string[],
 ): Promise<{ bubbles: ComplaintBubble[]; error: string | null }> {
-  if (!client || summaries.length === 0) return { bubbles: [], error: null };
+  if (summaries.length === 0) return { bubbles: [], error: null };
+  if (!(await llmIsConfigured())) return { bubbles: [], error: "llm_not_configured" };
   const prompt = `You are clustering complaint themes from settlement summaries.
 
 Context: these are ${summaries.length} negative-experience summaries from past deals in cell "${cellLabel}" that were flagged "${kind}".
@@ -197,14 +173,7 @@ INPUT SUMMARIES:
 ${summaries.map((s, i) => `[${i + 1}] ${s}`).join("\n")}
 `;
   try {
-    const resp = await client.messages.create({
-      model: CLUSTER_MODEL,
-      max_tokens: 8192,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const block = resp.content[0];
-    const text = block && block.type === "text" ? block.text : "";
-    const parsed = JSON.parse(extractJson(text)) as { bubbles?: ComplaintBubble[] };
+    const parsed = await llmGenerateJson<{ bubbles?: ComplaintBubble[] }>({ prompt });
     const bubbles = (parsed.bubbles ?? [])
       .filter((b): b is ComplaintBubble => !!b && typeof b.theme === "string" && typeof b.count === "number")
       .slice(0, 5);
