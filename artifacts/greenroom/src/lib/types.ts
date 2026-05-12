@@ -142,9 +142,33 @@ export interface ShowListRow {
   settlement: Settlement | null;
   isUnsupportedDeal: boolean;
   isDisputed: boolean;
+  switchStatus: SwitchStatus | null;
   expenseCategories: string[];
   recoupCategories: string[];
   disputedRecoupCategories: string[];
+}
+
+export type SwitchStatus = "suggested" | "accepted" | "declined";
+export type ConfidenceTier = "A" | "B" | "C" | "D";
+
+export interface SwitchSuggestion {
+  id: string;
+  showId: string;
+  dealId: string;
+  suggestedAt: string;
+  dealTypeFrom: DealType;
+  shape: "flat" | "door_hybrid";
+  suggestedFlat: number | null;
+  doorFloor: number | null;
+  doorSplitPct: number | null;
+  doorExpenseCap: number | null;
+  confidenceTier: ConfidenceTier;
+  bandLow: number | null;
+  bandHigh: number | null;
+  sampleSize: number;
+  basis: string;
+  status: SwitchStatus;
+  decidedAt: string | null;
 }
 
 export interface ShowDetail {
@@ -159,6 +183,7 @@ export interface ShowDetail {
   expenses: Expense[];
   comps: Comp[];
   recoups: Recoup[];
+  switchSuggestion: SwitchSuggestion | null;
   isUnsupportedDeal: boolean;
   isDisputed: boolean;
 }

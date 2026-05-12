@@ -1,7 +1,7 @@
 import { db } from "../db";
 import {
   shows, artists, agents, agencies, deals, ticketSales, comps, expenses,
-  settlements, venues, type Recoup,
+  settlements, venues, switchSuggestions, type Recoup,
 } from "../db/schema";
 import { desc, asc, eq, sql, lte } from "drizzle-orm";
 
@@ -61,12 +61,17 @@ export async function getAllShows() {
     expenseCategoriesByShowId.get(e.showId)!.add(e.category);
   }
 
+  const allSuggestions = await db.select().from(switchSuggestions);
+  const switchStatusByShowId = new Map<string, "suggested" | "accepted" | "declined">();
+  for (const s of allSuggestions) switchStatusByShowId.set(s.showId, s.status);
+
   return rows.map((r) => {
     const recoups = parseRecoups(r.settlement?.recoupsJson ?? null);
     return {
       ...r,
       isUnsupportedDeal: isUnsupportedDeal(r.deal),
       isDisputed: isDisputedSettlement(r.settlement),
+      switchStatus: switchStatusByShowId.get(r.show.id) ?? null,
       expenseCategories: Array.from(
         expenseCategoriesByShowId.get(r.show.id) ?? [],
       ),
@@ -106,12 +111,19 @@ export async function getShowById(id: string) {
 
   const recoups = parseRecoups(row.settlement?.recoupsJson ?? null);
 
+  const suggestionRows = await db
+    .select()
+    .from(switchSuggestions)
+    .where(eq(switchSuggestions.showId, id));
+  const switchSuggestion = suggestionRows[0] ?? null;
+
   return {
     ...row,
     ticketSales: showTicketSales,
     expenses: showExpenses,
     comps: showComps,
     recoups,
+    switchSuggestion,
     isUnsupportedDeal: isUnsupportedDeal(row.deal),
     isDisputed: isDisputedSettlement(row.settlement),
   };

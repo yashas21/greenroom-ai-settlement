@@ -1,9 +1,10 @@
 import { useMemo, useCallback } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { ArrowUpRight, Search, Calendar, X } from "lucide-react";
+import { ArrowUpRight, Search, Calendar, X, Shield } from "lucide-react";
 import { DealTypeBadge, PlainBadge } from "@/components/ui/badge";
 
 type Status = "booked" | "advanced" | "day_of" | "settled" | "closed";
+type SwitchStatus = "suggested" | "accepted" | "declined";
 
 export type ShowRow = {
   show: { id: string; status: Status };
@@ -15,6 +16,7 @@ export type ShowRow = {
   month: string;
   isUnsupported: boolean;
   isDisputed: boolean;
+  switchStatus: SwitchStatus | null;
   complexity: "simple" | "medium" | "complex" | null;
   sizeBucket: string | null;
   dealType: string | null;
@@ -97,6 +99,7 @@ type Filters = {
   query: string;
   unsupportedOnly: boolean;
   disputedOnly: boolean;
+  switchSuggestedOnly: boolean;
   complexity: string | null;
   size: string | null;
   dealType: string | null;
@@ -109,6 +112,7 @@ const EMPTY_FILTERS: Filters = {
   query: "",
   unsupportedOnly: false,
   disputedOnly: false,
+  switchSuggestedOnly: false,
   complexity: null,
   size: null,
   dealType: null,
@@ -123,6 +127,7 @@ function parseFilters(search: string): Filters {
     query: params.get("q") ?? "",
     unsupportedOnly: params.get("unsupported") === "1",
     disputedOnly: params.get("disputed") === "1",
+    switchSuggestedOnly: params.get("switch") === "1",
     complexity: params.get("complexity"),
     size: params.get("size"),
     dealType: params.get("dealType"),
@@ -137,6 +142,7 @@ function buildQueryString(f: Filters): string {
   if (f.query.trim()) params.set("q", f.query.trim());
   if (f.unsupportedOnly) params.set("unsupported", "1");
   if (f.disputedOnly) params.set("disputed", "1");
+  if (f.switchSuggestedOnly) params.set("switch", "1");
   if (f.complexity) params.set("complexity", f.complexity);
   if (f.size) params.set("size", f.size);
   if (f.dealType) params.set("dealType", f.dealType);
@@ -152,6 +158,7 @@ function isFilterActive(f: Filters): boolean {
     !!f.query ||
     f.unsupportedOnly ||
     f.disputedOnly ||
+    f.switchSuggestedOnly ||
     !!f.complexity ||
     !!f.size ||
     !!f.dealType ||
@@ -176,11 +183,17 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
 
   const unsupportedCount = useMemo(() => rows.filter((r) => r.isUnsupported).length, [rows]);
   const disputedCount = useMemo(() => rows.filter((r) => r.isDisputed).length, [rows]);
+  const switchSuggestedCount = useMemo(
+    () => rows.filter((r) => r.switchStatus === "suggested").length,
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     let out = rows;
     if (filters.unsupportedOnly) out = out.filter((r) => r.isUnsupported);
     if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
+    if (filters.switchSuggestedOnly)
+      out = out.filter((r) => r.switchStatus === "suggested");
     if (filters.complexity) out = out.filter((r) => r.complexity === filters.complexity);
     if (filters.size) out = out.filter((r) => r.sizeBucket === filters.size);
     if (filters.dealType) out = out.filter((r) => r.dealType === filters.dealType);
@@ -244,6 +257,13 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           variant="rose"
           label="Disputed only"
           count={disputedCount}
+        />
+        <FilterToggle
+          active={filters.switchSuggestedOnly}
+          onClick={() => update({ switchSuggestedOnly: !filters.switchSuggestedOnly })}
+          variant="brand"
+          label="Smart Switch pending"
+          count={switchSuggestedCount}
         />
         {isFilterActive(filters) && (
           <button
@@ -390,6 +410,7 @@ function ShowListRow({ row }: { row: ShowRow }) {
             {deal && <DealTypeBadge type={deal.dealType} />}
             {row.isUnsupported && <PlainBadge variant="amber">Unsupported</PlainBadge>}
             {row.isDisputed && <PlainBadge variant="rose">Disputed</PlainBadge>}
+            {row.switchStatus && <SwitchPill status={row.switchStatus} />}
             {deal?.guaranteeFormatted && (
               <span className="font-mono tabular text-[11px] text-ink-500">
                 {deal.guaranteeFormatted}
@@ -422,12 +443,27 @@ function ShowListRow({ row }: { row: ShowRow }) {
   );
 }
 
+function SwitchPill({ status }: { status: SwitchStatus }) {
+  const map = {
+    suggested: { variant: "amber" as const, label: "Switch pending" },
+    accepted: { variant: "brand" as const, label: "Switch accepted" },
+    declined: { variant: "default" as const, label: "Switch declined" },
+  };
+  const v = map[status];
+  return (
+    <PlainBadge variant={v.variant}>
+      <Shield className="h-2.5 w-2.5 mr-1 inline-block" />
+      {v.label}
+    </PlainBadge>
+  );
+}
+
 function FilterToggle({
   active, onClick, variant, label, count,
 }: {
   active: boolean;
   onClick: () => void;
-  variant: "amber" | "rose";
+  variant: "amber" | "rose" | "brand";
   label: string;
   count: number;
 }) {
@@ -437,10 +473,16 @@ function FilterToggle({
         off: "bg-white text-ink-600 ring-ink-200/60 hover:bg-amber-50/50 hover:text-amber-800",
         dot: "bg-amber-600",
       }
-    : {
+    : variant === "rose"
+    ? {
         on: "bg-rose-50 text-rose-800 ring-rose-300 hover:bg-rose-100/80",
         off: "bg-white text-ink-600 ring-ink-200/60 hover:bg-rose-50/50 hover:text-rose-800",
         dot: "bg-rose-600",
+      }
+    : {
+        on: "bg-brand-50 text-brand-800 ring-brand-300 hover:bg-brand-100/80",
+        off: "bg-white text-ink-600 ring-ink-200/60 hover:bg-brand-50/50 hover:text-brand-800",
+        dot: "bg-brand-600",
       };
   return (
     <button

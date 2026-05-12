@@ -1,4 +1,4 @@
-import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, LlmStatus, SaveLlmSettingsInput } from "./types";
+import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, LlmStatus, SaveLlmSettingsInput, SwitchSuggestion } from "./types";
 
 const BASE = `${import.meta.env.BASE_URL}api`;
 
@@ -30,5 +30,23 @@ export const api = {
       throw new Error(`API error ${res.status}: ${txt}`);
     }
     return res.json() as Promise<LlmStatus>;
+  },
+  generateSwitch: async (id: string): Promise<SwitchSuggestion> => {
+    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/switch/generate`, { method: "POST" });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(j.error ?? `API error ${res.status}`);
+    }
+    return res.json() as Promise<SwitchSuggestion>;
+  },
+  acceptSwitch: async (id: string): Promise<SwitchSuggestion> => {
+    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/switch/accept`, { method: "POST" });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json() as Promise<SwitchSuggestion>;
+  },
+  declineSwitch: async (id: string): Promise<SwitchSuggestion> => {
+    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/switch/decline`, { method: "POST" });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json() as Promise<SwitchSuggestion>;
   },
 };

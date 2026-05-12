@@ -36,6 +36,7 @@ export default function ShowsPage() {
     month: formatShowMonth(r.show.date),
     isUnsupported: r.isUnsupportedDeal,
     isDisputed: r.isDisputed,
+    switchStatus: r.switchStatus ?? null,
     complexity: r.deal ? classifyComplexity(r.deal) : null,
     sizeBucket: r.deal ? classifySizeBucket(r.deal) : null,
     dealType: r.deal?.dealType ?? null,

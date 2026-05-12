@@ -3,6 +3,7 @@ import { getAllShows, getShowById, getAllArtists, getReports, getDealAnalysis, g
 import { buildShowExport } from "../lib/showExport";
 import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insights";
 import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
+import { generateAndPersist, decideSuggestion } from "../lib/smartSwitch";
 
 const router: IRouter = Router();
 
@@ -72,6 +73,42 @@ router.get("/insights", async (_req, res): Promise<void> => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "insights_failed" });
+  }
+});
+
+router.post("/shows/:id/switch/generate", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try {
+    const out = await generateAndPersist(raw);
+    if (!out.suggestion) {
+      res.status(409).json({ error: out.reason ?? "could_not_generate" });
+      return;
+    }
+    res.json(out.suggestion);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "generate_failed" });
+  }
+});
+
+router.post("/shows/:id/switch/accept", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try {
+    const out = await decideSuggestion(raw, "accepted");
+    if (!out) { res.status(404).json({ error: "no_suggestion" }); return; }
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "accept_failed" });
+  }
+});
+
+router.post("/shows/:id/switch/decline", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try {
+    const out = await decideSuggestion(raw, "declined");
+    if (!out) { res.status(404).json({ error: "no_suggestion" }); return; }
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "decline_failed" });
   }
 });
 

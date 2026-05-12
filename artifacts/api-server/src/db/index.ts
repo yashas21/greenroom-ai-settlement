@@ -26,4 +26,25 @@ export const migrationsReady = (async () => {
   await client.execute(
     "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
   );
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS switch_suggestions (
+      id TEXT PRIMARY KEY,
+      show_id TEXT NOT NULL UNIQUE REFERENCES shows(id),
+      deal_id TEXT NOT NULL REFERENCES deals(id),
+      suggested_at INTEGER NOT NULL,
+      deal_type_from TEXT NOT NULL,
+      shape TEXT NOT NULL,
+      suggested_flat REAL,
+      door_floor REAL,
+      door_split_pct REAL,
+      door_expense_cap REAL,
+      confidence_tier TEXT NOT NULL,
+      band_low REAL,
+      band_high REAL,
+      sample_size INTEGER NOT NULL,
+      basis TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'suggested',
+      decided_at INTEGER
+    )
+  `);
 })();

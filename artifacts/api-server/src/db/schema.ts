@@ -144,6 +144,29 @@ export const settlements = sqliteTable("settlements", {
   negativeSummary: text("negative_summary"),
 });
 
+export const switchSuggestions = sqliteTable("switch_suggestions", {
+  id: text("id").primaryKey(),
+  showId: text("show_id").notNull().unique().references(() => shows.id),
+  dealId: text("deal_id").notNull().references(() => deals.id),
+  suggestedAt: integer("suggested_at", { mode: "timestamp" }).notNull(),
+  dealTypeFrom: text("deal_type_from", {
+    enum: ["flat", "percentage_of_gross", "percentage_of_net", "vs", "door"],
+  }).notNull(),
+  shape: text("shape", { enum: ["flat", "door_hybrid"] }).notNull(),
+  suggestedFlat: real("suggested_flat"),
+  doorFloor: real("door_floor"),
+  doorSplitPct: real("door_split_pct"),
+  doorExpenseCap: real("door_expense_cap"),
+  confidenceTier: text("confidence_tier", { enum: ["A", "B", "C", "D"] }).notNull(),
+  bandLow: real("band_low"),
+  bandHigh: real("band_high"),
+  sampleSize: integer("sample_size").notNull(),
+  basis: text("basis").notNull(),
+  status: text("status", { enum: ["suggested", "accepted", "declined"] })
+    .notNull().default("suggested"),
+  decidedAt: integer("decided_at", { mode: "timestamp" }),
+});
+
 export type User = typeof users.$inferSelect;
 export type Venue = typeof venues.$inferSelect;
 export type Agency = typeof agencies.$inferSelect;

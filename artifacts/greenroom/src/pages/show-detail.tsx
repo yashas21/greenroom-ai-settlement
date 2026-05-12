@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "wouter";
 import {
   ArrowLeft, FileSpreadsheet, AlertCircle, Clock, TrendingUp, FileJson, Loader2,
+  Shield, Check, X, Sparkles,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -13,7 +14,7 @@ import { parseBonuses } from "@/lib/dealMath";
 import {
   formatMoney, formatMoneyCompact, formatShowDateFull, relativeShowDate,
 } from "@/lib/format";
-import type { Bonus } from "@/lib/types";
+import type { Bonus, SwitchSuggestion, Deal, Settlement } from "@/lib/types";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
 import NotFound from "./not-found";
 
@@ -177,6 +178,15 @@ export default function ShowDetailPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-2">
+          {deal && (deal.dealType === "vs" || deal.dealType === "percentage_of_net" || deal.dealType === "door") && (
+            <SmartSwitchPanel
+              showId={show.id}
+              deal={deal}
+              settlement={settlement}
+              initial={data.switchSuggestion}
+            />
+          )}
+
           <Card className="md:col-span-2">
             <CardHeader>
               <div>
@@ -437,6 +447,180 @@ function MiniStat({
         {value}
       </div>
     </div>
+  );
+}
+
+const TIER_LABEL: Record<"A" | "B" | "C" | "D", string> = {
+  A: "High confidence",
+  B: "Solid",
+  C: "Directional",
+  D: "Thin sample",
+};
+
+const TIER_COLOR: Record<"A" | "B" | "C" | "D", string> = {
+  A: "bg-emerald-50 text-emerald-800 ring-emerald-200/60",
+  B: "bg-brand-50 text-brand-800 ring-brand-200/60",
+  C: "bg-amber-50 text-amber-800 ring-amber-200/60",
+  D: "bg-ink-100 text-ink-600 ring-ink-200/60",
+};
+
+function SmartSwitchPanel({
+  showId, deal, settlement, initial,
+}: {
+  showId: string;
+  deal: Deal;
+  settlement: Settlement | null;
+  initial: SwitchSuggestion | null;
+}) {
+  const [sug, setSug] = useState<SwitchSuggestion | null>(initial);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function call(fn: () => Promise<SwitchSuggestion>) {
+    setBusy(true); setErr(null);
+    try { setSug(await fn()); }
+    catch (e) { setErr(e instanceof Error ? e.message : "failed"); }
+    finally { setBusy(false); }
+  }
+
+  const generate = () => call(() => api.generateSwitch(showId));
+  const accept = () => call(() => api.acceptSwitch(showId));
+  const decline = () => call(() => api.declineSwitch(showId));
+
+  return (
+    <Card className="md:col-span-3 ring-1 ring-brand-200/60 bg-gradient-to-br from-brand-50/30 to-canvas">
+      <CardHeader>
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-brand-700" />
+            Smart Switch
+          </CardTitle>
+          <CardDescription>
+            Convert this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal
+            into a structure the in-app settle wizard can close cleanly, using historical payouts from comparable shows.
+          </CardDescription>
+        </div>
+        {sug && (
+          <PlainBadge variant={sug.status === "accepted" ? "brand" : sug.status === "declined" ? "default" : "amber"}>
+            {sug.status === "suggested" ? "Pending" : sug.status === "accepted" ? "Accepted" : "Declined"}
+          </PlainBadge>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!sug && (
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
+              Generate a suggestion based on every comparable past deal at this venue.
+              Suggestions are advisory — accepting marks intent to use it on the next
+              renegotiation; declining records why this deal stays as-is.
+            </div>
+            <Button variant="brand" onClick={generate} disabled={busy}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {busy ? "Computing…" : "Generate suggestion"}
+            </Button>
+          </div>
+        )}
+
+        {sug && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2 space-y-3">
+                {sug.shape === "flat" && sug.suggestedFlat != null && (
+                  <div>
+                    <div className="eyebrow text-[10px] text-ink-500 mb-1.5">Suggested structure</div>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-[40px] font-mono tabular font-semibold text-ink-900 leading-none">
+                        {formatMoney(sug.suggestedFlat)}
+                      </span>
+                      <span className="text-[13px] text-ink-500">flat guarantee</span>
+                    </div>
+                    {sug.bandLow != null && sug.bandHigh != null && (
+                      <div className="text-[12px] text-ink-500 mt-2">
+                        Historical band <span className="font-mono tabular">{formatMoney(sug.bandLow)}</span> – <span className="font-mono tabular">{formatMoney(sug.bandHigh)}</span> (P10–P90)
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {sug.shape === "door_hybrid" && (
+                  <div>
+                    <div className="eyebrow text-[10px] text-ink-500 mb-1.5">Suggested structure</div>
+                    <div className="text-[20px] font-display font-medium text-ink-900 leading-tight">
+                      <span className="font-mono tabular">{formatMoney(sug.doorFloor ?? 0)}</span> floor
+                      {" + "}
+                      <span className="font-mono tabular">{Math.round((sug.doorSplitPct ?? 0) * 100)}%</span> of pool above
+                      {" "}
+                      <span className="font-mono tabular">{formatMoney(sug.doorExpenseCap ?? 0)}</span> expense cap
+                    </div>
+                    {sug.bandHigh != null && (
+                      <div className="text-[12px] text-ink-500 mt-2">
+                        Projected artist payout <span className="font-mono tabular">~{formatMoney(sug.bandLow ?? 0)}</span> – <span className="font-mono tabular">{formatMoney(sug.bandHigh)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="text-[13px] text-ink-700 leading-relaxed pt-3 border-t border-ink-200/40">
+                  {sug.basis}
+                </div>
+
+                {settlement?.totalToArtist != null && sug.suggestedFlat != null && (
+                  <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-3 mt-2">
+                    <div className="eyebrow text-[10px] text-ink-500 mb-1">Hindsight (this show actually settled)</div>
+                    <div className="text-[12.5px] text-ink-700 leading-relaxed">
+                      Suggested flat <span className="font-mono tabular font-medium">{formatMoney(sug.suggestedFlat)}</span> vs actual payout <span className="font-mono tabular font-medium">{formatMoney(settlement.totalToArtist)}</span>
+                      {" — "}
+                      {(() => {
+                        const delta = sug.suggestedFlat - settlement.totalToArtist;
+                        const sign = delta >= 0 ? "+" : "−";
+                        return (
+                          <span className={delta >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                            {sign}{formatMoney(Math.abs(delta))} {delta >= 0 ? "venue would have paid more" : "venue would have saved"}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="eyebrow text-[10px] text-ink-500 mb-2">Confidence</div>
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ring-1 text-[12px] font-medium ${TIER_COLOR[sug.confidenceTier]}`}>
+                    <span className="font-mono tabular text-[14px] font-bold">{sug.confidenceTier}</span>
+                    <span>{TIER_LABEL[sug.confidenceTier]}</span>
+                  </div>
+                  <div className="text-[11px] text-ink-500 mt-2">
+                    Based on <span className="font-mono tabular">{sug.sampleSize}</span> comparable past deal{sug.sampleSize === 1 ? "" : "s"}.
+                  </div>
+                </div>
+
+                {sug.status === "suggested" && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-ink-200/40">
+                    <Button variant="brand" onClick={accept} disabled={busy}>
+                      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Accept suggestion
+                    </Button>
+                    <Button variant="ghost" onClick={decline} disabled={busy}>
+                      <X className="h-3.5 w-3.5" />
+                      Decline — keep as-is
+                    </Button>
+                  </div>
+                )}
+                {sug.status !== "suggested" && sug.decidedAt && (
+                  <div className="text-[11px] text-ink-500 pt-2 border-t border-ink-200/40">
+                    {sug.status === "accepted" ? "Accepted" : "Declined"} {new Date(sug.decidedAt).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {err && <div className="text-[12px] text-rose-600">{err}</div>}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
