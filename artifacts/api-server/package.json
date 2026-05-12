@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.2",
     "@libsql/client": "^0.17.3",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",

@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Link, useParams } from "wouter";
 import {
-  ArrowLeft, FileSpreadsheet, AlertCircle, Clock, TrendingUp,
+  ArrowLeft, FileSpreadsheet, AlertCircle, Clock, TrendingUp, FileJson, Loader2,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -25,6 +26,45 @@ const COMP_LABELS: Record<string, string> = {
   promo: "Promo / radio",
   other: "Other",
 };
+
+function ExportJsonButton({ showId, artistName, date }: { showId: string; artistName: string; date: string }) {
+  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleClick() {
+    setState("loading");
+    setErr(null);
+    try {
+      const data = await api.showExport(showId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = artistName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      a.href = url;
+      a.download = `greenroom-${date}-${safeName}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setState("idle");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to generate JSON");
+      setState("error");
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button variant="ghost" size="sm" onClick={handleClick} disabled={state === "loading"}>
+        {state === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 w-3.5" />}
+        {state === "loading" ? "Generating…" : "Generate JSON"}
+      </Button>
+      {state === "error" && err && (
+        <span className="text-[11px] text-rose-600">{err}</span>
+      )}
+    </div>
+  );
+}
 
 export default function ShowDetailPage() {
   const params = useParams<{ id: string }>();
@@ -100,12 +140,15 @@ export default function ShowDetailPage() {
               </span>
             </div>
           </div>
-          <Link href={`/shows/${show.id}/settle`} className="mt-6 shrink-0">
-            <Button variant="brand" size="lg">
-              <FileSpreadsheet className="h-4 w-4" />
-              {settlement ? "View settlement" : "Settle show"}
-            </Button>
-          </Link>
+          <div className="mt-6 shrink-0 flex flex-col items-end gap-2">
+            <Link href={`/shows/${show.id}/settle`}>
+              <Button variant="brand" size="lg">
+                <FileSpreadsheet className="h-4 w-4" />
+                {settlement ? "View settlement" : "Settle show"}
+              </Button>
+            </Link>
+            <ExportJsonButton showId={show.id} artistName={artist?.name ?? "show"} date={show.date} />
+          </div>
         </div>
 
         <div className="flex items-baseline gap-10 mt-8 pt-5 border-t border-ink-200/40">

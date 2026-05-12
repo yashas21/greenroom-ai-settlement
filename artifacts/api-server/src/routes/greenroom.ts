@@ -1,7 +1,22 @@
 import { Router, type IRouter } from "express";
 import { getAllShows, getShowById, getAllArtists, getReports, getDealAnalysis } from "../lib/queries";
+import { buildShowExport } from "../lib/showExport";
 
 const router: IRouter = Router();
+
+router.get("/shows/:id/export", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try {
+    const data = await buildShowExport(raw);
+    if (!data) {
+      res.status(404).json({ error: "Show not found" });
+      return;
+    }
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "export_failed" });
+  }
+});
 
 router.get("/shows", async (_req, res): Promise<void> => {
   const rows = await getAllShows();

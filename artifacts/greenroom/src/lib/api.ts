@@ -15,4 +15,5 @@ export const api = {
   artists: () => get<ArtistRow[]>("/artists"),
   reports: () => get<Reports>("/reports"),
   dealAnalysis: () => get<DealAnalysis>("/deal-analysis"),
+  showExport: (id: string) => get<unknown>(`/shows/${encodeURIComponent(id)}/export`),
 };
