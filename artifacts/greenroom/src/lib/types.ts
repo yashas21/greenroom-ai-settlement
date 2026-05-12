@@ -140,6 +140,8 @@ export interface ShowListRow {
   agent: Agent | null;
   deal: Deal | null;
   settlement: Settlement | null;
+  isUnsupportedDeal: boolean;
+  isDisputed: boolean;
 }
 
 export interface ShowDetail {
@@ -154,6 +156,8 @@ export interface ShowDetail {
   expenses: Expense[];
   comps: Comp[];
   recoups: Recoup[];
+  isUnsupportedDeal: boolean;
+  isDisputed: boolean;
 }
 
 export interface ArtistRow {

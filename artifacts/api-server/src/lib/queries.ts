@@ -11,8 +11,36 @@ function todayDateString(): string {
   return d.toISOString().slice(0, 10);
 }
 
+const UNSUPPORTED_DEAL_TYPES = new Set(["percentage_of_net", "vs", "door"]);
+
+export function parseRecoups(recoupsJson: string | null): Recoup[] {
+  if (!recoupsJson) return [];
+  try {
+    const parsed = JSON.parse(recoupsJson);
+    return Array.isArray(parsed) ? (parsed as Recoup[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isUnsupportedDeal(
+  deal: typeof deals.$inferSelect | null,
+): boolean {
+  return !!deal && UNSUPPORTED_DEAL_TYPES.has(deal.dealType);
+}
+
+export function isDisputedSettlement(
+  settlement: typeof settlements.$inferSelect | null,
+): boolean {
+  if (!settlement) return false;
+  if (settlement.status === "disputed") return true;
+  return parseRecoups(settlement.recoupsJson).some(
+    (r) => r?.status === "disputed",
+  );
+}
+
 export async function getAllShows() {
-  return db
+  const rows = await db
     .select({
       show: shows, artist: artists, agent: agents, deal: deals, settlement: settlements,
     })
@@ -23,6 +51,12 @@ export async function getAllShows() {
     .leftJoin(settlements, eq(settlements.showId, shows.id))
     .where(lte(shows.date, todayDateString()))
     .orderBy(asc(shows.date));
+
+  return rows.map((r) => ({
+    ...r,
+    isUnsupportedDeal: isUnsupportedDeal(r.deal),
+    isDisputed: isDisputedSettlement(r.settlement),
+  }));
 }
 
 export async function getShowById(id: string) {
@@ -51,13 +85,7 @@ export async function getShowById(id: string) {
     db.select().from(comps).where(eq(comps.showId, id)),
   ]);
 
-  let recoups: Recoup[] = [];
-  if (row.settlement?.recoupsJson) {
-    try {
-      const parsed = JSON.parse(row.settlement.recoupsJson);
-      if (Array.isArray(parsed)) recoups = parsed;
-    } catch {}
-  }
+  const recoups = parseRecoups(row.settlement?.recoupsJson ?? null);
 
   return {
     ...row,
@@ -65,6 +93,8 @@ export async function getShowById(id: string) {
     expenses: showExpenses,
     comps: showComps,
     recoups,
+    isUnsupportedDeal: isUnsupportedDeal(row.deal),
+    isDisputed: isDisputedSettlement(row.settlement),
   };
 }
 
@@ -161,17 +191,6 @@ export async function getDealAnalysis() {
     sizeAcc[k] = { count: 0, grossSum: 0, grossN: 0, artistSum: 0, artistN: 0, disputed: 0, settledN: 0 };
   }
 
-  function settlementIsDisputed(s: typeof settlements.$inferSelect): boolean {
-    if (s.status === "disputed") return true;
-    if (!s.recoupsJson) return false;
-    try {
-      const parsed = JSON.parse(s.recoupsJson) as Recoup[];
-      return Array.isArray(parsed) && parsed.some((r) => r?.status === "disputed");
-    } catch {
-      return false;
-    }
-  }
-
   for (const d of pastDeals) {
     const c = classifyComplexity(d);
     const s = settlementByShowId.get(d.showId);
@@ -187,7 +206,7 @@ export async function getDealAnalysis() {
     sizeAcc[bucket].count++;
     if (s) {
       sizeAcc[bucket].settledN++;
-      if (settlementIsDisputed(s)) sizeAcc[bucket].disputed++;
+      if (isDisputedSettlement(s)) sizeAcc[bucket].disputed++;
       if (s.grossBoxOffice != null) {
         sizeAcc[bucket].grossSum += s.grossBoxOffice;
         sizeAcc[bucket].grossN++;

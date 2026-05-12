@@ -57,10 +57,8 @@ export default function ShowDetailPage() {
 
   const bonuses = deal ? parseBonuses(deal) : [];
 
-  const unsupportedTypes = new Set(["percentage_of_net", "vs", "door"]);
-  const isUnsupported = !!deal && unsupportedTypes.has(deal.dealType);
-  const recoupDisputed = data.recoups.some((r) => r.status === "disputed");
-  const isDisputed = settlement?.status === "disputed" || recoupDisputed;
+  const isUnsupported = data.isUnsupportedDeal;
+  const isDisputed = data.isDisputed;
 
   return (
     <div className="max-w-7xl">
