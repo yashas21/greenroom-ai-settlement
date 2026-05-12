@@ -246,7 +246,6 @@ export async function getDealAnalysis() {
   const expensesByCategory: Record<string, number> = {};
   let totalExpenses = 0;
   for (const e of pastExpenses) {
-    if (e.absorbedByVenue) continue;
     expensesByCategory[e.category] = (expensesByCategory[e.category] ?? 0) + e.amount;
     totalExpenses += e.amount;
   }
@@ -274,7 +273,6 @@ export async function getDealAnalysis() {
   const dealTypeByShowId = new Map(pastDeals.map((d) => [d.showId, d.dealType]));
   const expensesByShowId: Map<string, number> = new Map();
   for (const e of pastExpenses) {
-    if (e.absorbedByVenue) continue;
     expensesByShowId.set(e.showId, (expensesByShowId.get(e.showId) ?? 0) + e.amount);
   }
 
