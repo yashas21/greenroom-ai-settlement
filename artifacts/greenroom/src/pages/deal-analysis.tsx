@@ -102,9 +102,77 @@ export default function DealAnalysisPage() {
 
       <ComplexitySection data={d} />
       <SizeSection data={d} />
+      <ProfitabilitySection data={d} />
       <CostsSection data={d} />
       <RevenueSection data={d} />
     </div>
+  );
+}
+
+function ProfitabilitySection({ data }: { data: DealAnalysis }) {
+  const { profitable, unprofitable } = data.byProfitability;
+  const total = profitable.count + unprofitable.count;
+  const unprofitablePct = total > 0 ? (unprofitable.count / total) * 100 : 0;
+
+  return (
+    <section className="mb-16">
+      <SectionHeader
+        title="By profitability"
+        subtitle="A show is unprofitable when net to venue (gross − to artist − total expenses) is negative. Disputes cluster on the unprofitable side — the question is by how much."
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="rounded-xl border border-ink-200/60 bg-brand-50/30 p-5 ring-1 ring-inset ring-brand-200/60">
+          <div className="eyebrow text-[10px] mb-2 text-brand-800">Profitable shows</div>
+          <div className="flex items-baseline gap-2">
+            <div
+              className="text-[40px] font-mono tabular font-bold text-ink-900 leading-none"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              {profitable.count}
+            </div>
+            <div className="text-[12px] font-mono tabular text-ink-500">
+              {(100 - unprofitablePct).toFixed(0)}%
+            </div>
+          </div>
+          <p className="text-[12px] text-ink-600 mt-2 leading-relaxed">
+            Net to venue ≥ $0 after deal payout and expenses.
+          </p>
+          <div className="mt-4 pt-4 border-t border-ink-200/40 space-y-2">
+            <Row label="Disputed" value={`${profitable.disputed} of ${profitable.count}`} />
+            <Row label="Dispute rate" value={`${(profitable.disputeRate * 100).toFixed(1)}%`} />
+          </div>
+        </div>
+        <div className="rounded-xl border border-ink-200/60 bg-rose-50/30 p-5 ring-1 ring-inset ring-rose-200/60">
+          <div className="eyebrow text-[10px] mb-2 text-rose-800">Unprofitable shows</div>
+          <div className="flex items-baseline gap-2">
+            <div
+              className="text-[40px] font-mono tabular font-bold text-ink-900 leading-none"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              {unprofitable.count}
+            </div>
+            <div className="text-[12px] font-mono tabular text-ink-500">
+              {unprofitablePct.toFixed(0)}%
+            </div>
+          </div>
+          <p className="text-[12px] text-ink-600 mt-2 leading-relaxed">
+            Net to venue {"<"} $0. The venue lost money on the show.
+          </p>
+          <div className="mt-4 pt-4 border-t border-ink-200/40 space-y-2">
+            <Row label="Disputed" value={`${unprofitable.disputed} of ${unprofitable.count}`} />
+            <Row
+              label="Dispute rate"
+              value={`${(unprofitable.disputeRate * 100).toFixed(1)}%`}
+            />
+            {profitable.disputeRate > 0 && unprofitable.disputeRate > profitable.disputeRate && (
+              <div className="text-[10px] text-rose-700 mt-1">
+                {(unprofitable.disputeRate / profitable.disputeRate).toFixed(1)}× the dispute rate of profitable shows
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -213,6 +281,9 @@ function SizeSection({ data }: { data: DealAnalysis }) {
                   Avg to artist
                 </th>
                 <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold text-right">
+                  Losing money
+                </th>
+                <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold text-right">
                   Dispute rate
                 </th>
               </tr>
@@ -247,6 +318,23 @@ function SizeSection({ data }: { data: DealAnalysis }) {
                     </td>
                     <td className="py-3 text-right font-mono tabular">
                       {b.avgToArtist > 0 ? formatMoneyCompact(b.avgToArtist) : "—"}
+                    </td>
+                    <td className="py-3 text-right font-mono tabular text-ink-600">
+                      {b.profitN > 0 ? (
+                        <>
+                          <span className={b.losingMoneyCount > 0 ? "text-rose-700 font-semibold" : ""}>
+                            {b.losingMoneyCount}
+                          </span>
+                          <span className="text-ink-400"> / {b.profitN}</span>
+                          {b.losingMoneyCount > 0 && (
+                            <span className="text-[10px] text-rose-700 ml-1">
+                              ({((b.losingMoneyCount / b.profitN) * 100).toFixed(0)}%)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-ink-400">—</span>
+                      )}
                     </td>
                     <td
                       className={`py-3 text-right font-mono tabular ${

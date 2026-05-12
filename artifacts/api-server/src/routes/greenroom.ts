@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { getAllShows, getShowById, getAllArtists, getReports, getDealAnalysis } from "../lib/queries";
+import { getAllShows, getShowById, getAllArtists, getReports, getDealAnalysis, getNeedsAttention } from "../lib/queries";
 import { buildShowExport } from "../lib/showExport";
 
 const router: IRouter = Router();
@@ -45,6 +45,11 @@ router.get("/reports", async (_req, res): Promise<void> => {
 
 router.get("/deal-analysis", async (_req, res): Promise<void> => {
   const data = await getDealAnalysis();
+  res.json(data);
+});
+
+router.get("/needs-attention", async (_req, res): Promise<void> => {
+  const data = await getNeedsAttention();
   res.json(data);
 });
 

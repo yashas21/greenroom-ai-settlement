@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Calendar, Users, BarChart3, PieChart } from "lucide-react";
+import { Calendar, Users, BarChart3, PieChart, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -7,6 +7,7 @@ const items = [
   { href: "/artists", label: "Artists", icon: Users },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/deal-analysis", label: "Deal Analysis", icon: PieChart },
+  { href: "/needs-attention", label: "Needs Attention", icon: AlertTriangle },
 ];
 
 export function NavLinks() {

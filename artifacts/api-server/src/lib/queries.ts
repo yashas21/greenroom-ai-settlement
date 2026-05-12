@@ -190,6 +190,11 @@ export async function getDealAnalysis() {
   const allExpensesRows = await db.select().from(expenses);
   const pastExpenses = allExpensesRows.filter((e) => pastShowIds.has(e.showId));
 
+  const expensesByShowIdAll: Map<string, number> = new Map();
+  for (const e of pastExpenses) {
+    expensesByShowIdAll.set(e.showId, (expensesByShowIdAll.get(e.showId) ?? 0) + e.amount);
+  }
+
   const supportedTypes = new Set(["flat", "percentage_of_gross"]);
   const totalDeals = pastDeals.length;
 
@@ -204,11 +209,16 @@ export async function getDealAnalysis() {
 
   const sizeAcc: Record<
     string,
-    { count: number; grossSum: number; grossN: number; artistSum: number; artistN: number; disputed: number; settledN: number }
+    { count: number; grossSum: number; grossN: number; artistSum: number; artistN: number; disputed: number; settledN: number; losingMoney: number; profitN: number }
   > = {};
   for (const k of SIZE_ORDER) {
-    sizeAcc[k] = { count: 0, grossSum: 0, grossN: 0, artistSum: 0, artistN: 0, disputed: 0, settledN: 0 };
+    sizeAcc[k] = { count: 0, grossSum: 0, grossN: 0, artistSum: 0, artistN: 0, disputed: 0, settledN: 0, losingMoney: 0, profitN: 0 };
   }
+
+  const profitabilityAcc = {
+    profitable: { count: 0, disputed: 0 },
+    unprofitable: { count: 0, disputed: 0 },
+  };
 
   for (const d of pastDeals) {
     const c = classifyComplexity(d);
@@ -225,7 +235,8 @@ export async function getDealAnalysis() {
     sizeAcc[bucket].count++;
     if (s) {
       sizeAcc[bucket].settledN++;
-      if (isDisputedSettlement(s)) sizeAcc[bucket].disputed++;
+      const disputed = isDisputedSettlement(s);
+      if (disputed) sizeAcc[bucket].disputed++;
       if (s.grossBoxOffice != null) {
         sizeAcc[bucket].grossSum += s.grossBoxOffice;
         sizeAcc[bucket].grossN++;
@@ -233,6 +244,21 @@ export async function getDealAnalysis() {
       if (s.totalToArtist != null) {
         sizeAcc[bucket].artistSum += s.totalToArtist;
         sizeAcc[bucket].artistN++;
+      }
+
+      if (s.grossBoxOffice != null && s.totalToArtist != null) {
+        const exp = expensesByShowIdAll.get(d.showId) ?? 0;
+        const net = s.grossBoxOffice - s.totalToArtist - exp;
+        sizeAcc[bucket].profitN++;
+        if (net < 0) sizeAcc[bucket].losingMoney++;
+
+        if (net < 0) {
+          profitabilityAcc.unprofitable.count++;
+          if (disputed) profitabilityAcc.unprofitable.disputed++;
+        } else {
+          profitabilityAcc.profitable.count++;
+          if (disputed) profitabilityAcc.profitable.disputed++;
+        }
       }
     }
   }
@@ -258,8 +284,25 @@ export async function getDealAnalysis() {
       avgGross: a.grossN > 0 ? a.grossSum / a.grossN : 0,
       avgToArtist: a.artistN > 0 ? a.artistSum / a.artistN : 0,
       disputeRate: a.settledN > 0 ? a.disputed / a.settledN : 0,
+      losingMoneyCount: a.losingMoney,
+      profitN: a.profitN,
     };
   });
+
+  const byProfitability = {
+    profitable: {
+      count: profitabilityAcc.profitable.count,
+      disputed: profitabilityAcc.profitable.disputed,
+      disputeRate: profitabilityAcc.profitable.count > 0
+        ? profitabilityAcc.profitable.disputed / profitabilityAcc.profitable.count : 0,
+    },
+    unprofitable: {
+      count: profitabilityAcc.unprofitable.count,
+      disputed: profitabilityAcc.unprofitable.disputed,
+      disputeRate: profitabilityAcc.unprofitable.count > 0
+        ? profitabilityAcc.unprofitable.disputed / profitabilityAcc.unprofitable.count : 0,
+    },
+  };
 
   // Costs
   const expensesByCategory: Record<string, number> = {};
@@ -343,6 +386,7 @@ export async function getDealAnalysis() {
     totalDeals,
     byComplexity,
     bySize,
+    byProfitability,
     costs: {
       totalExpenses,
       expensesByCategory,
@@ -355,6 +399,117 @@ export async function getDealAnalysis() {
       months,
     },
   };
+}
+
+const CLOSED_STATUSES = new Set(["signed", "finalized", "paid"]);
+const CLOSED_KEYWORDS = /\b(closed out|settled up|fully settled|signed off|signed and paid|paid in full|paid out|finalized|finalised|wrapped up|squared away|all squared|case closed)\b/i;
+
+export type AttentionKind =
+  | "notes_say_closed_but_status_open"
+  | "show_settled_no_settlement"
+  | "disputed_recoups_but_signed"
+  | "stale_disputed";
+
+export type AttentionItem = {
+  kind: AttentionKind;
+  showId: string;
+  artistName: string | null;
+  date: string;
+  status: string;
+  settlementStatus: string | null;
+  detail: string;
+  evidence?: string;
+};
+
+export async function getNeedsAttention(): Promise<AttentionItem[]> {
+  const today = todayDateString();
+  const allShowsRows = await db
+    .select({ show: shows, artist: artists, settlement: settlements })
+    .from(shows)
+    .leftJoin(artists, eq(shows.artistId, artists.id))
+    .leftJoin(settlements, eq(settlements.showId, shows.id))
+    .where(lte(shows.date, todayDateString()))
+    .orderBy(desc(shows.date));
+
+  const items: AttentionItem[] = [];
+  const todayMs = new Date(today + "T00:00:00").getTime();
+  const STALE_DAYS = 30;
+
+  for (const r of allShowsRows) {
+    const { show, artist, settlement } = r;
+    const artistName = artist?.name ?? null;
+
+    if ((show.status === "settled" || show.status === "closed") && !settlement) {
+      items.push({
+        kind: "show_settled_no_settlement",
+        showId: show.id,
+        artistName,
+        date: show.date,
+        status: show.status,
+        settlementStatus: null,
+        detail: `Show is marked ${show.status} but has no settlement row.`,
+      });
+      continue;
+    }
+
+    if (!settlement) continue;
+
+    const sStatus = settlement.status;
+
+    if (!CLOSED_STATUSES.has(sStatus)) {
+      const noteText = [settlement.notes, settlement.signoffText]
+        .filter((t): t is string => !!t)
+        .join("\n");
+      const match = noteText.match(CLOSED_KEYWORDS);
+      if (match) {
+        items.push({
+          kind: "notes_say_closed_but_status_open",
+          showId: show.id,
+          artistName,
+          date: show.date,
+          status: show.status,
+          settlementStatus: sStatus,
+          detail: `Settlement notes mention "${match[0]}" but status is still ${sStatus}.`,
+          evidence: noteText.length > 240 ? noteText.slice(0, 240) + "…" : noteText,
+        });
+      }
+    }
+
+    if (CLOSED_STATUSES.has(sStatus)) {
+      const recoupsList = parseRecoups(settlement.recoupsJson);
+      const disputed = recoupsList.filter((rc) => rc?.status === "disputed");
+      if (disputed.length > 0) {
+        items.push({
+          kind: "disputed_recoups_but_signed",
+          showId: show.id,
+          artistName,
+          date: show.date,
+          status: show.status,
+          settlementStatus: sStatus,
+          detail: `${disputed.length} disputed recoup line${disputed.length === 1 ? "" : "s"} on a ${sStatus} settlement.`,
+          evidence: disputed.map((d) => `${d.label} ($${d.amount})`).join(", "),
+        });
+      }
+    }
+
+    if (sStatus === "disputed" && settlement.disputedAt) {
+      const ageMs = todayMs - settlement.disputedAt.getTime();
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      if (ageDays >= STALE_DAYS) {
+        items.push({
+          kind: "stale_disputed",
+          showId: show.id,
+          artistName,
+          date: show.date,
+          status: show.status,
+          settlementStatus: sStatus,
+          detail: `Disputed for ${ageDays} days with no resolution.`,
+        });
+      }
+    }
+  }
+
+  return items;
 }
 
 export async function getReports() {

@@ -163,6 +163,23 @@ export interface ShowDetail {
   isDisputed: boolean;
 }
 
+export type AttentionKind =
+  | "notes_say_closed_but_status_open"
+  | "show_settled_no_settlement"
+  | "disputed_recoups_but_signed"
+  | "stale_disputed";
+
+export interface AttentionItem {
+  kind: AttentionKind;
+  showId: string;
+  artistName: string | null;
+  date: string;
+  status: string;
+  settlementStatus: string | null;
+  detail: string;
+  evidence?: string;
+}
+
 export interface ArtistRow {
   artist: Artist;
   agent: Agent | null;
@@ -208,7 +225,13 @@ export interface DealAnalysis {
     avgGross: number;
     avgToArtist: number;
     disputeRate: number;
+    losingMoneyCount: number;
+    profitN: number;
   }[];
+  byProfitability: {
+    profitable: { count: number; disputed: number; disputeRate: number };
+    unprofitable: { count: number; disputed: number; disputeRate: number };
+  };
   costs: {
     totalExpenses: number;
     expensesByCategory: Record<string, number>;
