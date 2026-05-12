@@ -13,6 +13,8 @@ export type ShowRow = {
   dateFormatted: string;
   dateRelative: string;
   month: string;
+  isUnsupported: boolean;
+  isDisputed: boolean;
 };
 
 const lifecycleStatusVariants: Record<
@@ -53,23 +55,33 @@ function groupByMonth(rows: ShowRow[]): { month: string; rows: ShowRow[] }[] {
 
 export function ShowsList({ rows }: { rows: ShowRow[] }) {
   const [query, setQuery] = useState("");
+  const [unsupportedOnly, setUnsupportedOnly] = useState(false);
+  const [disputedOnly, setDisputedOnly] = useState(false);
+
+  const unsupportedCount = useMemo(() => rows.filter((r) => r.isUnsupported).length, [rows]);
+  const disputedCount = useMemo(() => rows.filter((r) => r.isDisputed).length, [rows]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return rows;
-    const q = query.toLowerCase();
-    return rows.filter(
-      (r) =>
-        r.artist?.name.toLowerCase().includes(q) ||
-        r.deal?.dealType.toLowerCase().includes(q) ||
-        r.dateFormatted.toLowerCase().includes(q),
-    );
-  }, [rows, query]);
+    let out = rows;
+    if (unsupportedOnly) out = out.filter((r) => r.isUnsupported);
+    if (disputedOnly) out = out.filter((r) => r.isDisputed);
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      out = out.filter(
+        (r) =>
+          r.artist?.name.toLowerCase().includes(q) ||
+          r.deal?.dealType.toLowerCase().includes(q) ||
+          r.dateFormatted.toLowerCase().includes(q),
+      );
+    }
+    return out;
+  }, [rows, query, unsupportedOnly, disputedOnly]);
 
   const months = useMemo(() => groupByMonth(filtered), [filtered]);
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-6 flex items-center gap-3 flex-wrap">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-400 pointer-events-none" />
           <input
@@ -80,6 +92,20 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
             className="w-64 pl-9 pr-3 py-2 text-[13px] bg-white border border-ink-200/60 rounded-lg text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-300 transition-all"
           />
         </div>
+        <FilterToggle
+          active={unsupportedOnly}
+          onClick={() => setUnsupportedOnly((v) => !v)}
+          variant="amber"
+          label="Unsupported only"
+          count={unsupportedCount}
+        />
+        <FilterToggle
+          active={disputedOnly}
+          onClick={() => setDisputedOnly((v) => !v)}
+          variant="rose"
+          label="Disputed only"
+          count={disputedCount}
+        />
       </div>
 
       {filtered.length === 0 ? (
@@ -154,8 +180,10 @@ function ShowListRow({ row }: { row: ShowRow }) {
           <div className="text-[14.5px] font-medium text-ink-900 truncate group-hover:text-brand-800 transition-colors">
             {artist?.name ?? "—"}
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {deal && <DealTypeBadge type={deal.dealType} />}
+            {row.isUnsupported && <PlainBadge variant="amber">Unsupported</PlainBadge>}
+            {row.isDisputed && <PlainBadge variant="rose">Disputed</PlainBadge>}
             {deal?.guaranteeFormatted && (
               <span className="font-mono tabular text-[11px] text-ink-500">
                 {deal.guaranteeFormatted}
@@ -185,6 +213,42 @@ function ShowListRow({ row }: { row: ShowRow }) {
         <ArrowUpRight className="h-3.5 w-3.5 text-ink-200 group-hover:text-ink-500 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all duration-150" />
       </Link>
     </li>
+  );
+}
+
+function FilterToggle({
+  active, onClick, variant, label, count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  variant: "amber" | "rose";
+  label: string;
+  count: number;
+}) {
+  const palette = variant === "amber"
+    ? {
+        on: "bg-amber-50 text-amber-800 ring-amber-300 hover:bg-amber-100/80",
+        off: "bg-white text-ink-600 ring-ink-200/60 hover:bg-amber-50/50 hover:text-amber-800",
+        dot: "bg-amber-600",
+      }
+    : {
+        on: "bg-rose-50 text-rose-800 ring-rose-300 hover:bg-rose-100/80",
+        off: "bg-white text-ink-600 ring-ink-200/60 hover:bg-rose-50/50 hover:text-rose-800",
+        dot: "bg-rose-600",
+      };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium ring-1 ring-inset transition-all ${active ? palette.on : palette.off}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? palette.dot : "bg-ink-300"}`} />
+      {label}
+      <span className={`font-mono tabular text-[10.5px] ${active ? "" : "text-ink-400"}`}>
+        {count}
+      </span>
+    </button>
   );
 }
 

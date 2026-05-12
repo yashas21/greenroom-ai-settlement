@@ -183,3 +183,44 @@ export interface Reports {
   totalCompFaceValue: number;
   compsByCategory: Record<string, number>;
 }
+
+export interface DealAnalysis {
+  totalDeals: number;
+  byComplexity: {
+    bucket: "simple" | "medium" | "complex";
+    count: number;
+    pct: number;
+    avgPayout: number;
+    inToolCount: number;
+    spreadsheetCount: number;
+  }[];
+  bySize: {
+    bucket: string;
+    count: number;
+    pct: number;
+    avgGross: number;
+    avgToArtist: number;
+    disputeRate: number;
+  }[];
+  costs: {
+    totalExpenses: number;
+    expensesByCategory: Record<string, number>;
+    totalRecoups: number;
+    disputedRecoupValue: number;
+    recoupsByCategory: Record<string, { amount: number; disputedAmount: number }>;
+  };
+  revenue: {
+    byDealType: Record<
+      string,
+      { gross: number; netToVenue: number; toArtist: number; count: number }
+    >;
+    months: {
+      month: string;
+      label: string;
+      gross: number;
+      netToVenue: number;
+      toArtist: number;
+      byType: Record<string, number>;
+    }[];
+  };
+}

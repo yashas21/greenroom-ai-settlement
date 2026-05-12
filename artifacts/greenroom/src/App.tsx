@@ -6,6 +6,7 @@ import ShowDetailPage from "@/pages/show-detail";
 import SettlePage from "@/pages/settle";
 import ArtistsPage from "@/pages/artists";
 import ReportsPage from "@/pages/reports";
+import DealAnalysisPage from "@/pages/deal-analysis";
 import ContextPage from "@/pages/context";
 import NotFound from "@/pages/not-found";
 
@@ -18,6 +19,7 @@ function AppRoutes() {
       <Route path="/shows/:id" component={ShowDetailPage} />
       <Route path="/artists" component={ArtistsPage} />
       <Route path="/reports" component={ReportsPage} />
+      <Route path="/deal-analysis" component={DealAnalysisPage} />
       <Route path="/context" component={ContextPage} />
       <Route component={NotFound} />
     </Switch>

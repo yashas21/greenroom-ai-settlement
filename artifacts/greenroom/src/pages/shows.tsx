@@ -11,30 +11,47 @@ export default function ShowsPage() {
 
   const reversed = [...state.data].reverse();
   const settledCount = reversed.filter((r) => r.settlement).length;
-  const disputedCount = reversed.filter((r) => r.settlement?.status === "disputed").length;
   const totalToArtists = reversed.reduce(
     (sum, r) => sum + (r.settlement?.totalToArtist ?? 0), 0);
 
-  const serialized: ShowRow[] = reversed.map(({ show, artist, deal, settlement }) => ({
-    show: {
-      id: show.id,
-      status: show.status as "booked" | "advanced" | "day_of" | "settled" | "closed",
-    },
-    artist: artist ? { name: artist.name } : null,
-    deal: deal ? {
-      dealType: deal.dealType,
-      guaranteeFormatted: deal.guaranteeAmount != null
-        ? formatMoneyCompact(deal.guaranteeAmount) : null,
-    } : null,
-    settlement: settlement ? {
-      totalFormatted: settlement.totalToArtist != null
-        ? formatMoneyCompact(settlement.totalToArtist) : null,
-      status: settlement.status,
-    } : null,
-    dateFormatted: formatShowDate(show.date),
-    dateRelative: relativeShowDate(show.date),
-    month: formatShowMonth(show.date),
-  }));
+  const unsupportedTypes = new Set(["percentage_of_net", "vs", "door"]);
+  const serialized: ShowRow[] = reversed.map(({ show, artist, deal, settlement }) => {
+    const isUnsupported = !!deal && unsupportedTypes.has(deal.dealType);
+    let recoupDisputed = false;
+    if (settlement?.recoupsJson) {
+      try {
+        const parsed = JSON.parse(settlement.recoupsJson);
+        if (Array.isArray(parsed)) {
+          recoupDisputed = parsed.some((r: { status?: string }) => r?.status === "disputed");
+        }
+      } catch {}
+    }
+    const isDisputed = settlement?.status === "disputed" || recoupDisputed;
+    return {
+      show: {
+        id: show.id,
+        status: show.status as "booked" | "advanced" | "day_of" | "settled" | "closed",
+      },
+      artist: artist ? { name: artist.name } : null,
+      deal: deal ? {
+        dealType: deal.dealType,
+        guaranteeFormatted: deal.guaranteeAmount != null
+          ? formatMoneyCompact(deal.guaranteeAmount) : null,
+      } : null,
+      settlement: settlement ? {
+        totalFormatted: settlement.totalToArtist != null
+          ? formatMoneyCompact(settlement.totalToArtist) : null,
+        status: settlement.status,
+      } : null,
+      dateFormatted: formatShowDate(show.date),
+      dateRelative: relativeShowDate(show.date),
+      month: formatShowMonth(show.date),
+      isUnsupported,
+      isDisputed,
+    };
+  });
+
+  const disputedCount = serialized.filter((r) => r.isDisputed).length;
 
   return (
     <div className="px-12 py-10 max-w-7xl">

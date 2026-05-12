@@ -57,7 +57,10 @@ export default function ShowDetailPage() {
 
   const bonuses = deal ? parseBonuses(deal) : [];
 
-  const isDisputed = settlement?.status === "disputed";
+  const unsupportedTypes = new Set(["percentage_of_net", "vs", "door"]);
+  const isUnsupported = !!deal && unsupportedTypes.has(deal.dealType);
+  const recoupDisputed = data.recoups.some((r) => r.status === "disputed");
+  const isDisputed = settlement?.status === "disputed" || recoupDisputed;
 
   return (
     <div className="max-w-7xl">
@@ -74,6 +77,7 @@ export default function ShowDetailPage() {
             <div className="flex items-center gap-1.5 mb-4">
               <StatusBadge status={show.status} />
               {deal && <DealTypeBadge type={deal.dealType} />}
+              {isUnsupported && <PlainBadge variant="amber">Unsupported</PlainBadge>}
               {isDisputed && <PlainBadge variant="rose">Disputed</PlainBadge>}
               {bonuses.length > 0 && (
                 <PlainBadge variant="brand">

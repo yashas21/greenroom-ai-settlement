@@ -1,4 +1,4 @@
-import type { ShowListRow, ShowDetail, ArtistRow, Reports } from "./types";
+import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis } from "./types";
 
 const BASE = `${import.meta.env.BASE_URL}api`;
 
@@ -14,4 +14,5 @@ export const api = {
   show: (id: string) => get<ShowDetail>(`/shows/${encodeURIComponent(id)}`),
   artists: () => get<ArtistRow[]>("/artists"),
   reports: () => get<Reports>("/reports"),
+  dealAnalysis: () => get<DealAnalysis>("/deal-analysis"),
 };
