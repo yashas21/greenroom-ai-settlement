@@ -220,6 +220,23 @@ export async function getDealAnalysis() {
     unprofitable: { count: 0, disputed: 0 },
   };
 
+  type CrossCell = {
+    count: number;
+    settledN: number;
+    profitN: number;
+    losingMoney: number;
+    disputed: number;
+  };
+  const crossAcc: Map<string, Map<string, CrossCell>> = new Map();
+  const dealTypesSeen = new Set<string>();
+  function crossCell(dealType: string, bucket: string): CrossCell {
+    let row = crossAcc.get(dealType);
+    if (!row) { row = new Map(); crossAcc.set(dealType, row); }
+    let cell = row.get(bucket);
+    if (!cell) { cell = { count: 0, settledN: 0, profitN: 0, losingMoney: 0, disputed: 0 }; row.set(bucket, cell); }
+    return cell;
+  }
+
   for (const d of pastDeals) {
     const c = classifyComplexity(d);
     const s = settlementByShowId.get(d.showId);
@@ -233,10 +250,15 @@ export async function getDealAnalysis() {
 
     const bucket = classifySizeBucket(d);
     sizeAcc[bucket].count++;
+    dealTypesSeen.add(d.dealType);
+    const cc = crossCell(d.dealType, bucket);
+    cc.count++;
     if (s) {
       sizeAcc[bucket].settledN++;
       const disputed = isDisputedSettlement(s);
       if (disputed) sizeAcc[bucket].disputed++;
+      cc.settledN++;
+      if (disputed) cc.disputed++;
       if (s.grossBoxOffice != null) {
         sizeAcc[bucket].grossSum += s.grossBoxOffice;
         sizeAcc[bucket].grossN++;
@@ -251,6 +273,8 @@ export async function getDealAnalysis() {
         const net = s.grossBoxOffice - s.totalToArtist - exp;
         sizeAcc[bucket].profitN++;
         if (net < 0) sizeAcc[bucket].losingMoney++;
+        cc.profitN++;
+        if (net < 0) cc.losingMoney++;
 
         if (net < 0) {
           profitabilityAcc.unprofitable.count++;
@@ -260,6 +284,29 @@ export async function getDealAnalysis() {
           if (disputed) profitabilityAcc.profitable.disputed++;
         }
       }
+    }
+  }
+
+  const crossTabBySizeAndType = {
+    dealTypes: Array.from(dealTypesSeen).sort(),
+    buckets: SIZE_ORDER,
+    cells: [] as Array<{
+      dealType: string; bucket: string; count: number; settledN: number;
+      profitN: number; losingMoneyCount: number; disputed: number;
+      losingMoneyRate: number; disputeRate: number;
+    }>,
+  };
+  for (const dealType of crossTabBySizeAndType.dealTypes) {
+    for (const bucket of SIZE_ORDER) {
+      const c = crossAcc.get(dealType)?.get(bucket);
+      if (!c || c.count === 0) continue;
+      crossTabBySizeAndType.cells.push({
+        dealType, bucket,
+        count: c.count, settledN: c.settledN,
+        profitN: c.profitN, losingMoneyCount: c.losingMoney, disputed: c.disputed,
+        losingMoneyRate: c.profitN > 0 ? c.losingMoney / c.profitN : 0,
+        disputeRate: c.settledN > 0 ? c.disputed / c.settledN : 0,
+      });
     }
   }
 
@@ -397,6 +444,7 @@ export async function getDealAnalysis() {
     revenue: {
       byDealType,
       months,
+      crossTabBySizeAndType,
     },
   };
 }

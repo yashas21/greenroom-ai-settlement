@@ -252,5 +252,20 @@ export interface DealAnalysis {
       toArtist: number;
       byType: Record<string, number>;
     }[];
+    crossTabBySizeAndType: {
+      dealTypes: string[];
+      buckets: string[];
+      cells: {
+        dealType: string;
+        bucket: string;
+        count: number;
+        settledN: number;
+        profitN: number;
+        losingMoneyCount: number;
+        disputed: number;
+        losingMoneyRate: number;
+        disputeRate: number;
+      }[];
+    };
   };
 }

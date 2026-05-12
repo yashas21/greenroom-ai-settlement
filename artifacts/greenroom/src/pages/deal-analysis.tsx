@@ -609,6 +609,8 @@ function RevenueSection({ data }: { data: DealAnalysis }) {
         </CardContent>
       </Card>
 
+      <CrossTabCard data={data} />
+
       <Card>
         <CardContent>
           <div className="eyebrow text-[10px] text-ink-500 mb-4">
@@ -646,6 +648,136 @@ function RevenueSection({ data }: { data: DealAnalysis }) {
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function CrossTabCard({ data }: { data: DealAnalysis }) {
+  const [, setLocation] = useLocation();
+  const ct = data.revenue.crossTabBySizeAndType;
+  const cellByKey = new Map(ct.cells.map((c) => [`${c.dealType}|${c.bucket}`, c]));
+
+  const activeBuckets = ct.buckets.filter((b) =>
+    ct.cells.some((c) => c.bucket === b),
+  );
+
+  return (
+    <Card className="mb-5">
+      <CardContent>
+        <div className="flex items-baseline justify-between mb-4">
+          <div className="eyebrow text-[10px] text-ink-500">
+            Deal type × deal size · losing money / dispute rate
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-ink-400">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-rose-500/80" />
+              losing money
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-amber-500/80" />
+              disputed
+            </span>
+          </div>
+        </div>
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="text-left border-b border-ink-100/80">
+              <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold">
+                Deal type
+              </th>
+              {activeBuckets.map((b) => (
+                <th
+                  key={b}
+                  className="py-2 px-2 eyebrow text-[10px] text-ink-400 font-semibold text-center"
+                >
+                  {b}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-ink-100/60">
+            {ct.dealTypes.map((dt) => {
+              const supported = dt === "flat" || dt === "percentage_of_gross";
+              return (
+                <tr key={dt} className="align-middle">
+                  <td className="py-2.5 pr-3">
+                    <span className="text-ink-900 font-medium">
+                      {DEAL_LABELS[dt] ?? dt}
+                    </span>
+                    {!supported && (
+                      <span className="ml-2 text-[9px] text-amber-700 uppercase tracking-[0.08em] font-semibold">
+                        unsupported
+                      </span>
+                    )}
+                  </td>
+                  {activeBuckets.map((b) => {
+                    const cell = cellByKey.get(`${dt}|${b}`);
+                    if (!cell) {
+                      return (
+                        <td
+                          key={b}
+                          className="py-2.5 px-2 text-center text-ink-300 font-mono tabular text-[11px]"
+                        >
+                          —
+                        </td>
+                      );
+                    }
+                    const losingHot = cell.losingMoneyRate >= 0.5;
+                    const disputeHot = cell.disputeRate >= 0.1;
+                    const params = new URLSearchParams({
+                      dealType: dt,
+                      size: b,
+                    });
+                    return (
+                      <td
+                        key={b}
+                        onClick={() => setLocation(`/shows?${params.toString()}`)}
+                        className="py-2 px-2 cursor-pointer hover:bg-brand-50/40 transition-colors"
+                        title={`${cell.count} ${DEAL_LABELS[dt] ?? dt} deals in ${b} · ${cell.losingMoneyCount}/${cell.profitN} losing money · ${cell.disputed}/${cell.settledN} disputed`}
+                      >
+                        <div className="text-center">
+                          <div className="text-[10px] font-mono tabular text-ink-400 mb-0.5">
+                            n={cell.count}
+                          </div>
+                          <div className="flex items-center justify-center gap-2">
+                            <span
+                              className={`font-mono tabular text-[12px] ${
+                                losingHot ? "text-rose-700 font-semibold" : "text-ink-700"
+                              }`}
+                              title="Losing money rate"
+                            >
+                              {cell.profitN > 0
+                                ? `${(cell.losingMoneyRate * 100).toFixed(0)}%`
+                                : "—"}
+                            </span>
+                            <span className="text-ink-300">·</span>
+                            <span
+                              className={`font-mono tabular text-[12px] ${
+                                disputeHot ? "text-amber-700 font-semibold" : "text-ink-500"
+                              }`}
+                              title="Dispute rate"
+                            >
+                              {cell.settledN > 0
+                                ? `${(cell.disputeRate * 100).toFixed(0)}%`
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <p className="text-[11px] text-ink-400 mt-3 leading-relaxed">
+          Each cell shows the count of deals (n=), then the share losing
+          money and the share disputed. Cells with ≥50% losing money are
+          red; cells with ≥10% disputed are amber. Click a cell to see the
+          shows behind it.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
