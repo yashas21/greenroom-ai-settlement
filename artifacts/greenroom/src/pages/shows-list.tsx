@@ -105,6 +105,7 @@ type Filters = {
   switchSuggestedOnly: boolean;
   upcomingOnly: boolean;
   switchEligibleOnly: boolean;
+  switchedOnly: boolean;
   complexity: string | null;
   size: string | null;
   dealType: string | null;
@@ -120,6 +121,7 @@ const EMPTY_FILTERS: Filters = {
   switchSuggestedOnly: false,
   upcomingOnly: false,
   switchEligibleOnly: false,
+  switchedOnly: false,
   complexity: null,
   size: null,
   dealType: null,
@@ -139,6 +141,7 @@ function parseFilters(search: string): Filters {
     switchSuggestedOnly: params.get("switch") === "1",
     upcomingOnly: params.get("upcoming") === "1",
     switchEligibleOnly: params.get("switchEligible") === "1",
+    switchedOnly: params.get("switched") === "1",
     complexity: params.get("complexity"),
     size: params.get("size"),
     dealType: params.get("dealType"),
@@ -156,6 +159,7 @@ function buildQueryString(f: Filters): string {
   if (f.switchSuggestedOnly) params.set("switch", "1");
   if (f.upcomingOnly) params.set("upcoming", "1");
   if (f.switchEligibleOnly) params.set("switchEligible", "1");
+  if (f.switchedOnly) params.set("switched", "1");
   if (f.complexity) params.set("complexity", f.complexity);
   if (f.size) params.set("size", f.size);
   if (f.dealType) params.set("dealType", f.dealType);
@@ -174,6 +178,7 @@ function isFilterActive(f: Filters): boolean {
     f.switchSuggestedOnly ||
     f.upcomingOnly ||
     f.switchEligibleOnly ||
+    f.switchedOnly ||
     !!f.complexity ||
     !!f.size ||
     !!f.dealType ||
@@ -232,6 +237,7 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           r.switchStatus !== "accepted" &&
           r.switchStatus !== "declined",
       );
+    if (filters.switchedOnly) out = out.filter((r) => r.switchStatus === "accepted");
     if (filters.unsupportedOnly) out = out.filter((r) => r.isUnsupported);
     if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
     if (filters.switchSuggestedOnly)
@@ -308,13 +314,20 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           count={upcomingCount}
         />
         {switchAcceptedCount > 0 && (
-          <span
-            className="text-[11px] text-emerald-700 bg-emerald-50/70 px-2 py-1 rounded ring-1 ring-emerald-200/60 inline-flex items-center gap-1"
-            title="Smart Switch suggestions accepted by the booker"
+          <button
+            type="button"
+            onClick={() => update({ switchedOnly: !filters.switchedOnly })}
+            aria-pressed={filters.switchedOnly}
+            className={`text-[11px] px-2 py-1 rounded ring-1 inline-flex items-center gap-1 transition-colors ${
+              filters.switchedOnly
+                ? "bg-emerald-100 text-emerald-900 ring-emerald-300"
+                : "bg-emerald-50/70 text-emerald-700 ring-emerald-200/60 hover:bg-emerald-100/70"
+            }`}
+            title="Show only deals where Smart Switch was accepted"
           >
             <span aria-hidden>🎯</span>
             {switchAcceptedCount} switched
-          </span>
+          </button>
         )}
         <FilterToggle
           active={filters.unsupportedOnly}
@@ -467,6 +480,12 @@ function DrillChip({ label, onClear }: { label: string; onClear: () => void }) {
 function ShowListRow({ row }: { row: ShowRow }) {
   const { show, artist, deal, settlement } = row;
   const accent = getAccentColor(row);
+  const isActionableSmartSwitch =
+    row.tense === "upcoming" &&
+    deal !== null &&
+    ELIGIBLE_DEAL_TYPES.has(deal.dealType) &&
+    row.switchStatus !== "accepted" &&
+    row.switchStatus !== "declined";
 
   return (
     <li className="relative group list-none">
@@ -517,7 +536,17 @@ function ShowListRow({ row }: { row: ShowRow }) {
         </div>
 
         <div className="flex justify-end">
-          {settlement ? <SettlementPill status={settlement.status} /> : null}
+          {isActionableSmartSwitch ? (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-brand-700 text-white ring-1 ring-brand-700 group-hover:bg-brand-800 transition-colors shadow-[0_1px_2px_rgba(0,80,60,0.18)]"
+              title="Open deal page to run a Smart Switch suggestion"
+            >
+              <Shield className="h-3 w-3" />
+              Run Smart Switch
+            </span>
+          ) : settlement ? (
+            <SettlementPill status={settlement.status} />
+          ) : null}
         </div>
 
         <ArrowUpRight className="h-3.5 w-3.5 text-ink-200 group-hover:text-ink-500 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all duration-150" />
