@@ -269,9 +269,14 @@ export async function getDealImprovements(showId: string): Promise<DealImproveme
   };
 }
 
+export interface ApplyImprovementItem {
+  kind: ImprovementKind;
+  value?: number;
+}
+
 export async function applyDealImprovements(
   showId: string,
-  kinds: ImprovementKind[],
+  items: ApplyImprovementItem[],
 ): Promise<{ ok: true; appliedKinds: ImprovementKind[]; dealId: string }> {
   const [dealRow] = await db.select().from(deals).where(eq(deals.showId, showId));
   if (!dealRow) throw new Error("no_deal");
@@ -282,18 +287,22 @@ export async function applyDealImprovements(
   const update: Partial<typeof deals.$inferInsert> = {};
   const applied: ImprovementKind[] = [];
 
-  for (const kind of kinds) {
+  for (const item of items) {
+    const kind = item.kind;
     const imp = byKind.get(kind);
-    if (!imp || imp.proposedNumber == null) continue;
+    const value = (typeof item.value === "number" && Number.isFinite(item.value) && item.value >= 0)
+      ? item.value
+      : imp?.proposedNumber ?? null;
+    if (value == null) continue;
     if (kind === "add_expense_cap") {
-      update.expenseCap = imp.proposedNumber;
+      update.expenseCap = value;
       applied.push(kind);
     } else if (kind === "add_hospitality_cap") {
-      update.hospitalityCap = imp.proposedNumber;
+      update.hospitalityCap = value;
       applied.push(kind);
     } else if (kind === "convert_to_flat") {
       update.dealType = "flat";
-      update.guaranteeAmount = imp.proposedNumber;
+      update.guaranteeAmount = value;
       update.percentage = null;
       update.percentageBasis = null;
       applied.push(kind);

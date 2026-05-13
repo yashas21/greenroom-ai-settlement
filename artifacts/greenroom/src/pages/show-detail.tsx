@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
 import {
   ArrowLeft, FileSpreadsheet, AlertCircle, Clock, TrendingUp, FileJson, Loader2,
@@ -202,6 +202,7 @@ export default function ShowDetailPage() {
             <ImproveDealPanel
               showId={show.id}
               deal={deal}
+              agentName={agent?.name ?? null}
               onApplied={reload}
             />
           )}
@@ -903,60 +904,78 @@ function SmartGuaranteedPricePanel({
 }
 
 function ImproveDealPanel({
-  showId, deal, onApplied,
+  showId, deal, agentName, onApplied,
 }: {
   showId: string;
   deal: Deal;
+  agentName: string | null;
   onApplied: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [data, setData] = useState<DealImprovementsPayload | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<ImprovementKind>>(new Set());
-  const [appliedKinds, setAppliedKinds] = useState<ImprovementKind[]>([]);
+  const [busyKind, setBusyKind] = useState<ImprovementKind | null>(null);
+  const [edits, setEdits] = useState<Partial<Record<ImprovementKind, string>>>({});
+  const [editing, setEditing] = useState<Set<ImprovementKind>>(new Set());
+  const [lastApplied, setLastApplied] = useState<{ kind: ImprovementKind; value: number } | null>(null);
 
-  async function loadAndOpen() {
-    setBusy(true); setErr(null);
+  async function load() {
+    setLoading(true); setErr(null);
     try {
       const res = await api.dealImprovements(showId);
       setData(res);
-      const next = new Set<ImprovementKind>();
-      for (const i of res.improvements) next.add(i.kind);
-      setSelected(next);
-      setOpen(true);
+      const seed: Partial<Record<ImprovementKind, string>> = {};
+      for (const i of res.improvements) {
+        if (i.proposedNumber != null) seed[i.kind] = String(i.proposedNumber);
+      }
+      setEdits(seed);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "failed");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
-  function toggle(kind: ImprovementKind) {
-    const next = new Set(selected);
-    if (next.has(kind)) next.delete(kind); else next.add(kind);
-    setSelected(next);
-  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [showId]);
 
-  async function apply() {
-    if (selected.size === 0) return;
-    setBusy(true); setErr(null);
+  async function applyOne(kind: ImprovementKind) {
+    setBusyKind(kind); setErr(null);
+    const raw = edits[kind];
+    const parsed = raw != null && raw !== "" ? Number(raw) : undefined;
+    const value = typeof parsed === "number" && Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
     try {
-      const out = await api.applyDealImprovements(showId, Array.from(selected));
-      setAppliedKinds(out.appliedKinds);
+      const out = await api.applyDealImprovements(showId, [{ kind, value }]);
+      if (out.appliedKinds.length > 0) {
+        const fallback = data?.improvements.find((i) => i.kind === kind)?.proposedNumber ?? 0;
+        setLastApplied({ kind, value: value ?? fallback });
+      }
+      const nextEditing = new Set(editing); nextEditing.delete(kind); setEditing(nextEditing);
       onApplied();
-      setOpen(false);
+      await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "failed");
     } finally {
-      setBusy(false);
+      setBusyKind(null);
     }
+  }
+
+  function toggleEdit(kind: ImprovementKind) {
+    const next = new Set(editing);
+    if (next.has(kind)) next.delete(kind); else next.add(kind);
+    setEditing(next);
   }
 
   const protectsLabel = (p: DealImprovement["protects"]) =>
     p === "booker" ? "Reduces venue risk"
       : p === "artist" ? "Reduces artist risk"
         : "Reduces risk for both sides";
+
+  const kindLabel = (k: ImprovementKind) =>
+    k === "add_expense_cap" ? "expense cap"
+      : k === "add_hospitality_cap" ? "hospitality cap"
+        : "flat conversion";
+
+  const recipient = agentName ? agentName : "the agent";
 
   return (
     <Card className="md:col-span-3 ring-1 ring-emerald-200/70 bg-gradient-to-br from-emerald-50/50 to-canvas">
@@ -969,28 +988,19 @@ function ImproveDealPanel({
           <CardDescription>
             Concrete structural changes — drawn from comparable past shows at this venue — that
             make this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType.replace(/_/g, " ")}</code> deal
-            simpler to close and lower-risk for both sides.
+            simpler to close and lower-risk for both sides. Apply individually or tweak the
+            number first, then resend the updated terms to {recipient}.
           </CardDescription>
         </div>
-        {appliedKinds.length > 0 && (
-          <PlainBadge variant="brand">{appliedKinds.length} applied</PlainBadge>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {!open && (
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
-              Look at the historical pattern for {deal.dealType.replace(/_/g, " ")} deals in this size bucket and propose
-              caps, floors, and shape changes that would make this deal close cleanly in the wizard.
-            </div>
-            <Button variant="brand" onClick={loadAndOpen} disabled={busy}>
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
-              {busy ? "Analyzing…" : "Improve the Deal"}
-            </Button>
+        {loading && (
+          <div className="flex items-center gap-2 text-[12px] text-ink-500">
+            <Loader2 className="h-3 w-3 animate-spin" /> Analyzing comparable past shows…
           </div>
         )}
 
-        {open && data && (
+        {!loading && data && (
           <>
             <div className="text-[12px] text-ink-500 leading-relaxed">
               Based on {data.context.comparableSettlements} past comparable settlement{data.context.comparableSettlements === 1 ? "" : "s"} at this venue
@@ -1003,6 +1013,17 @@ function ImproveDealPanel({
               .
             </div>
 
+            {lastApplied && (
+              <div className="rounded-lg bg-emerald-50 ring-1 ring-emerald-200/70 px-3 py-2 text-[12.5px] text-emerald-900 flex items-center gap-2">
+                <Check className="h-3.5 w-3.5 text-emerald-700" />
+                <span>
+                  Updated terms ({kindLabel(lastApplied.kind)}
+                  {lastApplied.value > 0 ? <> · <span className="font-mono tabular">{formatMoney(lastApplied.value)}</span></> : null}
+                  ) sent to {recipient}.
+                </span>
+              </div>
+            )}
+
             {data.improvements.length === 0 && (
               <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-4 text-[13px] text-ink-600">
                 This deal already has the structural protections we'd recommend — no
@@ -1013,67 +1034,81 @@ function ImproveDealPanel({
             {data.improvements.length > 0 && (
               <div className="space-y-2.5">
                 {data.improvements.map((imp) => {
-                  const isOn = selected.has(imp.kind);
+                  const isEditing = editing.has(imp.kind);
+                  const isBusy = busyKind === imp.kind;
+                  const editable = imp.proposedNumber != null;
                   return (
-                    <label
+                    <div
                       key={imp.kind}
-                      className={`flex items-start gap-3 rounded-lg p-3 ring-1 cursor-pointer transition-colors ${
-                        isOn
-                          ? "bg-white/80 ring-emerald-300/70"
-                          : "bg-white/40 ring-ink-200/50 hover:bg-white/60"
-                      }`}
+                      className="rounded-lg p-3 ring-1 bg-white/60 ring-ink-200/50"
                     >
-                      <input
-                        type="checkbox"
-                        checked={isOn}
-                        onChange={() => toggle(imp.kind)}
-                        className="mt-1 h-4 w-4 rounded border-ink-300 text-emerald-700 focus:ring-emerald-500"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <div className="text-[14px] font-medium text-ink-900">{imp.title}</div>
-                          {imp.simplifies && (
-                            <span className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider bg-sky-50 ring-1 ring-sky-200/70 text-sky-800">
-                              simpler close
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-[14px] font-medium text-ink-900">{imp.title}</div>
+                            {imp.simplifies && (
+                              <span className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider bg-sky-50 ring-1 ring-sky-200/70 text-sky-800">
+                                simpler close
+                              </span>
+                            )}
+                            <span className={`inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider ring-1 ${
+                              imp.protects === "both" ? "bg-emerald-50 ring-emerald-200/70 text-emerald-800"
+                                : imp.protects === "artist" ? "bg-amber-50 ring-amber-200/70 text-amber-800"
+                                  : "bg-violet-50 ring-violet-200/70 text-violet-800"
+                            }`}>
+                              {protectsLabel(imp.protects)}
                             </span>
-                          )}
-                          <span className={`inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider ring-1 ${
-                            imp.protects === "both" ? "bg-emerald-50 ring-emerald-200/70 text-emerald-800"
-                              : imp.protects === "artist" ? "bg-amber-50 ring-amber-200/70 text-amber-800"
-                                : "bg-violet-50 ring-violet-200/70 text-violet-800"
-                          }`}>
-                            {protectsLabel(imp.protects)}
-                          </span>
-                        </div>
-                        <div className="text-[12px] text-ink-500 mt-1 flex items-center gap-2 flex-wrap">
-                          <span>Now: <span className="font-mono tabular text-ink-700">{imp.currentValue}</span></span>
-                          <span className="text-ink-300">→</span>
-                          <span>Proposed: <span className="font-mono tabular text-emerald-800 font-medium">{imp.proposedValue}</span></span>
-                        </div>
-                        <div className="text-[12.5px] text-ink-700 leading-relaxed mt-2">
-                          {imp.rationale}
+                          </div>
+                          <div className="text-[12px] text-ink-500 mt-1 flex items-center gap-2 flex-wrap">
+                            <span>Now: <span className="font-mono tabular text-ink-700">{imp.currentValue}</span></span>
+                            <span className="text-ink-300">→</span>
+                            {isEditing && editable ? (
+                              <span className="inline-flex items-center gap-1">
+                                <span className="text-ink-500">$</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={50}
+                                  value={edits[imp.kind] ?? ""}
+                                  onChange={(e) =>
+                                    setEdits((prev) => ({ ...prev, [imp.kind]: e.target.value }))
+                                  }
+                                  className="w-24 rounded border border-emerald-300 bg-white px-2 py-0.5 text-[12px] font-mono tabular text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                />
+                              </span>
+                            ) : (
+                              <span>Proposed: <span className="font-mono tabular text-emerald-800 font-medium">{imp.proposedValue}</span></span>
+                            )}
+                          </div>
+                          <div className="text-[12.5px] text-ink-700 leading-relaxed mt-2">
+                            {imp.rationale}
+                          </div>
                         </div>
                       </div>
-                    </label>
+                      <div className="mt-3 pt-2 border-t border-ink-200/40 flex items-center justify-end gap-2">
+                        {editable && (
+                          <button
+                            type="button"
+                            onClick={() => toggleEdit(imp.kind)}
+                            disabled={isBusy}
+                            className="text-[11.5px] text-ink-500 hover:text-emerald-800 underline-offset-2 hover:underline disabled:opacity-50"
+                          >
+                            {isEditing ? "Cancel edit" : "Edit number"}
+                          </button>
+                        )}
+                        <Button
+                          variant="brand"
+                          onClick={() => applyOne(imp.kind)}
+                          disabled={isBusy || busyKind != null}
+                          className="text-[12px] h-8 px-3"
+                        >
+                          {isBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                          {isBusy ? "Applying…" : `Apply & resend to ${recipient}`}
+                        </Button>
+                      </div>
+                    </div>
                   );
                 })}
-              </div>
-            )}
-
-            {data.improvements.length > 0 && (
-              <div className="flex items-center justify-between gap-3 pt-2 border-t border-ink-200/40">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  disabled={busy}
-                  className="text-[12px] text-ink-500 hover:text-ink-900 underline-offset-2 hover:underline disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <Button variant="brand" onClick={apply} disabled={busy || selected.size === 0}>
-                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                  {busy ? "Applying…" : `Apply ${selected.size} change${selected.size === 1 ? "" : "s"} to deal`}
-                </Button>
               </div>
             )}
           </>

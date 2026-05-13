@@ -65,12 +65,12 @@ export const api = {
     get<DealImprovementsPayload>(`/shows/${encodeURIComponent(id)}/deal/improvements`),
   applyDealImprovements: async (
     id: string,
-    kinds: ImprovementKind[],
+    items: { kind: ImprovementKind; value?: number }[],
   ): Promise<{ ok: true; appliedKinds: ImprovementKind[]; dealId: string }> => {
     const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/deal/apply-improvements`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kinds }),
+      body: JSON.stringify({ items }),
     });
     if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string };

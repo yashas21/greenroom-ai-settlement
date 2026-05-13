@@ -152,17 +152,27 @@ router.get("/shows/:id/deal/improvements", async (req, res): Promise<void> => {
 
 router.post("/shows/:id/deal/apply-improvements", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const body = (req.body ?? {}) as { kinds?: unknown };
-  const kinds = Array.isArray(body.kinds)
-    ? (body.kinds.filter((k): k is ImprovementKind =>
-        k === "add_expense_cap" || k === "add_hospitality_cap" || k === "convert_to_flat"))
-    : [];
-  if (kinds.length === 0) {
+  const body = (req.body ?? {}) as { items?: unknown; kinds?: unknown };
+  const isKind = (k: unknown): k is ImprovementKind =>
+    k === "add_expense_cap" || k === "add_hospitality_cap" || k === "convert_to_flat";
+  let items: { kind: ImprovementKind; value?: number }[] = [];
+  if (Array.isArray(body.items)) {
+    items = body.items
+      .filter((it): it is { kind: unknown; value?: unknown } => !!it && typeof it === "object")
+      .filter((it) => isKind(it.kind))
+      .map((it) => ({
+        kind: it.kind as ImprovementKind,
+        value: typeof it.value === "number" ? it.value : undefined,
+      }));
+  } else if (Array.isArray(body.kinds)) {
+    items = body.kinds.filter(isKind).map((kind) => ({ kind }));
+  }
+  if (items.length === 0) {
     res.status(400).json({ error: "no_kinds_selected" });
     return;
   }
   try {
-    const out = await applyDealImprovements(raw, kinds);
+    const out = await applyDealImprovements(raw, items);
     res.json(out);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "apply_failed";
