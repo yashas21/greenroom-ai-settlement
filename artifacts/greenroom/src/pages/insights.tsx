@@ -1076,6 +1076,7 @@ function BAStatCard({ label, value, tone }: { label: string; value: string; tone
 
 function SwitchProjectedGridSection() {
   const state = useApiData(() => api.switchProjectedGrid(12), []);
+  const [explainerOpen, setExplainerOpen] = useState(false);
 
   if (state.status === "loading")
     return (
@@ -1147,33 +1148,11 @@ function SwitchProjectedGridSection() {
           caps or propose a flat at proposal time, but isn't backtested on already-signed deals here.
         </p>
 
-        <details className="mb-5 rounded-md ring-1 ring-ink-200/60 bg-ink-50/30 px-3 py-2 text-[11px] text-ink-600">
-          <summary className="cursor-pointer text-ink-700 font-medium">
-            How the flat contract is computed
-          </summary>
-          <div className="mt-2 leading-relaxed space-y-2">
-            <p>
-              For each <span className="font-mono">vs</span> or{" "}
-              <span className="font-mono">% of net</span> deal, the suggested flat is the
-              historical average artist payout for deals in the same{" "}
-              <span className="font-mono">deal type × size bucket</span> cell, rounded to the
-              nearest $50:
-            </p>
-            <pre className="font-mono text-[10.5px] bg-white rounded px-2 py-1.5 ring-1 ring-ink-200/50 overflow-x-auto">
-{`bucket            = classifySizeBucket(deal)        // $0–1K | $1–5K | $5–15K | $15K+ | Uncapped %
-cell              = pastSettled[dealType][bucket]   // need cell.n >= 3, else no suggestion
-suggestedFlat     = roundTo50( cell.avgPayout )     // mean totalToArtist across the cell
-confidenceBand    = [ roundTo50(cell.p10Payout), roundTo50(cell.p90Payout) ]`}
-            </pre>
-            <p>
-              Counterfactual losing-money for the projection then uses{" "}
-              <span className="font-mono">gross − suggestedFlat − actualExpenses &lt; 0</span>.
-              Door deals use a separate hybrid:{" "}
-              <span className="font-mono">$500 floor + 60% × max(0, gross·0.9 − expenseCap)</span>{" "}
-              with <span className="font-mono">expenseCap = min($1,500, avg cell expenses)</span>.
-            </p>
-          </div>
-        </details>
+        <ProjectedExplainer
+          open={explainerOpen}
+          onToggle={() => setExplainerOpen((v) => !v)}
+          data={data}
+        />
 
         <div className="grid grid-cols-4 gap-3 mb-5">
           <ProjStatCard label="Money saved" value={fmtMoney(data.totalMoneySavedToVenue)} tone="emerald" />
@@ -1219,6 +1198,191 @@ confidenceBand    = [ roundTo50(cell.p10Payout), roundTo50(cell.p90Payout) ]`}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function ProjectedExplainer({
+  open,
+  onToggle,
+  data,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  data: {
+    windowMonths: number;
+    totalDealsModelled: number;
+    totalCandidates: number;
+    totalMoneySavedToVenue: number;
+    totalLosingMoneyAvoided: number;
+    totalDisputesAvoided: number;
+    totalAttentionAvoided: number;
+    cells: SwitchProjectedCell[];
+  };
+}) {
+  // Pick the cell with the largest money saved as the worked example
+  const topCell = [...data.cells]
+    .filter((c) => c.switchApplies && c.count > 0)
+    .sort((a, b) => b.moneySavedToVenue - a.moneySavedToVenue)[0] ?? null;
+
+  return (
+    <div className="mb-5 rounded-md ring-1 ring-ink-200/60 bg-ink-50/40">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-ink-100/50 rounded-md transition-colors"
+      >
+        <ChevronRight
+          className={`h-3.5 w-3.5 text-ink-400 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+        />
+        <Calculator className="h-3.5 w-3.5 text-brand-700 shrink-0" />
+        <span className="text-[12px] text-ink-700 font-medium">
+          How are these projected numbers computed?
+        </span>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 space-y-3 text-[11.5px] text-ink-700 leading-relaxed">
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Eligibility</div>
+            <div className="text-ink-600">
+              For each past-dated, settled deal in the window, we classify it into a{" "}
+              <span className="font-mono">deal type × size bucket</span> cell. Smart Switch
+              <span className="font-semibold"> applies</span> only to{" "}
+              <span className="font-mono">door</span> (any size) and{" "}
+              <span className="font-mono">vs / % of net</span> in the <span className="font-mono">$1–5K</span>{" "}
+              bucket. Other cells (<span className="font-mono">vs / % of net</span> outside that
+              bucket, <span className="font-mono">% of gross</span>, <span className="font-mono">flat</span>)
+              are rendered muted as Improve Deal territory — caps suggestions aren't backtested
+              against already-signed deals here.
+            </div>
+          </div>
+
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Money saved · per cell</div>
+            <div className="font-mono tabular text-[11px] bg-white rounded ring-1 ring-ink-200/60 px-2 py-1.5 inline-block whitespace-pre-wrap">
+              {`moneySavedToVenue = switchApplies
+  ? Σ actualPayout − Σ projectedPayout      // over deals in the cell
+  : 0                                       // muted cells contribute nothing`}
+            </div>
+            <div className="mt-1.5 text-ink-600">
+              <span className="font-semibold text-ink-900">Smart Switch is the only engine
+              moving this number.</span> Each deal's <span className="font-mono">projectedPayout</span>{" "}
+              comes from re-running the Smart Switch engine and replacing the variable payout:
+              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                <li>
+                  <span className="font-mono">flat</span> shape →{" "}
+                  <span className="font-mono">suggestedFlat = roundTo50(cell.avgPayout)</span>{" "}
+                  (mean <span className="font-mono">totalToArtist</span> across the historical cell;
+                  needs <span className="font-mono">cell.n ≥ 3</span>)
+                </li>
+                <li>
+                  <span className="font-mono">door_hybrid</span> shape →{" "}
+                  <span className="font-mono">$500 floor + 60% × max(0, gross·0.9 − cap)</span>{" "}
+                  with <span className="font-mono">cap = min($1,500, avg cell expenses)</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Loss-making nights avoided</div>
+            <div className="font-mono tabular text-[11px] bg-white rounded ring-1 ring-ink-200/60 px-2 py-1.5 inline-block whitespace-pre-wrap">
+              {`actualLosing      = count( gross − actualPayout − actualExpenses < 0 )
+projectedLosing   = count( gross − projectedPayout − actualExpenses < 0 )
+nightsAvoided     = actualLosing − projectedLosing`}
+            </div>
+            <div className="mt-1.5 text-ink-600">
+              Same actual expense lines on both sides of the comparison — only the payout
+              changes. So a "night avoided" means the Smart Switch payout would have been low
+              enough to keep the venue's net positive on a deal that actually went red.
+            </div>
+          </div>
+
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">
+              Disputes & attention items avoided
+            </div>
+            <div className="font-mono tabular text-[11px] bg-white rounded ring-1 ring-ink-200/60 px-2 py-1.5 inline-block whitespace-pre-wrap">
+              {`projectedDisputed  = switchApplies ? 0 : actualDisputed
+projectedAttention = switchApplies ? 0 : actualAttention
+disputesAvoided    = actualDisputed  − projectedDisputed
+attentionAvoided   = actualAttention − projectedAttention`}
+            </div>
+            <div className="mt-1.5 text-ink-600">
+              Modelling assumption: pre-agreed Smart Switch terms eliminate the recoup arithmetic,
+              and every settlement-flow attention kind in this app traces back to recoup or
+              status-vs-notes friction — so we project both rates to <span className="font-mono">0</span>{" "}
+              for switched cells. Muted cells inherit their actual numbers unchanged.
+            </div>
+          </div>
+
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Where Improve Deal fits in</div>
+            <div className="text-ink-600">
+              <span className="font-semibold text-ink-900">Improve Deal</span> only emits structural
+              caps (expense / hospitality), so it doesn't show up in the projected dollar number
+              above — caps land at proposal time, before a signed deal exists to backtest. The
+              muted cells in the grid are exactly the cells where Improve Deal would have stepped
+              in instead of Smart Switch; their projected numbers equal their actuals because we
+              don't simulate cap-driven expense reductions on already-settled shows.
+            </div>
+          </div>
+
+          {topCell && (
+            <div className="rounded-md ring-1 ring-emerald-200/60 bg-emerald-50/40 p-3">
+              <div className="eyebrow text-[10px] text-emerald-700 mb-1">
+                Worked example · biggest-savings cell ({PROJ_DEAL_LABEL[topCell.dealType] ?? topCell.dealType} · {topCell.bucket})
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono tabular">
+                <div className="text-ink-500">Deals in cell</div>
+                <div className="text-right text-ink-900">{topCell.count}</div>
+                <div className="text-ink-500">Σ actual payout</div>
+                <div className="text-right text-ink-900">{fmtMoney(topCell.actualPayoutSum)}</div>
+                <div className="text-ink-500">Σ projected payout</div>
+                <div className="text-right text-ink-900">{fmtMoney(topCell.projectedPayoutSum)}</div>
+                <div className="text-emerald-700 font-semibold border-t border-emerald-200/60 pt-0.5">
+                  Money saved
+                </div>
+                <div className="text-right text-emerald-700 font-semibold border-t border-emerald-200/60 pt-0.5">
+                  {topCell.moneySavedToVenue >= 0 ? "+" : ""}
+                  {fmtMoney(topCell.moneySavedToVenue)}
+                </div>
+                <div className="text-ink-500 pt-1">Loss-making nights (actual → projected)</div>
+                <div className="text-right text-ink-900 pt-1">
+                  {topCell.actualLosingMoney} → {topCell.projectedLosingMoney}
+                </div>
+                <div className="text-ink-500">Disputed (actual → projected)</div>
+                <div className="text-right text-ink-900">
+                  {topCell.actualDisputed} → {topCell.projectedDisputed}
+                </div>
+                <div className="text-ink-500">Attention items (actual → projected)</div>
+                <div className="text-right text-ink-900">
+                  {topCell.actualAttention} → {topCell.projectedAttention}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="text-[11px] text-ink-500 border-t border-ink-200/60 pt-2.5">
+            Headline tiles roll up every cell in the grid: money saved is{" "}
+            <span className="font-mono tabular text-ink-700">
+              {fmtMoney(data.totalMoneySavedToVenue)}
+            </span>
+            , loss-making nights avoided{" "}
+            <span className="font-mono tabular text-ink-700">
+              {data.totalLosingMoneyAvoided}
+            </span>
+            , disputes avoided{" "}
+            <span className="font-mono tabular text-ink-700">{data.totalDisputesAvoided}</span>,
+            attention avoided{" "}
+            <span className="font-mono tabular text-ink-700">{data.totalAttentionAvoided}</span>.
+            Modelled <span className="font-mono">{data.totalDealsModelled}</span> of{" "}
+            <span className="font-mono">{data.totalCandidates}</span> settled deals in the last{" "}
+            {data.windowMonths} months — future-dated NEW DEMO proposals never enter the calc.
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
