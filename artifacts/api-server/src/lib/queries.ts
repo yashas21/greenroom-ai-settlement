@@ -271,7 +271,14 @@ function classifyComplexity(d: typeof deals.$inferSelect): ComplexityBucket {
 
 export function classifySizeBucket(d: typeof deals.$inferSelect): string {
   if (d.guaranteeAmount == null || d.guaranteeAmount === 0) {
-    if (d.percentage != null) return "Uncapped %";
+    // Audit fix #8: "Uncapped %" is reserved for percentage_of_gross deals
+    // (the only shape where uncapped percentage is the literal contract
+    // structure). vs / percentage_of_net deals with a $0 guarantee fall into
+    // the smallest gross-size bucket so they're analyzed alongside their
+    // peers, not lumped with the uncapped-%g line.
+    if (d.percentage != null && d.dealType === "percentage_of_gross") {
+      return "Uncapped %";
+    }
     return "$0–1K";
   }
   const g = d.guaranteeAmount;

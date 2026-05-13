@@ -154,7 +154,7 @@ router.post("/shows/:id/deal/apply-improvements", async (req, res): Promise<void
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const body = (req.body ?? {}) as { items?: unknown; kinds?: unknown };
   const isKind = (k: unknown): k is ImprovementKind =>
-    k === "add_expense_cap" || k === "add_hospitality_cap" || k === "convert_to_flat";
+    k === "add_expense_cap" || k === "add_hospitality_cap";
   let items: { kind: ImprovementKind; value?: number }[] = [];
   if (Array.isArray(body.items)) {
     items = body.items

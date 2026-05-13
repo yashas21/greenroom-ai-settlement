@@ -603,11 +603,20 @@ function SmartSwitchPanel({
                     <div className="space-y-3">
                       <div className="eyebrow text-[10px] text-ink-500">Suggested structure — flat-equivalent (Smart Guaranteed Price)</div>
                       {settlement ? (
-                        <div className="flex items-baseline gap-3">
+                        <div className="flex items-baseline gap-3 flex-wrap">
                           <span className="text-[40px] font-mono tabular font-semibold text-ink-900 leading-none">
                             {formatMoney(sug.suggestedFlat)}
                           </span>
-                          <span className="text-[13px] text-ink-500">flat guarantee</span>
+                          {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0 ? (
+                            <span className="text-[18px] font-mono tabular text-ink-500 leading-none">
+                              ± {formatMoney(Math.round(sug.bandWidth / 2))}
+                            </span>
+                          ) : null}
+                          <span className="text-[13px] text-ink-500">
+                            {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0
+                              ? "flat (range — historical band is wide)"
+                              : "flat guarantee"}
+                          </span>
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 gap-3">
@@ -622,8 +631,17 @@ function SmartSwitchPanel({
                             <div className="eyebrow text-[10px] text-ink-500 mb-1">Smart Guaranteed Price</div>
                             <div className="text-[28px] font-mono tabular font-semibold text-emerald-800 leading-none">
                               {formatMoney(sug.suggestedFlat)}
+                              {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0 && (
+                                <span className="text-[16px] font-mono tabular text-emerald-700/70 ml-1">
+                                  ± {formatMoney(Math.round(sug.bandWidth / 2))}
+                                </span>
+                              )}
                             </div>
-                            <div className="text-[11px] text-ink-500 mt-2">7-step calc · rounded to $50</div>
+                            <div className="text-[11px] text-ink-500 mt-2">
+                              {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0
+                                ? "Cell-mean estimate · range shown because P10–P90 spread is wide"
+                                : "7-step calc · rounded to $50"}
+                            </div>
                           </div>
                         </div>
                       )}
