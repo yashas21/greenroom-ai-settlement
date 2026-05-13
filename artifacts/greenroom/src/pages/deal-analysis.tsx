@@ -116,8 +116,11 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
   const cellByKey = new Map(db.cells.map((c) => [`${c.dealType}|${c.bucket}`, c]));
   const activeBuckets = db.buckets.filter((b) => db.cells.some((c) => c.bucket === b));
   const activeTypes = db.dealTypes.filter((dt) => db.cells.some((c) => c.dealType === dt));
-  const totalDisputed = db.cells.reduce((a, c) => a + c.disputed, 0);
-  const totalDisputedAmount = db.cells.reduce((a, c) => a + c.disputedAmount, 0);
+  const totalDisputed = db.cells.reduce((a, c) => a + (c.disputed ?? 0), 0);
+  const totalDisputedAmount = db.cells.reduce(
+    (a, c) => a + (c.disputedAmount ?? 0),
+    0,
+  );
 
   return (
     <section className="mb-14">
@@ -199,9 +202,9 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
                             </div>
                             <div
                               className="text-[11px] font-mono tabular text-rose-700"
-                              title={`${cell.disputedAmount.toLocaleString("en-US", {style:"currency", currency:"USD"})} of recoup value disputed`}
+                              title={`${(cell.disputedAmount ?? 0).toLocaleString("en-US", {style:"currency", currency:"USD"})} of recoup value disputed`}
                             >
-                              {formatMoneyCompact(cell.disputedAmount)} disputed
+                              {formatMoneyCompact(cell.disputedAmount ?? 0)} disputed
                             </div>
                             {cell.topTopics.length > 0 && (
                               <div className="flex flex-wrap justify-center gap-1 mt-1 max-w-[140px]">
