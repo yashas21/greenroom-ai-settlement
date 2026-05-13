@@ -1,42 +1,32 @@
+"use client";
+
 import * as React from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+
 import { cn } from "@/lib/utils";
 
-export function Tooltip({
-  label, children, className, side = "top",
-}: {
-  label: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-  side?: "top" | "bottom";
-}) {
-  const isTop = side === "top";
-  return (
-    <span className={cn("relative group inline-flex", className)}>
-      {children}
-      <span
-        role="tooltip"
-        className={cn(
-          "pointer-events-none absolute left-1/2 -translate-x-1/2 z-50",
-          "w-max max-w-[260px] whitespace-normal",
-          "rounded-md bg-ink-900 px-2.5 py-1.5",
-          "text-[11.5px] font-normal leading-relaxed text-white",
-          "opacity-0 group-hover:opacity-100",
-          "translate-y-1 group-hover:translate-y-0",
-          "transition-all duration-150 ease-out",
-          "shadow-lg ring-1 ring-black/5",
-          isTop ? "bottom-full mb-2" : "top-full mt-2",
-        )}
-      >
-        {label}
-        <span
-          aria-hidden
-          className={cn(
-            "absolute left-1/2 -translate-x-1/2 w-0 h-0",
-            "border-[5px] border-transparent",
-            isTop ? "top-full border-t-ink-900" : "bottom-full border-b-ink-900",
-          )}
-        />
-      </span>
-    </span>
-  );
-}
+const TooltipProvider = TooltipPrimitive.Provider;
+
+const Tooltip = TooltipPrimitive.Root;
+
+const TooltipTrigger = TooltipPrimitive.Trigger;
+
+const TooltipContent = React.forwardRef<
+  React.ElementRef<typeof TooltipPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+>(({ className, sideOffset = 4, ...props }, ref) => (
+  <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Content
+      ref={ref}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 overflow-hidden rounded-md bg-ink-900 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-white shadow-lg ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-tooltip-content-transform-origin]",
+        className,
+      )}
+      {...props}
+    />
+  </TooltipPrimitive.Portal>
+));
+TooltipContent.displayName = TooltipPrimitive.Content.displayName;
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };

@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
-const buttonVariants = cva(
+export const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-1.5",
     "rounded-lg text-[13px] font-medium",
