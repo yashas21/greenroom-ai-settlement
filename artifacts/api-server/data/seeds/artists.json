@@ -1,0 +1,42 @@
+[
+  {
+    "id": "artist_demo_drowsy_beacon",
+    "name": "Drowsy Beacon",
+    "agent_id": "agent_sarah_kim",
+    "manager_email": "manager+artist_demo_drowsy_beacon@example.com",
+    "genre": "indie",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_demo_marble_index",
+    "name": "Marble Index",
+    "agent_id": "agent_sarah_kim",
+    "manager_email": "manager+artist_demo_marble_index@example.com",
+    "genre": "indie",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_demo_north_frontier",
+    "name": "North Frontier",
+    "agent_id": "agent_sarah_kim",
+    "manager_email": "manager+artist_demo_north_frontier@example.com",
+    "genre": "indie",
+    "prior_show_count": 4
+  },
+  {
+    "id": "artist_demo_quartz_lantern",
+    "name": "Quartz Lantern",
+    "agent_id": "agent_sarah_kim",
+    "manager_email": "manager+artist_demo_quartz_lantern@example.com",
+    "genre": "indie",
+    "prior_show_count": 3
+  },
+  {
+    "id": "artist_demo_vespertine_choir",
+    "name": "Vespertine Choir",
+    "agent_id": "agent_sarah_kim",
+    "manager_email": "manager+artist_demo_vespertine_choir@example.com",
+    "genre": "indie",
+    "prior_show_count": 0
+  }
+]
