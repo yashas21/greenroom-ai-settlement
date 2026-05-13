@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { analyzeSettlementRisk } from "@/lib/settlementRisk";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -22,7 +23,7 @@ import {
   Field,
 } from "@/components/ui/card";
 import { StatusBadge, DealTypeBadge, PlainBadge } from "@/components/ui/badge";
-import { calculateSettlement } from "@/lib/dealMath";
+import { calculateSettlement, parseBonuses } from "@/lib/dealMath";
 import {
   formatMoney,
   formatShowDateFull,
@@ -73,7 +74,19 @@ export default async function SettlePage({
   const totalExpenses = expenses
     .filter((e) => !e.absorbedByVenue)
     .reduce((sum, e) => sum + e.amount, 0);
+  const bonuses = parseBonuses(deal);
 
+const hospitalityExpense = expenses
+  .filter((e) => e.category === "hospitality")
+  .reduce((sum, e) => sum + e.amount, 0);
+
+const riskAnalysis = analyzeSettlementRisk({
+  dealNotes: deal.dealNotesFreetext,
+  bonusesCount: bonuses.length,
+  hospitalityCap: deal.hospitalityCap,
+  hospitalityExpense,
+  settlementStatus: settlement?.status,
+});
   const disputedRecoups = recoups.filter((r) => r.status === "disputed");
   const isDisputed = settlement?.status === "disputed" || settlement?.status === "revised" || !!settlement?.disputedAt;
   const disputedRecoupValue = disputedRecoups.reduce((s, r) => s + r.amount, 0);
@@ -127,6 +140,7 @@ export default async function SettlePage({
       )}
 
       <div className="space-y-6 mt-6">
+      <SettlementReviewCopilot riskAnalysis={riskAnalysis} />
         {!calc.supported ? (
           <UnsupportedDeal
             dealType={calc.dealType}
@@ -173,6 +187,74 @@ export default async function SettlePage({
         </div>
       </div>
     </div>
+  );
+}
+
+function SettlementReviewCopilot({
+  riskAnalysis,
+}: {
+  riskAnalysis: ReturnType<typeof analyzeSettlementRisk>;
+}) {
+  const accent =
+    riskAnalysis.riskLevel === "High"
+      ? "rose"
+      : riskAnalysis.riskLevel === "Medium"
+        ? "amber"
+        : "brand";
+
+  return (
+    <Card accent={accent}>
+      <CardHeader>
+        <div>
+          <CardTitle>Settlement Review Copilot</CardTitle>
+          <CardDescription>
+            A lightweight confidence check before Mariana sends or finalizes the settlement.
+          </CardDescription>
+        </div>
+        <PlainBadge variant={accent}>
+          {riskAnalysis.riskLevel} risk · {riskAnalysis.score}
+        </PlainBadge>
+      </CardHeader>
+
+      <CardContent>
+        <p className="text-[13px] text-ink-700 leading-relaxed mb-4">
+          {riskAnalysis.summary}
+        </p>
+
+        {riskAnalysis.flags.length > 0 ? (
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-2">
+              Why this was flagged
+              </div>
+              
+          <div className="space-y-2">
+            {riskAnalysis.flags.map((flag, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-2 text-[12.5px] text-ink-700"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-700 mt-0.5 shrink-0" />
+                <span>{flag}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        ) : (
+          <div className="text-[12.5px] text-ink-500">
+            No contradiction or escalation signals detected from the available deal notes.
+          </div>
+        )}
+
+        <div className="mt-5 rounded-lg bg-canvas-soft ring-1 ring-ink-200/60 p-4">
+          <div className="eyebrow text-[10px] text-ink-500 mb-2">
+            Suggested next action
+          </div>
+          <p className="text-[12.5px] text-ink-700 leading-relaxed">
+            Review payout-impacting language in the free-text deal notes before relying on the worksheet total. If needed, confirm the disputed or ambiguous item with the agent before final sign-off.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
