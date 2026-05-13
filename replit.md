@@ -329,6 +329,20 @@ Both LLM call sites route through this helper:
 - `GET /settings/llm` — read-only LLM status (no key material).
 - `POST /settings/llm` — upsert provider/key/model; clears insights cache.
 
+## Design documents
+
+The redesign argument and the engineering reference for it both live as PDFs
+in `exports/`:
+
+| File | What it is |
+|---|---|
+| `exports/greenroom-settlement-redesign-v2.pdf` | **Settlement Redesign · v2.1** (May 2026). The opinionated three-phase argument — simplify the deal types Smart Switch already covers, then layer Improve-Deal caps and insurance on top. Every figure is sourced from the live API at this commit. |
+| `exports/greenroom-settlement-redesign-v2.html` | HTML source of the redesign report (re-export with `python3 -c "from weasyprint import HTML; HTML('exports/greenroom-settlement-redesign-v2.html').write_pdf('exports/greenroom-settlement-redesign-v2.pdf')"`). |
+| `exports/greenroom-supporting-document.pdf` | **Supporting Document · Features, APIs, and Tabs.** Engineering and analytical companion: every tab, every API endpoint, every backend lib module, with a direct mapping from each surface to the claim it supplies in the redesign report. |
+| `exports/greenroom-supporting-document.html` | HTML source of the supporting document. |
+
+Older v1 PDFs were superseded by v2.1 and have been removed.
+
 ## User preferences
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
