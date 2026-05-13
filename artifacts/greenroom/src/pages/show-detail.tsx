@@ -638,16 +638,38 @@ function SmartSwitchPanel({
                           </div>
                         </div>
                       )}
-                      {sug.bandLow != null && sug.bandHigh != null && (
-                        <div className="text-[12px] text-ink-500">
-                          Historical band <span className="font-mono tabular">{formatMoney(sug.bandLow)}</span> – <span className="font-mono tabular">{formatMoney(sug.bandHigh)}</span> (P10–P90)
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 flex-wrap text-[12px] text-ink-500">
+                        {sug.source === "guarantee_amount" && (
+                          <span className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider bg-emerald-50 ring-1 ring-emerald-200/70 text-emerald-800">
+                            = contract guarantee
+                          </span>
+                        )}
+                        {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0 && (
+                          <span className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider bg-amber-50 ring-1 ring-amber-200/70 text-amber-800">
+                            wide band · ±{formatMoney(Math.round(sug.bandWidth / 2))}
+                          </span>
+                        )}
+                        {sug.bandLow != null && sug.bandHigh != null && (
+                          <span>
+                            Historical band <span className="font-mono tabular">{formatMoney(sug.bandLow)}</span> – <span className="font-mono tabular">{formatMoney(sug.bandHigh)}</span> (P10–P90)
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })()}
 
-                {sug.shape === "door_hybrid" && (
+                {sug.shape === "door_hybrid" && sug.source === "suppressed" && (
+                  <div>
+                    <div className="eyebrow text-[10px] text-ink-500 mb-1.5">Suggested structure</div>
+                    <div className="text-[15px] text-ink-700 leading-snug">
+                      Not enough comparable history to project a structure here.
+                      Discuss the floor and split with the agent directly.
+                    </div>
+                  </div>
+                )}
+
+                {sug.shape === "door_hybrid" && sug.source !== "suppressed" && (
                   <div>
                     <div className="eyebrow text-[10px] text-ink-500 mb-1.5">Suggested structure</div>
                     <div className="text-[20px] font-display font-medium text-ink-900 leading-tight">
@@ -971,9 +993,7 @@ function ImproveDealPanel({
         : "Reduces risk for both sides";
 
   const kindLabel = (k: ImprovementKind) =>
-    k === "add_expense_cap" ? "expense cap"
-      : k === "add_hospitality_cap" ? "hospitality cap"
-        : "flat conversion";
+    k === "add_expense_cap" ? "expense cap" : "hospitality cap";
 
   const recipient = agentName ? agentName : "the agent";
 

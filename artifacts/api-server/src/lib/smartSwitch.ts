@@ -126,6 +126,14 @@ export function clearSmartSwitchCache(): void {
   cellStatsCache = null;
 }
 
+export type SwitchSource =
+  | "sgp_engine"
+  | "guarantee_amount"
+  | "cell_mean"
+  | "door_hybrid_calc"
+  | "door_dead_pool"
+  | "suppressed";
+
 export type GeneratedSuggestion = {
   shape: "flat" | "door_hybrid";
   dealTypeFrom: Deal["dealType"];
@@ -136,6 +144,8 @@ export type GeneratedSuggestion = {
   confidenceTier: ConfidenceTier;
   bandLow: number | null;
   bandHigh: number | null;
+  bandWidth: number | null;
+  source: SwitchSource;
   sampleSize: number;
   basis: string;
 };
@@ -143,6 +153,13 @@ export type GeneratedSuggestion = {
 const DOOR_FLOOR = 500;
 const DOOR_SPLIT_PCT = 0.6;
 const DOOR_EXPENSE_CAP = 1500;
+// Audit threshold: when the cell payout band is wider than $1,000 (P10–P90),
+// a single-number "flat at $X" promise is dishonest. Demote display tier so
+// the UI renders a range ($X ± $Y) instead.
+const WIDE_BAND_THRESHOLD = 1000;
+// Audit: door deals at $15K+ have n=1 in our history (Pale Lake) — refuse to
+// project hybrid math on a single data point. Surface as "discuss directly".
+const DOOR_SUPPRESS_GROSS = 15000;
 
 export function switchAppliesTo(dealType: string, bucket: string): boolean {
   // Policy: replace any door deal with the door hybrid; replace vs / % of net
@@ -169,6 +186,7 @@ export async function generateSuggestion(
 
   if (deal.dealType === "vs" || deal.dealType === "percentage_of_net") {
     const cell = stats.get(`${deal.dealType}::${bucket}`);
+    const cellBandWidth = cell ? roundTo50(cell.p90Payout - cell.p10Payout) : null;
 
     // Preferred path: route through the Smart Guaranteed Price 7-step engine
     // (artist→agent→genre→venue waterfall, capped expense, % payout vs.
@@ -188,15 +206,58 @@ export async function generateSuggestion(
           confidenceTier: g.confidenceTier as ConfidenceTier,
           bandLow: cell ? roundTo50(cell.p10Payout) : null,
           bandHigh: cell ? roundTo50(cell.p90Payout) : null,
+          bandWidth: cellBandWidth,
+          source: "sgp_engine",
           sampleSize: cell?.n ?? g.artistShowCount + g.agentShowCount,
           basis: g.basis,
         };
       }
-      // fall through to cell-average path if SGP couldn't compute
+      // fall through to guarantee/cell-mean path if SGP couldn't compute
     }
 
+    // Audit fix: for vs / % of net at $1–5K, fall back to the contract
+    // guarantee — not the cell mean. The audit found 43/43 historical vs deals
+    // in this bucket paid the guarantee (the percentage never fired), so
+    // cell-mean over-promised by ~$591/show. The guarantee IS the answer.
+    if (
+      bucket === "$1–5K" &&
+      deal.guaranteeAmount != null &&
+      deal.guaranteeAmount > 0
+    ) {
+      // Audit acceptance: match the contract guarantee EXACTLY (no $50
+      // rounding) — the suggestion is anchored to the real number on the
+      // contract, not a synthesized average.
+      const flat = deal.guaranteeAmount;
+      const tier = computeTier(cell?.n ?? 0, artistShowsAtVenue);
+      const dealName = deal.dealType === "vs" ? "vs" : "percentage-of-net";
+      return {
+        shape: "flat",
+        dealTypeFrom: deal.dealType,
+        suggestedFlat: flat,
+        doorFloor: null,
+        doorSplitPct: null,
+        doorExpenseCap: null,
+        confidenceTier: tier,
+        bandLow: cell ? roundTo50(cell.p10Payout) : null,
+        bandHigh: cell ? roundTo50(cell.p90Payout) : null,
+        bandWidth: cellBandWidth,
+        source: "guarantee_amount",
+        sampleSize: cell?.n ?? 0,
+        basis:
+          `Across past ${dealName} deals in the ${bucket} bucket at this venue, the ` +
+          `percentage calc rarely beats the guarantee — the artist almost always walks ` +
+          `with the contract guarantee (${formatMoney(flat)}). Lock it in as a flat: ` +
+          `same payout, no settlement-night recoup math. Confidence tier ${tier} ` +
+          `(${familiarity}).`,
+      };
+    }
+
+    // Last resort: cell-mean. Demote tier when the historical band is wide
+    // (audit's "honest range" rule) so the UI shows $X ± $Y instead of a
+    // single number that pretends to be precise.
     if (!cell || cell.n < 3) return null;
-    const tier = computeTier(cell.n, artistShowsAtVenue);
+    let tier = computeTier(cell.n, artistShowsAtVenue);
+    if ((cellBandWidth ?? 0) > WIDE_BAND_THRESHOLD && tier === "A") tier = "B";
     const flat = roundTo50(cell.avgPayout);
     const bandLow = roundTo50(cell.p10Payout);
     const bandHigh = roundTo50(cell.p90Payout);
@@ -211,6 +272,8 @@ export async function generateSuggestion(
       confidenceTier: tier,
       bandLow,
       bandHigh,
+      bandWidth: cellBandWidth,
+      source: "cell_mean",
       sampleSize: cell.n,
       basis:
         `Across ${cell.n} past ${dealName} deals in the ${bucket} bucket, the artist ` +
@@ -227,10 +290,67 @@ export async function generateSuggestion(
     const sampleSize = cell?.n ?? 0;
     const tier = computeTier(sampleSize, artistShowsAtVenue);
     const avgGross = cell?.avgGross ?? 0;
+
+    // Audit fix #7: suppress the hybrid projection at $15K+ door (n=1 history).
+    // Surface as a "talk to the agent directly" suggestion instead of pretending
+    // to project from a single data point.
+    if (bucket === "$15K+" || avgGross >= DOOR_SUPPRESS_GROSS) {
+      return {
+        shape: "door_hybrid",
+        dealTypeFrom: deal.dealType,
+        suggestedFlat: null,
+        doorFloor: DOOR_FLOOR,
+        doorSplitPct: null,
+        doorExpenseCap: null,
+        confidenceTier: "D",
+        bandLow: null,
+        bandHigh: null,
+        bandWidth: null,
+        source: "suppressed",
+        sampleSize,
+        basis:
+          `Door deals at this size have only ${sampleSize} prior show${sampleSize === 1 ? "" : "s"} ` +
+          `at this venue — not enough history to project a hybrid floor/split with ` +
+          `confidence. Discuss the structure directly with the agent before signing; ` +
+          `the standard $${DOOR_FLOOR} floor is still recommended as a baseline.`,
+      };
+    }
+
     const avgExp = cell?.avgExpenses ?? DOOR_EXPENSE_CAP;
     const cap = Math.min(DOOR_EXPENSE_CAP, Math.round(avgExp));
-    const projectedPool = Math.max(0, avgGross * 0.9 - cap);
-    const projectedArtist = Math.round(DOOR_FLOOR + DOOR_SPLIT_PCT * projectedPool);
+    const projectedAvail = avgGross * 0.9 - cap;
+
+    // Audit fix #6: dead-pool branch. When the available pool after expenses
+    // doesn't even cover the floor, the artist gets exactly the floor and the
+    // hybrid degenerates to a pure floor deal. Surface that honestly.
+    if (projectedAvail <= DOOR_FLOOR) {
+      return {
+        shape: "door_hybrid",
+        dealTypeFrom: deal.dealType,
+        suggestedFlat: null,
+        doorFloor: DOOR_FLOOR,
+        doorSplitPct: DOOR_SPLIT_PCT,
+        doorExpenseCap: cap,
+        confidenceTier: tier,
+        bandLow: DOOR_FLOOR,
+        bandHigh: DOOR_FLOOR,
+        bandWidth: 0,
+        source: "door_dead_pool",
+        sampleSize,
+        basis:
+          `Door deals at this size barely cover expenses at this venue — projected ` +
+          `available pool after the $${cap} expense cap is ${formatMoney(Math.max(0, projectedAvail))}, ` +
+          `at or below the $${DOOR_FLOOR} floor. Artist effectively walks with the floor; ` +
+          `the ${Math.round(DOOR_SPLIT_PCT * 100)}% split rarely fires. Treat this as a ` +
+          `flat $${DOOR_FLOOR} guarantee. Confidence tier ${tier} (${familiarity}).`,
+      };
+    }
+
+    const projectedArtist = Math.round(DOOR_FLOOR + DOOR_SPLIT_PCT * projectedAvail);
+    const upperBand = roundTo50(
+      projectedArtist + (cell?.p90Payout ? cell.p90Payout - cell.avgPayout : 500),
+    );
+    const projectionBandWidth = upperBand - DOOR_FLOOR;
     return {
       shape: "door_hybrid",
       dealTypeFrom: deal.dealType,
@@ -240,7 +360,9 @@ export async function generateSuggestion(
       doorExpenseCap: cap,
       confidenceTier: tier,
       bandLow: DOOR_FLOOR,
-      bandHigh: roundTo50(projectedArtist + (cell?.p90Payout ? cell.p90Payout - cell.avgPayout : 500)),
+      bandHigh: upperBand,
+      bandWidth: projectionBandWidth,
+      source: "door_hybrid_calc",
       sampleSize,
       basis:
         `Pure door deals at this venue lose money 93% of the time (avg net to venue ` +
@@ -331,6 +453,8 @@ export async function generateAndPersist(showId: string, opts: { force?: boolean
     sampleSize: generated.sampleSize,
     basis: generated.basis,
     status: "suggested",
+    source: generated.source,
+    bandWidth: generated.bandWidth,
   });
 
   const fresh = await getSuggestionForShow(showId);

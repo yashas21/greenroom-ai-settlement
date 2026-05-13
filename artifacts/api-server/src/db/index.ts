@@ -78,7 +78,14 @@ export const migrationsReady = (async () => {
       sample_size INTEGER NOT NULL,
       basis TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'suggested',
-      decided_at INTEGER
+      decided_at INTEGER,
+      source TEXT,
+      band_width REAL
     )
   `);
+  // Idempotent ALTERs for any pre-existing switch_suggestions table that
+  // predates the source/band_width columns. Must run AFTER the CREATE so
+  // ensureColumn can detect the table.
+  await ensureColumn("switch_suggestions", "source", "TEXT");
+  await ensureColumn("switch_suggestions", "band_width", "REAL");
 })();

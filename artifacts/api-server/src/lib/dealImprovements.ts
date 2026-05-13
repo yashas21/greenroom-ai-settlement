@@ -6,29 +6,28 @@ import {
   expenses,
   type Deal,
 } from "../db/schema";
-import { and, eq, lte } from "drizzle-orm";
-import { generateAndPersistGuarantee, getGuaranteeForShow } from "./smartGuarantee";
+import { eq, lte } from "drizzle-orm";
 
+// P75-flat defaults derived from the 497-show audit (Apr 2026). Expenses at
+// this venue cluster around $1,500–$1,850 regardless of gross — they don't
+// scale with size — so a single per-bucket flat covers ~75% of nights without
+// the 10× over/undershoot the old bucket-scaled defaults caused.
 const DEFAULT_EXPENSE_CAP_BY_BUCKET: Record<string, number> = {
-  "$0–1K": 800,
-  "$1–5K": 1500,
-  "$5–15K": 3500,
-  "$15K+": 7500,
-  "Uncapped %": 1500,
+  "$0–1K": 1700,
+  "$1–5K": 1850,
+  "$5–15K": 1750,
+  "$15K+": 1650,
+  "Uncapped %": 1750,
 };
 
-const DEFAULT_HOSPITALITY_CAP_BY_BUCKET: Record<string, number> = {
-  "$0–1K": 250,
-  "$1–5K": 500,
-  "$5–15K": 1000,
-  "$15K+": 2000,
-  "Uncapped %": 500,
-};
+// Audit also showed hospitality is flat ~$304/show across every bucket — the
+// $50 spread between old bucket defaults wasn't supported by the data. Use
+// one number with margin so a single contract field works for any deal.
+const HOSPITALITY_CAP_DEFAULT = 400;
 
 export type ImprovementKind =
   | "add_expense_cap"
-  | "add_hospitality_cap"
-  | "convert_to_flat";
+  | "add_hospitality_cap";
 
 export type ImprovementRiskFor = "booker" | "artist" | "both";
 
@@ -152,10 +151,6 @@ function fmtMoney(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
-function pctText(n: number): string {
-  return `${Math.round(n * 100)}%`;
-}
-
 export async function getDealImprovements(showId: string): Promise<DealImprovementsPayload> {
   const [showRow] = await db.select().from(shows).where(eq(shows.id, showId));
   if (!showRow) throw new Error("show_not_found");
@@ -180,15 +175,6 @@ export async function getDealImprovements(showId: string): Promise<DealImproveme
   const bucket = classifyBucket(dealRow);
   const ctx = await loadComparables(dealRow, bucket);
 
-  // Make sure there's a fresh SGP suggestion to anchor the convert-to-flat improvement.
-  let sug = await getGuaranteeForShow(showId);
-  if (!sug && dealRow.dealType !== "flat") {
-    try {
-      const out = await generateAndPersistGuarantee(showId);
-      sug = out.suggestion;
-    } catch { /* noop */ }
-  }
-
   const improvements: DealImprovement[] = [];
 
   // 1) Add expense cap if missing — applies to vs / % of net / door (deals where expenses
@@ -197,14 +183,13 @@ export async function getDealImprovements(showId: string): Promise<DealImproveme
     dealRow.expenseCap == null &&
     (dealRow.dealType === "vs" || dealRow.dealType === "percentage_of_net" || dealRow.dealType === "door")
   ) {
-    const proposed = DEFAULT_EXPENSE_CAP_BY_BUCKET[bucket] ?? 1500;
-    const medianCopy = ctx.medianExpenses != null
-      ? `Past ${dealRow.dealType.replace(/_/g, " ")} deals in the ${bucket} bucket spent a median of ${fmtMoney(Math.round(ctx.medianExpenses))} on billable expenses (n=${ctx.comparableSettlements}).`
-      : `No comparable history yet — the proposed cap matches the venue's bucket default.`;
+    const proposed = DEFAULT_EXPENSE_CAP_BY_BUCKET[bucket] ?? 1750;
     improvements.push({
       kind: "add_expense_cap",
       title: `Add a ${fmtMoney(proposed)} expense cap`,
-      rationale: `${medianCopy} A written cap stops settlement-time arguments about which line items count.`,
+      rationale:
+        `Covers 75% of past nights at this venue. A written cap stops settlement-time ` +
+        `arguments about which line items count toward the artist's recoup.`,
       currentValue: "No cap",
       proposedValue: fmtMoney(proposed),
       proposedNumber: proposed,
@@ -215,43 +200,24 @@ export async function getDealImprovements(showId: string): Promise<DealImproveme
 
   // 2) Add hospitality cap if missing — applies to any non-flat deal.
   if (dealRow.hospitalityCap == null && dealRow.dealType !== "flat") {
-    const proposed = DEFAULT_HOSPITALITY_CAP_BY_BUCKET[bucket] ?? 500;
-    const medianCopy = ctx.medianHospitalityOverage != null
-      ? `Past comparable shows ran a median of ${fmtMoney(Math.round(ctx.medianHospitalityOverage))} in hospitality spend.`
-      : `Sets a clear ceiling on rider asks before settlement.`;
     improvements.push({
       kind: "add_hospitality_cap",
-      title: `Add a ${fmtMoney(proposed)} hospitality cap`,
-      rationale: `${medianCopy} Caps the rider so neither side argues over a $200 deli platter on settlement night.`,
+      title: `Add a ${fmtMoney(HOSPITALITY_CAP_DEFAULT)} hospitality cap`,
+      rationale:
+        `Covers 75% of past nights at this venue (hospitality runs flat ~$300/show ` +
+        `regardless of deal size). Prevents night-of receipt arguments over a ` +
+        `$200 deli platter.`,
       currentValue: "No cap",
-      proposedValue: fmtMoney(proposed),
-      proposedNumber: proposed,
+      proposedValue: fmtMoney(HOSPITALITY_CAP_DEFAULT),
+      proposedNumber: HOSPITALITY_CAP_DEFAULT,
       protects: "both",
       simplifies: true,
     });
   }
 
-  // 3) Convert to flat — only for non-flat deals with a high-confidence SGP suggestion.
-  //    This is the biggest simplifier: settles in the wizard, no math at the door.
-  if (
-    dealRow.dealType !== "flat" &&
-    sug &&
-    (sug.confidenceTier === "A" || sug.confidenceTier === "B")
-  ) {
-    const disputeCopy = ctx.comparableSettlements >= 3
-      ? `${pctText(ctx.disputeRate)} of past ${dealRow.dealType.replace(/_/g, " ")} deals in this bucket ended disputed (n=${ctx.comparableSettlements}).`
-      : `Removes settlement-time math entirely.`;
-    improvements.push({
-      kind: "convert_to_flat",
-      title: `Convert to a flat ${fmtMoney(sug.suggestedPrice)} guarantee`,
-      rationale: `${disputeCopy} A flat number means both sides know the payout the moment the contract is signed — no settlement disputes, no door-count arguments. Confidence ${sug.confidenceTier} (${sug.artistShowCount} prior show${sug.artistShowCount === 1 ? "" : "s"} with this artist).`,
-      currentValue: `${dealRow.dealType.replace(/_/g, " ")} deal`,
-      proposedValue: `Flat ${fmtMoney(sug.suggestedPrice)}`,
-      proposedNumber: sug.suggestedPrice,
-      protects: "both",
-      simplifies: true,
-    });
-  }
+  // Note: convert_to_flat is intentionally NOT generated here. Flat conversion
+  // is owned by Smart Switch, which is correctly scoped to vs/pn at $1–5K and
+  // door (any size) — the only cells where a flat replacement is data-safe.
 
   return {
     showId,
@@ -300,12 +266,6 @@ export async function applyDealImprovements(
     } else if (kind === "add_hospitality_cap") {
       update.hospitalityCap = value;
       applied.push(kind);
-    } else if (kind === "convert_to_flat") {
-      update.dealType = "flat";
-      update.guaranteeAmount = value;
-      update.percentage = null;
-      update.percentageBasis = null;
-      applied.push(kind);
     }
   }
 
@@ -316,3 +276,8 @@ export async function applyDealImprovements(
   await db.update(deals).set(update).where(eq(deals.id, dealRow.id));
   return { ok: true, appliedKinds: applied, dealId: dealRow.id };
 }
+
+export const __TEST_CONSTANTS__ = {
+  DEFAULT_EXPENSE_CAP_BY_BUCKET,
+  HOSPITALITY_CAP_DEFAULT,
+};

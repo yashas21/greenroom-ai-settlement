@@ -155,6 +155,14 @@ export interface ShowListRow {
 export type SwitchStatus = "suggested" | "accepted" | "declined";
 export type ConfidenceTier = "A" | "B" | "C" | "D";
 
+export type SwitchSource =
+  | "sgp_engine"
+  | "guarantee_amount"
+  | "cell_mean"
+  | "door_hybrid_calc"
+  | "door_dead_pool"
+  | "suppressed";
+
 export interface SwitchSuggestion {
   id: string;
   showId: string;
@@ -173,6 +181,8 @@ export interface SwitchSuggestion {
   basis: string;
   status: SwitchStatus;
   decidedAt: string | null;
+  source: SwitchSource | null;
+  bandWidth: number | null;
 }
 
 export interface GuaranteeSuggestion {
@@ -203,7 +213,7 @@ export interface GuaranteeSuggestion {
   auditJson: string;
 }
 
-export type ImprovementKind = "add_expense_cap" | "add_hospitality_cap" | "convert_to_flat";
+export type ImprovementKind = "add_expense_cap" | "add_hospitality_cap";
 
 export interface DealImprovement {
   kind: ImprovementKind;

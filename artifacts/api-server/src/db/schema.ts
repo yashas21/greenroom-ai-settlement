@@ -165,6 +165,24 @@ export const switchSuggestions = sqliteTable("switch_suggestions", {
   status: text("status", { enum: ["suggested", "accepted", "declined"] })
     .notNull().default("suggested"),
   decidedAt: integer("decided_at", { mode: "timestamp" }),
+  // Provenance of suggestedFlat / projection:
+  //   sgp_engine        — Smart Guaranteed Price 7-step calc
+  //   guarantee_amount  — fell back to the contract guarantee (vs/pn $1–5K)
+  //   cell_mean         — historical avg payout from comparable cell
+  //   door_hybrid_calc  — door hybrid projection from cell stats
+  //   door_dead_pool    — door deal where avail ≤ floor (artist gets floor)
+  //   suppressed        — cell has too little data (e.g. door $15K+, n=1)
+  source: text("source", {
+    enum: [
+      "sgp_engine",
+      "guarantee_amount",
+      "cell_mean",
+      "door_hybrid_calc",
+      "door_dead_pool",
+      "suppressed",
+    ],
+  }),
+  bandWidth: real("band_width"),
 });
 
 export const guaranteeSuggestions = sqliteTable("guarantee_suggestions", {

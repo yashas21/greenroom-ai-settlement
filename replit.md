@@ -300,6 +300,17 @@ Both LLM call sites route through this helper:
   first request computes; concurrent requests await the same promise; the
   cache is invalidated only by a server restart, a Settings save, or an
   explicit `clearInsightsCache()` call from the enrich route.
+- **Smart Switch owns flat conversion; Improve Deal is caps-only.** The
+  audit (Apr 2026) showed that "convert this %-deal to a flat" is only
+  data-safe in the cells Smart Switch already covers (`vs`/`pn` at $1–5K,
+  `door` any size). Improve Deal therefore emits only structural-cap
+  suggestions (expense cap, hospitality cap), with audit-derived P75-flat
+  defaults — no bucket-scaling, since expenses and hospitality are flat
+  across gross levels at this venue. Smart Switch suggestions carry a
+  `source` enum (`sgp_engine` / `guarantee_amount` / `cell_mean` /
+  `door_hybrid_calc` / `door_dead_pool` / `suppressed`) so the UI can
+  badge the provenance and demote tier `A → B` when the historical band
+  is wider than $1,000 (honest range display).
 
 ## API surface (under `/api`)
 
