@@ -132,6 +132,34 @@ const EMPTY_FILTERS: Filters = {
 
 const ELIGIBLE_DEAL_TYPES = new Set(["vs", "percentage_of_net", "door"]);
 
+// Show-lifecycle states where the deal is effectively locked in — no point
+// proposing a Smart Switch or Smart Guaranteed Price anymore.
+const LOCKED_SHOW_STATUSES = new Set(["settled", "closed"]);
+
+// Settlement-lifecycle states where the proposal is past the negotiation window:
+// signed = both sides agreed; finalized = settlement closed; paid = money moved.
+// Anything earlier (draft / submitted / in_review / revised / disputed) is still
+// fair game for a switch.
+const LOCKED_SETTLEMENT_STATUSES = new Set(["signed", "finalized", "paid"]);
+
+// "Actionable upcoming" = an upcoming show whose proposal is still open enough
+// for the booker to either (a) accept the Smart Switch suggestion before the
+// agent signs, or (b) redraft the proposal using the Smart Guaranteed Price.
+// We exclude:
+//  - past shows (date already happened)
+//  - deal types Smart Switch doesn't model (flat, % of gross)
+//  - shows where the booker already accepted/declined the switch
+//  - shows whose status says the deal is locked (settled/closed)
+//  - shows whose settlement is past the negotiation window (signed/finalized/paid)
+function isActionableUpcoming(row: ShowRow): boolean {
+  if (row.tense !== "upcoming") return false;
+  if (row.dealType === null || !ELIGIBLE_DEAL_TYPES.has(row.dealType)) return false;
+  if (row.switchStatus === "accepted" || row.switchStatus === "declined") return false;
+  if (LOCKED_SHOW_STATUSES.has(row.show.status)) return false;
+  if (row.settlement && LOCKED_SETTLEMENT_STATUSES.has(row.settlement.status)) return false;
+  return true;
+}
+
 function parseFilters(search: string): Filters {
   const params = new URLSearchParams(search);
   return {
@@ -205,15 +233,7 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
   const disputedCount = useMemo(() => rows.filter((r) => r.isDisputed).length, [rows]);
   const upcomingCount = useMemo(() => rows.filter((r) => r.tense === "upcoming").length, [rows]);
   const upcomingActionableCount = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          r.tense === "upcoming" &&
-          r.dealType !== null &&
-          ELIGIBLE_DEAL_TYPES.has(r.dealType) &&
-          r.switchStatus !== "accepted" &&
-          r.switchStatus !== "declined",
-      ).length,
+    () => rows.filter(isActionableUpcoming).length,
     [rows],
   );
   const switchAcceptedCount = useMemo(
@@ -227,15 +247,7 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
   const filtered = useMemo(() => {
     let out = rows;
     if (filters.upcomingOnly) out = out.filter((r) => r.tense === "upcoming");
-    if (filters.switchEligibleOnly)
-      out = out.filter(
-        (r) =>
-          r.tense === "upcoming" &&
-          r.dealType !== null &&
-          ELIGIBLE_DEAL_TYPES.has(r.dealType) &&
-          r.switchStatus !== "accepted" &&
-          r.switchStatus !== "declined",
-      );
+    if (filters.switchEligibleOnly) out = out.filter(isActionableUpcoming);
     if (filters.switchedOnly) out = out.filter((r) => r.switchStatus === "accepted");
     if (filters.unsupportedOnly) out = out.filter((r) => r.isUnsupported);
     if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
@@ -479,12 +491,7 @@ function DrillChip({ label, onClear }: { label: string; onClear: () => void }) {
 function ShowListRow({ row }: { row: ShowRow }) {
   const { show, artist, deal, settlement } = row;
   const accent = getAccentColor(row);
-  const isActionableSmartSwitch =
-    row.tense === "upcoming" &&
-    deal !== null &&
-    ELIGIBLE_DEAL_TYPES.has(deal.dealType) &&
-    row.switchStatus !== "accepted" &&
-    row.switchStatus !== "declined";
+  const isActionableSmartSwitch = isActionableUpcoming(row);
   return (
     <li className="relative group list-none">
       <div
