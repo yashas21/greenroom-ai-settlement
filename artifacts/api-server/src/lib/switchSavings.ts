@@ -130,7 +130,16 @@ function monthsAgoString(months: number): string {
 
 const SETTLED_STATUSES = new Set(["signed", "finalized", "paid", "disputed"]);
 const PROJECTED_DEAL_TYPES: ProjectedCell["dealType"][] = ["vs", "percentage_of_net", "door", "flat", "percentage_of_gross"];
-const SWITCH_APPLIES_TO = new Set(["vs", "percentage_of_net", "door"]);
+
+function switchAppliesTo(dealType: string, bucket: string): boolean {
+  // Smart Switch policy:
+  //  - Replace any door deal with the door hybrid (any bucket).
+  //  - Replace any vs / % of net deal in the $1–5K bucket with a flat.
+  //  - Leave everything else (flat, % of gross, and vs / % of net outside $1–5K) alone.
+  if (dealType === "door") return true;
+  if ((dealType === "vs" || dealType === "percentage_of_net") && bucket === "$1–5K") return true;
+  return false;
+}
 const PROJECTED_BUCKETS = ["$0–1K", "$1–5K", "$5–15K", "$15K+", "Uncapped %"];
 
 async function buildPriorShowIndex(): Promise<Map<string, string[]>> {
@@ -376,8 +385,8 @@ export async function getSwitchProjectedGrid(
     const hasAttention = attentionByShow.has(show.id);
     const actualNet = gross - actualPayout - totalExp;
 
-    let projectedPayout = actualPayout; // default for non-switch deal types
-    if (SWITCH_APPLIES_TO.has(deal.dealType)) {
+    let projectedPayout = actualPayout; // default: no switch, payout unchanged
+    if (switchAppliesTo(deal.dealType, bucket)) {
       const artistN = countPriorBefore(
         priorIndex.get(`${show.artistId}::${show.venueId}`),
         show.date,
@@ -414,7 +423,7 @@ export async function getSwitchProjectedGrid(
     for (const bucket of PROJECTED_BUCKETS) {
       const acc = cellAcc.get(`${dealType}::${bucket}`);
       if (!acc || acc.count === 0) continue;
-      const switchApplies = SWITCH_APPLIES_TO.has(dealType);
+      const switchApplies = switchAppliesTo(dealType, bucket);
       cells.push({
         dealType,
         bucket,
