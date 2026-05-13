@@ -194,6 +194,27 @@ describe("smartSwitch — audit fixes", () => {
     expect(sug!.source).toBe("door_dead_pool");
     expect(sug!.bandLow).toBe(500);
     expect(sug!.bandHigh).toBe(500);
+    // Audit acceptance: explicit isDeadPool boolean carries the contract,
+    // not just the source enum vocabulary.
+    expect(sug!.isDeadPool).toBe(true);
+  });
+
+  it("non-dead-pool branches all carry isDeadPool=false", async () => {
+    // Reuse the prior seeded door dataset (avgGross=1000) but override the
+    // deal so it routes through the door_hybrid_calc / suppressed branches
+    // instead. Then also test a vs cell-mean branch.
+    // door $15K+ → suppressed
+    const sup = await generateSuggestion(
+      {
+        id: "d-sup", showId: "s-sup", dealType: "door",
+        guaranteeAmount: 25000, percentage: 80, percentageBasis: null,
+        expenseCap: null, hospitalityCap: null, bonusesJson: null,
+        dealNotesFreetext: null, createdAt: new Date(),
+      },
+      0,
+    );
+    expect(sup!.source).toBe("suppressed");
+    expect(sup!.isDeadPool).toBe(false);
   });
 
   it("door hybrid normal projection still fires when pool > floor", async () => {

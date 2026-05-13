@@ -10,7 +10,10 @@ import { generateGuarantee } from "./smartGuarantee";
 
 export type ConfidenceTier = "A" | "B" | "C" | "D";
 
-export type SwitchSuggestion = typeof switchSuggestions.$inferSelect;
+export type SwitchSuggestion = typeof switchSuggestions.$inferSelect & {
+  // Audit acceptance: derived field, present on every API exposure.
+  isDeadPool: boolean;
+};
 
 type CellStats = {
   n: number;
@@ -148,7 +151,18 @@ export type GeneratedSuggestion = {
   source: SwitchSource;
   sampleSize: number;
   basis: string;
+  // Audit acceptance: explicit boolean signal that the door hybrid degenerated
+  // to a pure floor deal because the projected available pool after expenses
+  // didn't even cover the floor. Derived from source === "door_dead_pool"
+  // so callers don't have to know the source enum vocabulary.
+  isDeadPool: boolean;
 };
+
+/** Source-of-truth for the dead-pool boolean. Anywhere that reads a
+ * persisted SwitchSuggestion must derive the field from this. */
+export function deriveIsDeadPool(source: SwitchSource | null | undefined): boolean {
+  return source === "door_dead_pool";
+}
 
 const DOOR_FLOOR = 500;
 const DOOR_SPLIT_PCT = 0.6;
@@ -216,6 +230,7 @@ export async function generateSuggestion(
             source: "sgp_engine",
             sampleSize: cell?.n ?? g.artistShowCount + g.agentShowCount,
             basis: g.basis,
+            isDeadPool: false,
           };
         }
         // SGP returned tier C/D — fall through to guarantee_amount fallback.
@@ -261,6 +276,7 @@ export async function generateSuggestion(
           `with the contract guarantee (${formatMoney(flat)}). Lock it in as a flat: ` +
           `same payout, no settlement-night recoup math. Confidence tier ${tier} ` +
           `(${familiarity}).`,
+        isDeadPool: false,
       };
     }
 
@@ -286,6 +302,7 @@ export async function generateSuggestion(
       bandHigh,
       bandWidth: cellBandWidth,
       source: "cell_mean",
+      isDeadPool: false,
       sampleSize: cell.n,
       basis:
         `Across ${cell.n} past ${dealName} deals in the ${bucket} bucket, the artist ` +
@@ -319,6 +336,7 @@ export async function generateSuggestion(
         bandHigh: null,
         bandWidth: null,
         source: "suppressed",
+        isDeadPool: false,
         sampleSize,
         basis:
           `Door deals at this size have only ${sampleSize} prior show${sampleSize === 1 ? "" : "s"} ` +
@@ -348,6 +366,7 @@ export async function generateSuggestion(
         bandHigh: DOOR_FLOOR,
         bandWidth: 0,
         source: "door_dead_pool",
+        isDeadPool: true,
         sampleSize,
         basis:
           `Door deals at this size barely cover expenses at this venue — projected ` +
@@ -375,6 +394,7 @@ export async function generateSuggestion(
       bandHigh: upperBand,
       bandWidth: projectionBandWidth,
       source: "door_hybrid_calc",
+      isDeadPool: false,
       sampleSize,
       basis:
         `Pure door deals at this venue lose money 93% of the time (avg net to venue ` +
@@ -413,7 +433,11 @@ function formatMoney(n: number): string {
 
 export async function getSuggestionForShow(showId: string): Promise<SwitchSuggestion | null> {
   const rows = await db.select().from(switchSuggestions).where(eq(switchSuggestions.showId, showId));
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  // Audit acceptance: derive isDeadPool from the persisted source enum so
+  // every API exposure of a SwitchSuggestion carries the explicit boolean.
+  return { ...row, isDeadPool: deriveIsDeadPool(row.source) };
 }
 
 export async function generateAndPersist(showId: string, opts: { force?: boolean } = {}): Promise<{

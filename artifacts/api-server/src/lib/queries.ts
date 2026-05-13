@@ -123,7 +123,12 @@ export async function getShowById(id: string) {
     .select()
     .from(switchSuggestions)
     .where(eq(switchSuggestions.showId, id));
-  const switchSuggestion = suggestionRows[0] ?? null;
+  const rawSwitchSuggestion = suggestionRows[0] ?? null;
+  // Audit acceptance: derive isDeadPool from the persisted source enum so
+  // the public API contract always carries the explicit boolean.
+  const switchSuggestion = rawSwitchSuggestion
+    ? { ...rawSwitchSuggestion, isDeadPool: rawSwitchSuggestion.source === "door_dead_pool" }
+    : null;
 
   const guaranteeRows = await db
     .select()

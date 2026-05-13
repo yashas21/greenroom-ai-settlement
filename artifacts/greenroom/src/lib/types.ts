@@ -183,6 +183,10 @@ export interface SwitchSuggestion {
   decidedAt: string | null;
   source: SwitchSource | null;
   bandWidth: number | null;
+  // Audit acceptance: explicit boolean — true when this is a door-hybrid that
+  // collapsed to a pure floor deal because projected available pool ≤ floor.
+  // Derived server-side from `source === "door_dead_pool"`.
+  isDeadPool: boolean;
 }
 
 export interface GuaranteeSuggestion {

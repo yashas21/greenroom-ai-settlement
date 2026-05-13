@@ -607,13 +607,13 @@ function SmartSwitchPanel({
                           <span className="text-[40px] font-mono tabular font-semibold text-ink-900 leading-none">
                             {formatMoney(sug.suggestedFlat)}
                           </span>
-                          {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0 ? (
+                          {sug.source === "cell_mean" && sug.confidenceTier === "B" && sug.bandWidth != null && sug.bandWidth > 1000 ? (
                             <span className="text-[18px] font-mono tabular text-ink-500 leading-none">
                               ± {formatMoney(Math.round(sug.bandWidth / 2))}
                             </span>
                           ) : null}
                           <span className="text-[13px] text-ink-500">
-                            {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0
+                            {sug.source === "cell_mean" && sug.confidenceTier === "B" && sug.bandWidth != null && sug.bandWidth > 1000
                               ? "flat (range — historical band is wide)"
                               : "flat guarantee"}
                           </span>
@@ -631,14 +631,14 @@ function SmartSwitchPanel({
                             <div className="eyebrow text-[10px] text-ink-500 mb-1">Smart Guaranteed Price</div>
                             <div className="text-[28px] font-mono tabular font-semibold text-emerald-800 leading-none">
                               {formatMoney(sug.suggestedFlat)}
-                              {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0 && (
+                              {sug.source === "cell_mean" && sug.confidenceTier === "B" && sug.bandWidth != null && sug.bandWidth > 1000 && (
                                 <span className="text-[16px] font-mono tabular text-emerald-700/70 ml-1">
                                   ± {formatMoney(Math.round(sug.bandWidth / 2))}
                                 </span>
                               )}
                             </div>
                             <div className="text-[11px] text-ink-500 mt-2">
-                              {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0
+                              {sug.source === "cell_mean" && sug.confidenceTier === "B" && sug.bandWidth != null && sug.bandWidth > 1000
                                 ? "Cell-mean estimate · range shown because P10–P90 spread is wide"
                                 : "7-step calc · rounded to $50"}
                             </div>
@@ -662,7 +662,7 @@ function SmartSwitchPanel({
                             = contract guarantee
                           </span>
                         )}
-                        {sug.source === "cell_mean" && sug.bandWidth != null && sug.bandWidth > 0 && (
+                        {sug.source === "cell_mean" && sug.confidenceTier === "B" && sug.bandWidth != null && sug.bandWidth > 1000 && (
                           <span className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider bg-amber-50 ring-1 ring-amber-200/70 text-amber-800">
                             wide band · ±{formatMoney(Math.round(sug.bandWidth / 2))}
                           </span>
@@ -1063,10 +1063,10 @@ function ImproveDealPanel({
             )}
 
             {data.improvements.length === 0 && (
-              <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-4 text-[13px] text-ink-600">
-                This deal already has the structural protections we'd recommend — no
-                improvements to suggest right now.
-              </div>
+              <p className="text-[12.5px] text-ink-500 italic">
+                This deal already has both an expense cap and a hospitality cap —
+                no structural improvements to suggest.
+              </p>
             )}
 
             {data.improvements.length > 0 && (
