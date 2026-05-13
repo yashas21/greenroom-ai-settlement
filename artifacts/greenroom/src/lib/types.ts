@@ -203,6 +203,34 @@ export interface GuaranteeSuggestion {
   auditJson: string;
 }
 
+export type ImprovementKind = "add_expense_cap" | "add_hospitality_cap" | "convert_to_flat";
+
+export interface DealImprovement {
+  kind: ImprovementKind;
+  title: string;
+  rationale: string;
+  currentValue: string;
+  proposedValue: string;
+  proposedNumber: number | null;
+  protects: "booker" | "artist" | "both";
+  simplifies: boolean;
+}
+
+export interface DealImprovementsPayload {
+  showId: string;
+  dealId: string | null;
+  improvements: DealImprovement[];
+  context: {
+    bucket: string;
+    dealType: string;
+    comparableSettlements: number;
+    comparableDisputes: number;
+    disputeRate: number;
+    medianExpenses: number | null;
+    medianHospitalityOverage: number | null;
+  };
+}
+
 export interface ShowDetail {
   show: Show;
   artist: Artist | null;

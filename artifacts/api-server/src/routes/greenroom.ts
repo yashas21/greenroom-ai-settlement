@@ -5,6 +5,7 @@ import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insig
 import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
 import { generateAndPersist, decideSuggestion } from "../lib/smartSwitch";
 import { generateAndPersistGuarantee, backfillUpcomingGuarantees } from "../lib/smartGuarantee";
+import { getDealImprovements, applyDealImprovements, type ImprovementKind } from "../lib/dealImprovements";
 import { db } from "../db";
 import { deals, shows } from "../db/schema";
 import { eq } from "drizzle-orm";
@@ -135,6 +136,38 @@ router.post("/shows/:id/guarantee/generate", async (req, res): Promise<void> => 
     res.json(out.suggestion);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "generate_failed" });
+  }
+});
+
+router.get("/shows/:id/deal/improvements", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try {
+    res.json(await getDealImprovements(raw));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "improvements_failed";
+    if (msg === "show_not_found") { res.status(404).json({ error: msg }); return; }
+    res.status(500).json({ error: msg });
+  }
+});
+
+router.post("/shows/:id/deal/apply-improvements", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const body = (req.body ?? {}) as { kinds?: unknown };
+  const kinds = Array.isArray(body.kinds)
+    ? (body.kinds.filter((k): k is ImprovementKind =>
+        k === "add_expense_cap" || k === "add_hospitality_cap" || k === "convert_to_flat"))
+    : [];
+  if (kinds.length === 0) {
+    res.status(400).json({ error: "no_kinds_selected" });
+    return;
+  }
+  try {
+    const out = await applyDealImprovements(raw, kinds);
+    res.json(out);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "apply_failed";
+    if (msg === "no_deal") { res.status(404).json({ error: msg }); return; }
+    res.status(500).json({ error: msg });
   }
 });
 

@@ -14,7 +14,8 @@ import { parseBonuses } from "@/lib/dealMath";
 import {
   formatMoney, formatMoneyCompact, formatShowDateFull, relativeShowDate,
 } from "@/lib/format";
-import type { Bonus, SwitchSuggestion, GuaranteeSuggestion, Deal, Settlement } from "@/lib/types";
+import type { Bonus, SwitchSuggestion, GuaranteeSuggestion, Deal, Settlement, DealImprovementsPayload, DealImprovement, ImprovementKind } from "@/lib/types";
+import { Wrench } from "lucide-react";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
 import NotFound from "./not-found";
 
@@ -195,6 +196,12 @@ export default function ShowDetailPage() {
               deal={deal}
               settlement={settlement}
               initial={data.guaranteeSuggestion}
+            />
+          )}
+          {deal && deal.dealType !== "flat" && !switchEligibleClient(deal) && !settlement && (
+            <ImproveDealPanel
+              showId={show.id}
+              deal={deal}
               onApplied={reload}
             />
           )}
@@ -756,18 +763,16 @@ function SmartSwitchPanel({
 
 
 function SmartGuaranteedPricePanel({
-  showId, deal, settlement, initial, onApplied,
+  showId, deal, settlement, initial,
 }: {
   showId: string;
   deal: Deal;
   settlement: Settlement | null;
   initial: GuaranteeSuggestion | null;
-  onApplied: () => void;
 }) {
   const [sug, setSug] = useState<GuaranteeSuggestion | null>(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [applied, setApplied] = useState(false);
   const bucket = classifyBucketClient(deal);
 
   async function generate() {
@@ -777,30 +782,7 @@ function SmartGuaranteedPricePanel({
     finally { setBusy(false); }
   }
 
-  async function applyToDeal() {
-    if (!sug) return;
-    setBusy(true); setErr(null);
-    try {
-      await api.applyGuaranteeToDeal(showId, sug.suggestedPrice, false);
-      setApplied(true);
-      onApplied();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const agentG = deal.guaranteeAmount ?? 0;
-  const delta = sug ? sug.suggestedPrice - agentG : 0;
-  const gapDirection = delta > 0
-    ? "Smart price exceeds the agent's ask — counter up."
-    : delta < 0
-      ? "Agent's ask exceeds the Smart price — push back toward the lower number."
-      : "Agent's ask matches the Smart price — accept as-is.";
-  const gapTone = Math.abs(delta) > 150
-    ? (delta > 0 ? "amber" : "amber")
-    : "emerald";
 
   return (
     <Card className="md:col-span-3 ring-1 ring-sky-200/60 bg-gradient-to-br from-sky-50/40 to-canvas">
@@ -808,12 +790,12 @@ function SmartGuaranteedPricePanel({
         <div>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-sky-700" />
-            Smart Guaranteed Price
+            Smart Guaranteed Price <span className="text-[10px] uppercase tracking-wider font-mono text-ink-400 ml-1">insight</span>
           </CardTitle>
           <CardDescription>
             {settlement
               ? <>Hindsight check: what flat number our 7-step engine would have recommended for this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal in the <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{bucket}</code> bucket.</>
-              : <>Suggested guarantee for this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal — keeps the deal shape the agent proposed and just tells you the right number to put on the table.</>
+              : <>Reference number our 7-step engine would write for this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal. Use it as a benchmark when reading the agent's ask — to take action, see <strong>Improve the Deal</strong> below.</>
             }
           </CardDescription>
         </div>
@@ -824,7 +806,7 @@ function SmartGuaranteedPricePanel({
             <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
               Run the 7-step engine: expected gross → ticketing fees → capped expense estimate → percentage payout vs guarantee → rounded suggested price.
             </div>
-            <Button variant="brand" onClick={generate} disabled={busy}>
+            <Button variant="ghost" onClick={generate} disabled={busy}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               {busy ? "Computing…" : "Generate suggestion"}
             </Button>
@@ -842,26 +824,14 @@ function SmartGuaranteedPricePanel({
                   </div>
                   <div className="text-[11px] text-ink-500 mt-2">As written in the deal terms</div>
                 </div>
-                <div className={`rounded-lg p-3 ring-1 ${gapTone === "amber" ? "bg-amber-50/60 ring-amber-300/60" : "bg-emerald-50/40 ring-emerald-200/60"}`}>
+                <div className="rounded-lg bg-white/60 ring-1 ring-sky-200/60 p-3">
                   <div className="eyebrow text-[10px] text-ink-500 mb-1">Smart Guaranteed Price</div>
-                  <div className="text-[28px] font-mono tabular font-semibold text-emerald-800 leading-none">
+                  <div className="text-[28px] font-mono tabular font-semibold text-sky-800 leading-none">
                     {formatMoney(sug.suggestedPrice)}
                   </div>
                   <div className="text-[11px] text-ink-500 mt-2">7-step calc · rounded to $50</div>
                 </div>
               </div>
-
-              {!settlement && Math.abs(delta) > 0 && (
-                <div className={`rounded-lg ring-1 p-3 flex items-start gap-2 ${Math.abs(delta) > 150 ? "ring-amber-300/70 bg-amber-50/70" : "ring-emerald-200/60 bg-emerald-50/40"}`}>
-                  {Math.abs(delta) > 150
-                    ? <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
-                    : <Check className="h-4 w-4 text-emerald-700 mt-0.5 shrink-0" />
-                  }
-                  <div className={`text-[12.5px] leading-relaxed ${Math.abs(delta) > 150 ? "text-amber-900" : "text-emerald-900"}`}>
-                    <strong>Δ {delta > 0 ? "+" : "−"}{formatMoney(Math.abs(delta))}</strong> — {gapDirection}
-                  </div>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
                 <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-2.5">
@@ -913,27 +883,200 @@ function SmartGuaranteedPricePanel({
                   {sug.artistShowCount} prior show{sug.artistShowCount === 1 ? "" : "s"} with this artist · {sug.agentShowCount} with this agent.
                 </div>
               </div>
-
-              {!settlement && (
-                <div className="flex flex-col gap-2 pt-2 border-t border-ink-200/40">
-                  <Button variant="brand" onClick={applyToDeal} disabled={busy || applied}>
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                    {applied ? "Applied to deal" : `Apply to deal — set $${sug.suggestedPrice.toLocaleString()}`}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={generate}
-                    disabled={busy}
-                    className="text-[11px] text-ink-500 hover:text-sky-700 underline-offset-2 hover:underline inline-flex items-center gap-1 self-start mt-1 disabled:opacity-50"
-                    title="Recompute against the latest pricing engine"
-                  >
-                    {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                    {busy ? "Recomputing…" : "Recompute"}
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={generate}
+                disabled={busy}
+                className="text-[11px] text-ink-500 hover:text-sky-700 underline-offset-2 hover:underline inline-flex items-center gap-1 disabled:opacity-50"
+                title="Recompute against the latest pricing engine"
+              >
+                {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {busy ? "Recomputing…" : "Recompute"}
+              </button>
             </div>
           </div>
+        )}
+        {err && <div className="text-[12px] text-rose-600">{err}</div>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImproveDealPanel({
+  showId, deal, onApplied,
+}: {
+  showId: string;
+  deal: Deal;
+  onApplied: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<DealImprovementsPayload | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<ImprovementKind>>(new Set());
+  const [appliedKinds, setAppliedKinds] = useState<ImprovementKind[]>([]);
+
+  async function loadAndOpen() {
+    setBusy(true); setErr(null);
+    try {
+      const res = await api.dealImprovements(showId);
+      setData(res);
+      const next = new Set<ImprovementKind>();
+      for (const i of res.improvements) next.add(i.kind);
+      setSelected(next);
+      setOpen(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggle(kind: ImprovementKind) {
+    const next = new Set(selected);
+    if (next.has(kind)) next.delete(kind); else next.add(kind);
+    setSelected(next);
+  }
+
+  async function apply() {
+    if (selected.size === 0) return;
+    setBusy(true); setErr(null);
+    try {
+      const out = await api.applyDealImprovements(showId, Array.from(selected));
+      setAppliedKinds(out.appliedKinds);
+      onApplied();
+      setOpen(false);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const protectsLabel = (p: DealImprovement["protects"]) =>
+    p === "booker" ? "Reduces venue risk"
+      : p === "artist" ? "Reduces artist risk"
+        : "Reduces risk for both sides";
+
+  return (
+    <Card className="md:col-span-3 ring-1 ring-emerald-200/70 bg-gradient-to-br from-emerald-50/50 to-canvas">
+      <CardHeader>
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="h-4 w-4 text-emerald-700" />
+            Improve the Deal
+          </CardTitle>
+          <CardDescription>
+            Concrete structural changes — drawn from comparable past shows at this venue — that
+            make this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType.replace(/_/g, " ")}</code> deal
+            simpler to close and lower-risk for both sides.
+          </CardDescription>
+        </div>
+        {appliedKinds.length > 0 && (
+          <PlainBadge variant="brand">{appliedKinds.length} applied</PlainBadge>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!open && (
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
+              Look at the historical pattern for {deal.dealType.replace(/_/g, " ")} deals in this size bucket and propose
+              caps, floors, and shape changes that would make this deal close cleanly in the wizard.
+            </div>
+            <Button variant="brand" onClick={loadAndOpen} disabled={busy}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+              {busy ? "Analyzing…" : "Improve the Deal"}
+            </Button>
+          </div>
+        )}
+
+        {open && data && (
+          <>
+            <div className="text-[12px] text-ink-500 leading-relaxed">
+              Based on {data.context.comparableSettlements} past comparable settlement{data.context.comparableSettlements === 1 ? "" : "s"} at this venue
+              {data.context.comparableSettlements > 0 && (
+                <> · <span className="font-mono tabular">{Math.round(data.context.disputeRate * 100)}%</span> ended disputed</>
+              )}
+              {data.context.medianExpenses != null && (
+                <> · median billable expenses <span className="font-mono tabular">{formatMoney(Math.round(data.context.medianExpenses))}</span></>
+              )}
+              .
+            </div>
+
+            {data.improvements.length === 0 && (
+              <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-4 text-[13px] text-ink-600">
+                This deal already has the structural protections we'd recommend — no
+                improvements to suggest right now.
+              </div>
+            )}
+
+            {data.improvements.length > 0 && (
+              <div className="space-y-2.5">
+                {data.improvements.map((imp) => {
+                  const isOn = selected.has(imp.kind);
+                  return (
+                    <label
+                      key={imp.kind}
+                      className={`flex items-start gap-3 rounded-lg p-3 ring-1 cursor-pointer transition-colors ${
+                        isOn
+                          ? "bg-white/80 ring-emerald-300/70"
+                          : "bg-white/40 ring-ink-200/50 hover:bg-white/60"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isOn}
+                        onChange={() => toggle(imp.kind)}
+                        className="mt-1 h-4 w-4 rounded border-ink-300 text-emerald-700 focus:ring-emerald-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="text-[14px] font-medium text-ink-900">{imp.title}</div>
+                          {imp.simplifies && (
+                            <span className="inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider bg-sky-50 ring-1 ring-sky-200/70 text-sky-800">
+                              simpler close
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center px-1.5 py-px rounded text-[9px] font-mono uppercase tracking-wider ring-1 ${
+                            imp.protects === "both" ? "bg-emerald-50 ring-emerald-200/70 text-emerald-800"
+                              : imp.protects === "artist" ? "bg-amber-50 ring-amber-200/70 text-amber-800"
+                                : "bg-violet-50 ring-violet-200/70 text-violet-800"
+                          }`}>
+                            {protectsLabel(imp.protects)}
+                          </span>
+                        </div>
+                        <div className="text-[12px] text-ink-500 mt-1 flex items-center gap-2 flex-wrap">
+                          <span>Now: <span className="font-mono tabular text-ink-700">{imp.currentValue}</span></span>
+                          <span className="text-ink-300">→</span>
+                          <span>Proposed: <span className="font-mono tabular text-emerald-800 font-medium">{imp.proposedValue}</span></span>
+                        </div>
+                        <div className="text-[12.5px] text-ink-700 leading-relaxed mt-2">
+                          {imp.rationale}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {data.improvements.length > 0 && (
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-ink-200/40">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  disabled={busy}
+                  className="text-[12px] text-ink-500 hover:text-ink-900 underline-offset-2 hover:underline disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <Button variant="brand" onClick={apply} disabled={busy || selected.size === 0}>
+                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  {busy ? "Applying…" : `Apply ${selected.size} change${selected.size === 1 ? "" : "s"} to deal`}
+                </Button>
+              </div>
+            )}
+          </>
         )}
         {err && <div className="text-[12px] text-rose-600">{err}</div>}
       </CardContent>

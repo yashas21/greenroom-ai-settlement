@@ -1,4 +1,4 @@
-import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, SwitchSavingsPayload, SwitchProjectedGridPayload, LlmStatus, SaveLlmSettingsInput, SwitchSuggestion, GuaranteeSuggestion, GuaranteeBacktestPayload } from "./types";
+import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, SwitchSavingsPayload, SwitchProjectedGridPayload, LlmStatus, SaveLlmSettingsInput, SwitchSuggestion, GuaranteeSuggestion, GuaranteeBacktestPayload, DealImprovementsPayload, ImprovementKind } from "./types";
 
 const BASE = `${import.meta.env.BASE_URL}api`;
 
@@ -60,6 +60,23 @@ export const api = {
       throw new Error(j.error ?? `API error ${res.status}`);
     }
     return res.json() as Promise<GuaranteeSuggestion>;
+  },
+  dealImprovements: (id: string) =>
+    get<DealImprovementsPayload>(`/shows/${encodeURIComponent(id)}/deal/improvements`),
+  applyDealImprovements: async (
+    id: string,
+    kinds: ImprovementKind[],
+  ): Promise<{ ok: true; appliedKinds: ImprovementKind[]; dealId: string }> => {
+    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/deal/apply-improvements`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kinds }),
+    });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(j.error ?? `API error ${res.status}`);
+    }
+    return res.json() as Promise<{ ok: true; appliedKinds: ImprovementKind[]; dealId: string }>;
   },
   applyGuaranteeToDeal: async (
     id: string,
