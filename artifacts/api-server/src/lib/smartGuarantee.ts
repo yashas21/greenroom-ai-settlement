@@ -375,7 +375,12 @@ export async function generateGuarantee(
   const netBase = Math.max(0, netAfterFees - expenseEstimate);
 
   // STEP 6: percentage payout
+  // Defensive normalization: by convention `deals.percentage` is a fraction
+  // (0.85 = 85%), but some legacy / seed rows stored whole-number percent
+  // values (85). Anything > 1 is interpreted as already-in-percent and
+  // divided by 100, so the SGP math doesn't blow up to ~$1M payouts.
   let pct = deal.percentage ?? 0;
+  if (pct > 1) pct = pct / 100;
   let pctBasis: number;
   if (deal.dealType === "percentage_of_gross") {
     pctBasis = expectedGross;

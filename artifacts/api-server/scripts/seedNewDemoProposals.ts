@@ -23,27 +23,27 @@ type Spec = {
 
 const SPECS: Spec[] = [
   // vs $1-5K (Smart Switch eligible) — 3 shows
-  { artist: "Atlas Court",        genre: "Indie Rock",  daysOut: 22, dealType: "vs", guarantee: 2000, percentage: 80, basis: "net", expectedGross: 2400, expenseCap: 1850, hospitalityCap: null, settleStatus: "draft" },
-  { artist: "Bramble Hollow",     genre: "Folk",        daysOut: 31, dealType: "vs", guarantee: 3500, percentage: 80, basis: "net", expectedGross: 4200, expenseCap: 1850, hospitalityCap: 400,  settleStatus: "submitted" },
-  { artist: "Cinder Path",        genre: "Garage Rock", daysOut: 45, dealType: "vs", guarantee: 4500, percentage: 85, basis: "net", expectedGross: 4800, expenseCap: null, hospitalityCap: null, settleStatus: "in_review" },
+  { artist: "Atlas Court",        genre: "Indie Rock",  daysOut: 22, dealType: "vs", guarantee: 2000, percentage: 0.80, basis: "net", expectedGross: 2400, expenseCap: 1850, hospitalityCap: null, settleStatus: "draft" },
+  { artist: "Bramble Hollow",     genre: "Folk",        daysOut: 31, dealType: "vs", guarantee: 3500, percentage: 0.80, basis: "net", expectedGross: 4200, expenseCap: 1850, hospitalityCap: 400,  settleStatus: "submitted" },
+  { artist: "Cinder Path",        genre: "Garage Rock", daysOut: 45, dealType: "vs", guarantee: 4500, percentage: 0.85, basis: "net", expectedGross: 4800, expenseCap: null, hospitalityCap: null, settleStatus: "in_review" },
   // vs $5-15K (Improve Deal — caps only) — 2 shows
-  { artist: "Driftline",          genre: "Indie Rock",  daysOut: 18, dealType: "vs", guarantee: 7000,  percentage: 80, basis: "net", expectedGross: 9500,  expenseCap: null, hospitalityCap: null, settleStatus: "draft" },
-  { artist: "Echo Bramble",       genre: "Americana",   daysOut: 56, dealType: "vs", guarantee: 12000, percentage: 85, basis: "net", expectedGross: 14000, expenseCap: 1750, hospitalityCap: null, settleStatus: "submitted" },
+  { artist: "Driftline",          genre: "Indie Rock",  daysOut: 18, dealType: "vs", guarantee: 7000,  percentage: 0.80, basis: "net", expectedGross: 9500,  expenseCap: null, hospitalityCap: null, settleStatus: "draft" },
+  { artist: "Echo Bramble",       genre: "Americana",   daysOut: 56, dealType: "vs", guarantee: 12000, percentage: 0.85, basis: "net", expectedGross: 14000, expenseCap: 1750, hospitalityCap: null, settleStatus: "submitted" },
   // vs $15K+ — 1 show
-  { artist: "Foxglove Society",   genre: "Indie Rock",  daysOut: 71, dealType: "vs", guarantee: 18000, percentage: 85, basis: "net", expectedGross: 19500, expenseCap: null, hospitalityCap: null, settleStatus: "in_review" },
+  { artist: "Foxglove Society",   genre: "Indie Rock",  daysOut: 71, dealType: "vs", guarantee: 18000, percentage: 0.85, basis: "net", expectedGross: 19500, expenseCap: null, hospitalityCap: null, settleStatus: "in_review" },
   // pn $1-5K (Smart Switch eligible) — 2 shows
-  { artist: "Gilded Fern",        genre: "Folk",        daysOut: 27, dealType: "percentage_of_net", guarantee: 2500, percentage: 75, basis: "net", expectedGross: 3300, expenseCap: 1850, hospitalityCap: null, settleStatus: "draft" },
-  { artist: "Hollow Bay",         genre: "Indie Pop",   daysOut: 38, dealType: "percentage_of_net", guarantee: 4000, percentage: 80, basis: "net", expectedGross: 4600, expenseCap: null, hospitalityCap: 400,  settleStatus: "submitted" },
+  { artist: "Gilded Fern",        genre: "Folk",        daysOut: 27, dealType: "percentage_of_net", guarantee: 2500, percentage: 0.75, basis: "net", expectedGross: 3300, expenseCap: 1850, hospitalityCap: null, settleStatus: "draft" },
+  { artist: "Hollow Bay",         genre: "Indie Pop",   daysOut: 38, dealType: "percentage_of_net", guarantee: 4000, percentage: 0.80, basis: "net", expectedGross: 4600, expenseCap: null, hospitalityCap: 400,  settleStatus: "submitted" },
   // pn uncapped (Improve Deal) — 2 shows
-  { artist: "Iron Lattice",       genre: "Indie Rock",  daysOut: 14, dealType: "percentage_of_net", guarantee: null, percentage: 70, basis: "net", expectedGross: 6800, expenseCap: null, hospitalityCap: null, settleStatus: "in_review" },
-  { artist: "Juniper Cove",       genre: "Americana",   daysOut: 49, dealType: "percentage_of_net", guarantee: null, percentage: 80, basis: "net", expectedGross: 8200, expenseCap: 1750, hospitalityCap: null, settleStatus: "draft" },
+  { artist: "Iron Lattice",       genre: "Indie Rock",  daysOut: 14, dealType: "percentage_of_net", guarantee: null, percentage: 0.70, basis: "net", expectedGross: 6800, expenseCap: null, hospitalityCap: null, settleStatus: "in_review" },
+  { artist: "Juniper Cove",       genre: "Americana",   daysOut: 49, dealType: "percentage_of_net", guarantee: null, percentage: 0.80, basis: "net", expectedGross: 8200, expenseCap: 1750, hospitalityCap: null, settleStatus: "draft" },
   // door (Smart Switch — door hybrid) — 3 shows across buckets
   { artist: "Kestrel Lane",       genre: "Garage Rock", daysOut: 12, dealType: "door", guarantee: null, percentage: null, basis: null, expectedGross: 800,  expenseCap: 1700, hospitalityCap: null, settleStatus: "submitted" },
   { artist: "Lantern Mile",       genre: "Punk",        daysOut: 33, dealType: "door", guarantee: null, percentage: null, basis: null, expectedGross: 3000, expenseCap: 1850, hospitalityCap: 400,  settleStatus: "in_review" },
   { artist: "Mast & Marrow",      genre: "Indie Rock",  daysOut: 60, dealType: "door", guarantee: null, percentage: null, basis: null, expectedGross: 9000, expenseCap: 1750, hospitalityCap: null, settleStatus: "draft" },
   // %gross uncapped (Improve Deal) — 2 shows
-  { artist: "Nightingale Press",  genre: "Indie Pop",   daysOut: 25, dealType: "percentage_of_gross", guarantee: null, percentage: 85, basis: "gross", expectedGross: 5500, expenseCap: null, hospitalityCap: null, settleStatus: "submitted" },
-  { artist: "Oakshade Theory",    genre: "Folk",        daysOut: 42, dealType: "percentage_of_gross", guarantee: null, percentage: 90, basis: "gross", expectedGross: 7200, expenseCap: 1750, hospitalityCap: 400,  settleStatus: "in_review" },
+  { artist: "Nightingale Press",  genre: "Indie Pop",   daysOut: 25, dealType: "percentage_of_gross", guarantee: null, percentage: 0.85, basis: "gross", expectedGross: 5500, expenseCap: null, hospitalityCap: null, settleStatus: "submitted" },
+  { artist: "Oakshade Theory",    genre: "Folk",        daysOut: 42, dealType: "percentage_of_gross", guarantee: null, percentage: 0.90, basis: "gross", expectedGross: 7200, expenseCap: 1750, hospitalityCap: 400,  settleStatus: "in_review" },
 ];
 
 function dateString(daysOut: number): string {
