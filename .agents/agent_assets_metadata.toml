@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "hYrBuREt9gaXhfckB21oN"
+uri = "file://docs/smart-switch-vs-improve-deal.md"
+type = "text"
+title = "Smart Switch vs. Improve Deal"
