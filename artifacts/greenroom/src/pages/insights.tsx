@@ -263,6 +263,7 @@ function SwitchSavingsSection() {
   const [topN, setTopN] = useState(10);
   const state = useApiData(() => api.switchSavings(months, topN), [months, topN]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [explainerOpen, setExplainerOpen] = useState(false);
 
   if (state.status === "loading")
     return (
@@ -392,6 +393,15 @@ function SwitchSavingsSection() {
           </div>
         </div>
 
+        <SavingsExplainer
+          open={explainerOpen}
+          onToggle={() => setExplainerOpen((v) => !v)}
+          example={data.items[0] ?? null}
+          totalMoney={totalDollars}
+          totalMinutes={totalMins}
+          itemCount={data.items.length}
+        />
+
         <ul className="space-y-1.5">
           {data.items.map((it) => (
             <SavingsRow
@@ -406,6 +416,149 @@ function SwitchSavingsSection() {
         </ul>
       </CardContent>
     </Card>
+  );
+}
+
+function SavingsExplainer({
+  open,
+  onToggle,
+  example,
+  totalMoney,
+  totalMinutes,
+  itemCount,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  example: SwitchSavingsItem | null;
+  totalMoney: number;
+  totalMinutes: number;
+  itemCount: number;
+}) {
+  return (
+    <div className="mb-5 rounded-md ring-1 ring-ink-200/60 bg-ink-50/40">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-ink-100/50 rounded-md transition-colors"
+      >
+        <ChevronRight
+          className={`h-3.5 w-3.5 text-ink-400 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+        />
+        <Calculator className="h-3.5 w-3.5 text-brand-700 shrink-0" />
+        <span className="text-[12px] text-ink-700 font-medium">
+          If Smart Switch + Improve Deal had been used — where do these numbers come from?
+        </span>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 space-y-3 text-[11.5px] text-ink-700 leading-relaxed">
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Money saved · per row</div>
+            <div className="font-mono tabular text-[11px] bg-white rounded ring-1 ring-ink-200/60 px-2 py-1.5 inline-block">
+              moneySaved = actualPaidToArtist − counterfactualSwitchPayout
+            </div>
+            <div className="mt-1.5 text-ink-600">
+              <span className="font-semibold text-ink-900">Smart Switch is the only engine
+              driving this number.</span> For each past-dated, settled{" "}
+              <span className="font-mono">vs / % of net / door</span> deal in the window, we re-run
+              the Smart Switch engine against the original deal terms and replace the variable
+              payout with its output:
+              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                <li>
+                  <span className="font-mono">flat</span> shape →{" "}
+                  <span className="font-mono">suggestedFlat</span>
+                </li>
+                <li>
+                  <span className="font-mono">door_hybrid</span> shape →{" "}
+                  <span className="font-mono">floor + split × max(0, 0.9·gross − cap)</span>{" "}
+                  (floor / split / cap all come from the Smart Switch suggestion, not the
+                  original deal)
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Where Improve Deal fits in</div>
+            <div className="text-ink-600">
+              <span className="font-semibold text-ink-900">Improve Deal</span> only emits structural
+              caps (expense cap, hospitality cap), and the savings counterfactual above never
+              consumes those caps — so Improve Deal doesn't move this dollar number directly. Its
+              effect lives in <span className="font-semibold">Time saved</span>: a pre-agreed cap
+              eliminates most of the recoup arithmetic and the sign-off back-and-forth that the
+              time estimate is built from.
+            </div>
+          </div>
+
+          <div>
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Time saved · formula</div>
+            <div className="font-mono tabular text-[11px] bg-white rounded ring-1 ring-ink-200/60 px-2 py-1.5 inline-block whitespace-pre-wrap">
+              {`minutesSaved =
+  (30 baseline
+   + 25·disputedRecoups
+   + 5·(notesParagraphs + signoffParagraphs)
+   + 60·formalDispute)
+  − (10 flat | 15 hybrid)`}
+            </div>
+            <div className="mt-1.5 text-ink-600">
+              Verbose notes / sign-off threads and disputed recoup lines are proxies for the
+              negotiation that a pre-agreed Smart Switch deal wouldn't have triggered. Both note
+              and sign-off paragraph counts are summed before the 5-min multiplier.
+            </div>
+          </div>
+
+          {example && (
+            <div className="rounded-md ring-1 ring-emerald-200/60 bg-emerald-50/40 p-3">
+              <div className="eyebrow text-[10px] text-emerald-700 mb-1">
+                Worked example · top row ({example.artistName ?? "—"} · {example.date})
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono tabular">
+                <div className="text-ink-500">Actual payout</div>
+                <div className="text-right text-ink-900">{fmtMoney(example.actualToArtist)}</div>
+                <div className="text-ink-500">
+                  Counterfactual ({SHAPE_LABEL[example.switchShape]?.toLowerCase() ?? example.switchShape})
+                </div>
+                <div className="text-right text-ink-900">{fmtMoney(example.counterfactualToArtist)}</div>
+                <div className="text-emerald-700 font-semibold border-t border-emerald-200/60 pt-0.5">
+                  Money saved
+                </div>
+                <div className="text-right text-emerald-700 font-semibold border-t border-emerald-200/60 pt-0.5">
+                  {example.moneySavedToVenue >= 0 ? "+" : ""}
+                  {fmtMoney(example.moneySavedToVenue)}
+                </div>
+                <div className="text-ink-500 pt-1">Settlement-night minutes (actual)</div>
+                <div className="text-right text-ink-900 pt-1">
+                  {example.estimatedMinutesSpent} min
+                </div>
+                <div className="text-ink-500">Under Smart Switch</div>
+                <div className="text-right text-ink-900">
+                  {example.estimatedMinutesUnderSwitch} min
+                </div>
+                <div className="text-sky-700 font-semibold border-t border-sky-200/60 pt-0.5">
+                  Time saved
+                </div>
+                <div className="text-right text-sky-700 font-semibold border-t border-sky-200/60 pt-0.5">
+                  {fmtMinutes(example.minutesSaved)}
+                </div>
+              </div>
+              <div className="mt-2 text-[11px] text-ink-600 leading-relaxed">
+                {example.breakdown.moneyRationale}
+              </div>
+            </div>
+          )}
+
+          <div className="text-[11px] text-ink-500 border-t border-ink-200/60 pt-2.5">
+            Headline tiles roll up the top {itemCount} rows shown below: cumulative money saved is{" "}
+            <span className="font-mono tabular text-ink-700">{fmtMoney(totalMoney)}</span>, time
+            saved is{" "}
+            <span className="font-mono tabular text-ink-700">{fmtMinutes(totalMinutes)}</span>.
+            Adjust the time-window and Top-N controls above to expand the window. Only past-dated,
+            settled rows are eligible — future-dated proposals (NEW DEMO upcoming shows) never enter
+            the calc.
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
