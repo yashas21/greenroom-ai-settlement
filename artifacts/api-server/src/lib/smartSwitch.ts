@@ -6,6 +6,7 @@ import {
   type Deal,
 } from "../db/schema";
 import { classifySizeBucket } from "./queries";
+import { generateGuarantee } from "./smartGuarantee";
 
 export type ConfidenceTier = "A" | "B" | "C" | "D";
 
@@ -154,6 +155,7 @@ export function switchAppliesTo(dealType: string, bucket: string): boolean {
 export async function generateSuggestion(
   deal: Deal,
   artistShowsAtVenue = 0,
+  showId?: string,
 ): Promise<GeneratedSuggestion | null> {
   const stats = await getCellStats();
   const bucket = classifySizeBucket(deal);
@@ -167,6 +169,32 @@ export async function generateSuggestion(
 
   if (deal.dealType === "vs" || deal.dealType === "percentage_of_net") {
     const cell = stats.get(`${deal.dealType}::${bucket}`);
+
+    // Preferred path: route through the Smart Guaranteed Price 7-step engine
+    // (artist→agent→genre→venue waterfall, capped expense, % payout vs.
+    // guarantee winner). This unifies "Smart Switch flat" and "Smart
+    // Guaranteed Price" into one number for $1–5K vs / % of net deals.
+    if (showId) {
+      const sgp = await generateGuarantee(showId, { allowPast: true });
+      if (sgp.suggestion) {
+        const g = sgp.suggestion;
+        return {
+          shape: "flat",
+          dealTypeFrom: deal.dealType,
+          suggestedFlat: g.suggestedPrice,
+          doorFloor: null,
+          doorSplitPct: null,
+          doorExpenseCap: null,
+          confidenceTier: g.confidenceTier as ConfidenceTier,
+          bandLow: cell ? roundTo50(cell.p10Payout) : null,
+          bandHigh: cell ? roundTo50(cell.p90Payout) : null,
+          sampleSize: cell?.n ?? g.artistShowCount + g.agentShowCount,
+          basis: g.basis,
+        };
+      }
+      // fall through to cell-average path if SGP couldn't compute
+    }
+
     if (!cell || cell.n < 3) return null;
     const tier = computeTier(cell.n, artistShowsAtVenue);
     const flat = roundTo50(cell.avgPayout);
@@ -271,7 +299,7 @@ export async function generateAndPersist(showId: string): Promise<{
     ? await countPriorShowsAtVenue(show.artistId, show.venueId, show.date)
     : 0;
 
-  const generated = await generateSuggestion(deal, artistShowsAtVenue);
+  const generated = await generateSuggestion(deal, artistShowsAtVenue, showId);
   if (!generated) {
     return { suggestion: null, reason: "not_eligible" };
   }

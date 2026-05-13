@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { ArrowUpRight, Search, Calendar, X, Shield, Calculator } from "lucide-react";
+import { ArrowUpRight, Search, Calendar, X, Shield } from "lucide-react";
 import { DealTypeBadge, PlainBadge } from "@/components/ui/badge";
 
 type Status = "booked" | "advanced" | "day_of" | "settled" | "closed";
@@ -19,7 +19,6 @@ export type ShowRow = {
   isDisputed: boolean;
   tense: Tense;
   switchStatus: SwitchStatus | null;
-  guaranteeSuggestion: { suggestedPrice: number; delta: number } | null;
   complexity: "simple" | "medium" | "complex" | null;
   sizeBucket: string | null;
   dealType: string | null;
@@ -104,7 +103,6 @@ type Filters = {
   unsupportedOnly: boolean;
   disputedOnly: boolean;
   switchSuggestedOnly: boolean;
-  guaranteePendingOnly: boolean;
   upcomingOnly: boolean;
   switchEligibleOnly: boolean;
   switchedOnly: boolean;
@@ -121,7 +119,6 @@ const EMPTY_FILTERS: Filters = {
   unsupportedOnly: false,
   disputedOnly: false,
   switchSuggestedOnly: false,
-  guaranteePendingOnly: false,
   upcomingOnly: false,
   switchEligibleOnly: false,
   switchedOnly: false,
@@ -134,7 +131,6 @@ const EMPTY_FILTERS: Filters = {
 };
 
 const ELIGIBLE_DEAL_TYPES = new Set(["vs", "percentage_of_net", "door"]);
-const GUARANTEE_ELIGIBLE_DEAL_TYPES = new Set(["vs", "percentage_of_net", "percentage_of_gross", "door"]);
 
 function parseFilters(search: string): Filters {
   const params = new URLSearchParams(search);
@@ -143,7 +139,6 @@ function parseFilters(search: string): Filters {
     unsupportedOnly: params.get("unsupported") === "1",
     disputedOnly: params.get("disputed") === "1",
     switchSuggestedOnly: params.get("switch") === "1",
-    guaranteePendingOnly: params.get("guaranteePending") === "1",
     upcomingOnly: params.get("upcoming") === "1",
     switchEligibleOnly: params.get("switchEligible") === "1",
     switchedOnly: params.get("switched") === "1",
@@ -162,7 +157,6 @@ function buildQueryString(f: Filters): string {
   if (f.unsupportedOnly) params.set("unsupported", "1");
   if (f.disputedOnly) params.set("disputed", "1");
   if (f.switchSuggestedOnly) params.set("switch", "1");
-  if (f.guaranteePendingOnly) params.set("guaranteePending", "1");
   if (f.upcomingOnly) params.set("upcoming", "1");
   if (f.switchEligibleOnly) params.set("switchEligible", "1");
   if (f.switchedOnly) params.set("switched", "1");
@@ -182,7 +176,6 @@ function isFilterActive(f: Filters): boolean {
     f.unsupportedOnly ||
     f.disputedOnly ||
     f.switchSuggestedOnly ||
-    f.guaranteePendingOnly ||
     f.upcomingOnly ||
     f.switchEligibleOnly ||
     f.switchedOnly ||
@@ -231,18 +224,6 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
     () => rows.filter((r) => r.switchStatus === "suggested").length,
     [rows],
   );
-  const guaranteePendingCount = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          r.tense === "upcoming" &&
-          r.dealType !== null &&
-          GUARANTEE_ELIGIBLE_DEAL_TYPES.has(r.dealType) &&
-          r.guaranteeSuggestion === null,
-      ).length,
-    [rows],
-  );
-
   const filtered = useMemo(() => {
     let out = rows;
     if (filters.upcomingOnly) out = out.filter((r) => r.tense === "upcoming");
@@ -260,14 +241,6 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
     if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
     if (filters.switchSuggestedOnly)
       out = out.filter((r) => r.switchStatus === "suggested");
-    if (filters.guaranteePendingOnly)
-      out = out.filter(
-        (r) =>
-          r.tense === "upcoming" &&
-          r.dealType !== null &&
-          GUARANTEE_ELIGIBLE_DEAL_TYPES.has(r.dealType) &&
-          r.guaranteeSuggestion === null,
-      );
     if (filters.complexity) out = out.filter((r) => r.complexity === filters.complexity);
     if (filters.size) out = out.filter((r) => r.sizeBucket === filters.size);
     if (filters.dealType) out = out.filter((r) => r.dealType === filters.dealType);
@@ -375,18 +348,6 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           variant="brand"
           label="Smart Switch pending"
           count={switchSuggestedCount}
-        />
-        <FilterToggle
-          active={filters.guaranteePendingOnly}
-          onClick={() => update({
-            guaranteePendingOnly: !filters.guaranteePendingOnly,
-            upcomingOnly: false,
-            switchEligibleOnly: false,
-          })}
-          variant="brand"
-          label="Smart Guaranteed Price pending"
-          count={guaranteePendingCount}
-          icon={<Calculator className="h-3 w-3" />}
         />
         {filters.upcomingOnly && upcomingActionableCount > 0 && !filters.switchEligibleOnly && (
           <button
@@ -524,9 +485,6 @@ function ShowListRow({ row }: { row: ShowRow }) {
     ELIGIBLE_DEAL_TYPES.has(deal.dealType) &&
     row.switchStatus !== "accepted" &&
     row.switchStatus !== "declined";
-  const guaranteeAlert =
-    row.guaranteeSuggestion !== null && Math.abs(row.guaranteeSuggestion.delta) > 150;
-
   return (
     <li className="relative group list-none">
       <div
@@ -553,19 +511,6 @@ function ShowListRow({ row }: { row: ShowRow }) {
             {row.isUnsupported && <PlainBadge variant="amber">Unsupported</PlainBadge>}
             {row.isDisputed && <PlainBadge variant="rose">Disputed</PlainBadge>}
             {row.switchStatus && <SwitchPill status={row.switchStatus} />}
-            {row.guaranteeSuggestion && (
-              <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wide uppercase ring-1 ${
-                  guaranteeAlert
-                    ? "bg-amber-50 text-amber-800 ring-amber-200"
-                    : "bg-emerald-50 text-emerald-800 ring-emerald-200"
-                }`}
-                title={`Smart Guaranteed Price: $${row.guaranteeSuggestion.suggestedPrice.toLocaleString()} (Δ $${Math.round(row.guaranteeSuggestion.delta).toLocaleString()})`}
-              >
-                <Calculator className="h-2.5 w-2.5" />
-                SGP {guaranteeAlert ? "Δ" : "✓"}
-              </span>
-            )}
             {deal?.guaranteeFormatted && (
               <span className="font-mono tabular text-[11px] text-ink-500">
                 {deal.guaranteeFormatted}

@@ -197,7 +197,7 @@ export async function getSwitchSavings(opts: { months?: number; topN?: number } 
       priorIndex.get(`${show.artistId}::${show.venueId}`),
       show.date,
     );
-    const generated = await generateSuggestion(deal, artistN);
+    const generated = await generateSuggestion(deal, artistN, show.id);
     if (!generated) continue;
 
     const actualPayout = settlement.totalToArtist!;
@@ -381,7 +381,7 @@ export async function getSwitchProjectedGrid(
         priorIndex.get(`${show.artistId}::${show.venueId}`),
         show.date,
       );
-      const generated = await generateSuggestion(deal, artistN);
+      const generated = await generateSuggestion(deal, artistN, show.id);
       if (!generated) continue;
       if (generated.shape === "flat") {
         projectedPayout = generated.suggestedFlat ?? 0;

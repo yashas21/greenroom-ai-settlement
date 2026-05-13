@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "wouter";
 import {
   ArrowLeft, FileSpreadsheet, AlertCircle, Clock, TrendingUp, FileJson, Loader2,
-  Shield, Check, X, Sparkles, Calculator, AlertTriangle,
+  Shield, Check, X, Sparkles, AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -14,7 +14,7 @@ import { parseBonuses } from "@/lib/dealMath";
 import {
   formatMoney, formatMoneyCompact, formatShowDateFull, relativeShowDate,
 } from "@/lib/format";
-import type { Bonus, SwitchSuggestion, GuaranteeSuggestion, Deal, Settlement } from "@/lib/types";
+import type { Bonus, SwitchSuggestion, Deal, Settlement } from "@/lib/types";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
 import NotFound from "./not-found";
 
@@ -184,14 +184,6 @@ export default function ShowDetailPage() {
               deal={deal}
               settlement={settlement}
               initial={data.switchSuggestion}
-            />
-          )}
-
-          {deal && deal.dealType !== "flat" && show.date >= new Date().toISOString().slice(0, 10) && (
-            <SmartGuaranteedPricePanel
-              showId={show.id}
-              deal={deal}
-              initial={data.guaranteeSuggestion}
             />
           )}
 
@@ -536,22 +528,60 @@ function SmartSwitchPanel({
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2 space-y-3">
-                {sug.shape === "flat" && sug.suggestedFlat != null && (
-                  <div>
-                    <div className="eyebrow text-[10px] text-ink-500 mb-1.5">Suggested structure</div>
-                    <div className="flex items-baseline gap-3">
-                      <span className="text-[40px] font-mono tabular font-semibold text-ink-900 leading-none">
-                        {formatMoney(sug.suggestedFlat)}
-                      </span>
-                      <span className="text-[13px] text-ink-500">flat guarantee</span>
+                {sug.shape === "flat" && sug.suggestedFlat != null && (() => {
+                  const agentG = deal.guaranteeAmount ?? 0;
+                  const delta = sug.suggestedFlat - agentG;
+                  const gapAlert = !settlement && Math.abs(delta) > 150;
+                  const gapDirection = delta > 0
+                    ? "Smart price exceeds the agent's ask"
+                    : "Agent's ask exceeds the Smart price";
+                  return (
+                    <div className="space-y-3">
+                      <div className="eyebrow text-[10px] text-ink-500">Suggested structure — flat-equivalent (Smart Guaranteed Price)</div>
+                      {settlement ? (
+                        <div className="flex items-baseline gap-3">
+                          <span className="text-[40px] font-mono tabular font-semibold text-ink-900 leading-none">
+                            {formatMoney(sug.suggestedFlat)}
+                          </span>
+                          <span className="text-[13px] text-ink-500">flat guarantee</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-3">
+                            <div className="eyebrow text-[10px] text-ink-500 mb-1">Agent's guarantee</div>
+                            <div className="text-[28px] font-mono tabular font-semibold text-ink-900 leading-none">
+                              {formatMoney(agentG)}
+                            </div>
+                            <div className="text-[11px] text-ink-500 mt-2">As written in the deal terms</div>
+                          </div>
+                          <div className={`rounded-lg p-3 ring-1 ${gapAlert ? "bg-amber-50/60 ring-amber-300/60" : "bg-emerald-50/40 ring-emerald-200/60"}`}>
+                            <div className="eyebrow text-[10px] text-ink-500 mb-1">Smart Guaranteed Price</div>
+                            <div className="text-[28px] font-mono tabular font-semibold text-emerald-800 leading-none">
+                              {formatMoney(sug.suggestedFlat)}
+                            </div>
+                            <div className="text-[11px] text-ink-500 mt-2">7-step calc · rounded to $50</div>
+                          </div>
+                        </div>
+                      )}
+                      {gapAlert && (
+                        <div className="rounded-lg ring-1 ring-amber-300/70 bg-amber-50/70 p-3 flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                          <div className="text-[12.5px] text-amber-900 leading-relaxed">
+                            <strong>Gap of {formatMoney(Math.abs(delta))}</strong> — {gapDirection}.
+                            {delta > 0
+                              ? " Worth a counter-offer push toward the Smart price."
+                              : " Consider declining or trimming the ask back toward the Smart price."}
+                          </div>
+                        </div>
+                      )}
+                      {sug.bandLow != null && sug.bandHigh != null && (
+                        <div className="text-[12px] text-ink-500">
+                          Historical band <span className="font-mono tabular">{formatMoney(sug.bandLow)}</span> – <span className="font-mono tabular">{formatMoney(sug.bandHigh)}</span> (P10–P90)
+                        </div>
+                      )}
                     </div>
-                    {sug.bandLow != null && sug.bandHigh != null && (
-                      <div className="text-[12px] text-ink-500 mt-2">
-                        Historical band <span className="font-mono tabular">{formatMoney(sug.bandLow)}</span> – <span className="font-mono tabular">{formatMoney(sug.bandHigh)}</span> (P10–P90)
-                      </div>
-                    )}
-                  </div>
-                )}
+                  );
+                })()}
 
                 {sug.shape === "door_hybrid" && (
                   <div>
@@ -635,177 +665,6 @@ function SmartSwitchPanel({
   );
 }
 
-const EXPENSE_SOURCE_LABELS: Record<string, string> = {
-  artist_history_2plus: "this artist's prior shows here",
-  artist_history_1: "this artist's one prior show here",
-  agent_history: "this agent's other artists' history",
-  genre_p75: "P75 of genre across all shows",
-  venue_mean: "venue-wide average",
-};
-
-const GROSS_SOURCE_LABELS: Record<string, string> = {
-  artist_at_venue: "this artist's prior shows here",
-  artist_anywhere: "this artist's prior shows",
-  agent_history: "this agent's roster",
-  cell_mean: "comparable deals at this size",
-  venue_mean: "venue-wide average",
-  capacity_proxy: "capacity proxy (no history)",
-};
-
-function SmartGuaranteedPricePanel({
-  showId, deal, initial,
-}: {
-  showId: string;
-  deal: Deal;
-  initial: GuaranteeSuggestion | null;
-}) {
-  const [sug, setSug] = useState<GuaranteeSuggestion | null>(initial);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [showAudit, setShowAudit] = useState(false);
-
-  async function generate() {
-    setBusy(true); setErr(null);
-    try { setSug(await api.generateGuarantee(showId)); }
-    catch (e) { setErr(e instanceof Error ? e.message : "failed"); }
-    finally { setBusy(false); }
-  }
-
-  const agentG = deal.guaranteeAmount ?? 0;
-  const gapAlert = sug && Math.abs(sug.delta) > 150;
-  const gapDirection = sug && sug.delta > 0
-    ? "Smart price exceeds the agent's ask"
-    : "Agent's ask exceeds the Smart price";
-
-  return (
-    <Card className="md:col-span-3 ring-1 ring-emerald-200/60 bg-gradient-to-br from-emerald-50/40 to-canvas">
-      <CardHeader>
-        <div>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-4 w-4 text-emerald-700" />
-            Smart Guaranteed Price
-          </CardTitle>
-          <CardDescription>
-            Evidence-based pricing benchmark for this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal.
-            7-step calc: ticketing fees → net after fees → capped expense → net base → % payout → winner → suggested price. Use it as a counter-offer anchor, not a deal type.
-          </CardDescription>
-        </div>
-        {sug && (
-          <PlainBadge variant={sug.confidenceTier === "A" || sug.confidenceTier === "B" ? "brand" : sug.confidenceTier === "C" ? "amber" : "default"}>
-            Tier {sug.confidenceTier}
-          </PlainBadge>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!sug && (
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
-              Run the 7-step calc using artist→agent→genre→venue history. Output is one number you can hold against the agent's guarantee.
-            </div>
-            <Button variant="brand" onClick={generate} disabled={busy}>
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {busy ? "Computing…" : "Generate"}
-            </Button>
-          </div>
-        )}
-
-        {sug && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-4">
-                <div className="eyebrow text-[10px] text-ink-500 mb-1.5">Agent's guarantee</div>
-                <div className="text-[36px] font-mono tabular font-semibold text-ink-900 leading-none">
-                  {formatMoney(agentG)}
-                </div>
-                <div className="text-[12px] text-ink-500 mt-2">As written in the deal terms</div>
-              </div>
-              <div className={`rounded-lg p-4 ring-1 ${gapAlert ? "bg-amber-50/60 ring-amber-300/60" : "bg-emerald-50/40 ring-emerald-200/60"}`}>
-                <div className="eyebrow text-[10px] text-ink-500 mb-1.5">Smart Guaranteed Price</div>
-                <div className="text-[36px] font-mono tabular font-semibold text-emerald-800 leading-none">
-                  {formatMoney(sug.suggestedPrice)}
-                </div>
-                <div className="text-[12px] text-ink-500 mt-2">
-                  Rounded to nearest $50 · breakeven gross{" "}
-                  <span className="font-mono tabular text-ink-700">{formatMoney(sug.breakevenGross)}</span>
-                </div>
-              </div>
-            </div>
-
-            {gapAlert && (
-              <div className="rounded-lg ring-1 ring-amber-300/70 bg-amber-50/70 p-3 flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
-                <div className="text-[12.5px] text-amber-900 leading-relaxed">
-                  <strong>Gap of {formatMoney(Math.abs(sug.delta))}</strong> — {gapDirection}.
-                  {sug.delta > 0
-                    ? " Worth a counter-offer push toward the Smart price."
-                    : " Consider declining or trimming the ask back toward the Smart price."}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <Field label="Expected gross" mono value={formatMoney(sug.expectedGross)} />
-              <Field label="Expense estimate" mono value={formatMoney(sug.expenseEstimate)} />
-              <Field label="% payout (model)" mono value={formatMoney(sug.percentagePayout)} />
-              <Field label="Winner" value={
-                <span className="capitalize">
-                  {sug.winner} · margin {formatMoney(sug.winnerMargin)}
-                </span>
-              } />
-            </div>
-
-            <div className="text-[12.5px] text-ink-700 leading-relaxed pt-3 border-t border-ink-200/40">
-              {sug.basis}
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11.5px] pt-2">
-              <div>
-                <div className="eyebrow text-[10px] text-ink-400 mb-1">Gross source</div>
-                <div className="text-ink-700">{GROSS_SOURCE_LABELS[sug.expectedGrossSource] ?? sug.expectedGrossSource}</div>
-              </div>
-              <div>
-                <div className="eyebrow text-[10px] text-ink-400 mb-1">Expense source</div>
-                <div className="text-ink-700">{EXPENSE_SOURCE_LABELS[sug.expenseSource] ?? sug.expenseSource}</div>
-              </div>
-              <div>
-                <div className="eyebrow text-[10px] text-ink-400 mb-1">Familiarity</div>
-                <div className="text-ink-700 font-mono tabular">
-                  artist {sug.artistShowCount} · agent {sug.agentShowCount}
-                </div>
-              </div>
-              <div>
-                <div className="eyebrow text-[10px] text-ink-400 mb-1">Insurance tier</div>
-                <div className="text-ink-700 font-mono tabular">{sug.insuranceTier} / 5</div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-3 border-t border-ink-200/40">
-              <button
-                type="button"
-                onClick={() => setShowAudit((v) => !v)}
-                className="text-[11.5px] text-ink-500 hover:text-ink-800 transition-colors"
-              >
-                {showAudit ? "Hide" : "Show"} 7-step audit trail
-              </button>
-              <Button variant="ghost" onClick={generate} disabled={busy}>
-                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                Recompute
-              </Button>
-            </div>
-
-            {showAudit && (
-              <pre className="text-[10.5px] font-mono bg-ink-900/95 text-emerald-200 rounded-lg p-3 overflow-x-auto leading-relaxed">
-                {JSON.stringify(JSON.parse(sug.auditJson), null, 2)}
-              </pre>
-            )}
-
-            {err && <div className="text-[12px] text-rose-600">{err}</div>}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 function BonusBadge({ type }: { type: Bonus["type"] }) {
   const labels: Record<Bonus["type"], string> = {
