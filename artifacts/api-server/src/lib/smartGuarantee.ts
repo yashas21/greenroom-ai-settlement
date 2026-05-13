@@ -55,8 +55,6 @@ type CtxRow = {
 
 type Ctx = {
   rows: CtxRow[];
-  venueMeanGross: number;
-  venueMeanExpense: number;
   venueCapacity: number;
 };
 
@@ -139,13 +137,8 @@ async function buildCtx(): Promise<Ctx> {
     });
   }
 
-  const grosses = rows.map((r) => r.gross).filter((x): x is number => x != null && x > 0);
-  const expensesAll = rows.map((r) => r.expense).filter((x): x is number => x != null && x > 0);
-
   return {
     rows,
-    venueMeanGross: mean(grosses),
-    venueMeanExpense: mean(expensesAll),
     venueCapacity: allVenues[0]?.capacity ?? 650,
   };
 }
@@ -209,7 +202,11 @@ function resolveExpectedGross(
     }
   }
   const cell = ctx.rows.filter(
-    (r) => r.dealType === dealType && r.bucket === bucket && r.gross != null,
+    (r) =>
+      r.dealType === dealType &&
+      r.bucket === bucket &&
+      r.date < show.date &&
+      r.gross != null,
   );
   if (cell.length >= 3) {
     return {
@@ -218,11 +215,14 @@ function resolveExpectedGross(
       sampleSize: cell.length,
     };
   }
-  if (ctx.venueMeanGross > 0) {
+  const venueGrossRows = ctx.rows.filter(
+    (r) => r.date < show.date && r.gross != null,
+  );
+  if (venueGrossRows.length > 0) {
     return {
-      value: ctx.venueMeanGross,
+      value: mean(venueGrossRows.map((r) => r.gross!)),
       source: "venue_mean",
-      sampleSize: ctx.rows.filter((r) => r.gross != null).length,
+      sampleSize: venueGrossRows.length,
     };
   }
   return {
@@ -283,10 +283,15 @@ function resolveExpense(
       };
     }
   }
+  const venueExpenseRows = ctx.rows.filter(
+    (r) => r.date < show.date && r.expense != null,
+  );
   return {
-    value: ctx.venueMeanExpense,
+    value: venueExpenseRows.length > 0
+      ? mean(venueExpenseRows.map((r) => r.expense!))
+      : 0,
     source: "venue_mean",
-    sampleSize: ctx.rows.filter((r) => r.expense != null).length,
+    sampleSize: venueExpenseRows.length,
   };
 }
 
@@ -325,11 +330,12 @@ export type GeneratedGuarantee = Omit<
 
 export async function generateGuarantee(
   showId: string,
+  opts: { allowPast?: boolean } = {},
 ): Promise<{ suggestion: GeneratedGuarantee | null; reason?: string }> {
   const showRows = await db.select().from(shows).where(eq(shows.id, showId));
   const show = showRows[0];
   if (!show) return { suggestion: null, reason: "no_show" };
-  if (show.date < todayDateString()) {
+  if (!opts.allowPast && show.date < todayDateString()) {
     return { suggestion: null, reason: "show_already_past" };
   }
 

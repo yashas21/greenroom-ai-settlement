@@ -355,6 +355,61 @@ export interface SwitchSavingsItem {
   };
 }
 
+export type GuaranteeBacktestDirection = "money_protected" | "money_overpaid" | "even";
+
+export interface GuaranteeBacktestSteps {
+  step1_expectedGross: { value: number; source: string; sampleSize: number };
+  step2_ticketingFees: { rate: number; value: number };
+  step3_netAfterFees: number;
+  step4_expense: {
+    raw: number;
+    source: string;
+    sampleSize: number;
+    defaultCap: number;
+    dealExpenseCap: number | null;
+    effectiveCap: number;
+    cappedValue: number;
+  };
+  step5_netBase: number;
+  step6_percentagePayout: { pct: number; basis: number; value: number };
+  step7_winner: {
+    winner: "guarantee" | "percentage" | "tie";
+    winnerValue: number;
+    suggestedPrice: number;
+    breakevenGross: number;
+  };
+}
+
+export interface GuaranteeBacktestItem {
+  showId: string;
+  date: string;
+  artistName: string | null;
+  dealType: DealType;
+  agentGuarantee: number;
+  actualToArtist: number;
+  grossBoxOffice: number;
+  sgpSuggestedPrice: number;
+  deltaSgpVsActual: number;
+  deltaSgpVsAgent: number;
+  absDeltaActual: number;
+  direction: GuaranteeBacktestDirection;
+  confidenceTier: ConfidenceTier;
+  insuranceTier: number;
+  basis: string;
+  steps: GuaranteeBacktestSteps;
+}
+
+export interface GuaranteeBacktestPayload {
+  generatedAt: string;
+  windowMonths: number;
+  totalCandidates: number;
+  totalScored: number;
+  moneyProtected: number;
+  moneyOverpaid: number;
+  netDelta: number;
+  items: GuaranteeBacktestItem[];
+}
+
 export interface SwitchSavingsPayload {
   generatedAt: string;
   windowMonths: number;

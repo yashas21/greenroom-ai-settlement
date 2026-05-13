@@ -6,6 +6,7 @@ import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib
 import { generateAndPersist, decideSuggestion } from "../lib/smartSwitch";
 import { generateAndPersistGuarantee, backfillUpcomingGuarantees } from "../lib/smartGuarantee";
 import { getSwitchSavings, getSwitchProjectedGrid } from "../lib/switchSavings";
+import { getGuaranteeBacktest } from "../lib/guaranteeBacktest";
 
 const router: IRouter = Router();
 
@@ -76,6 +77,17 @@ router.get("/insights/switch-projected-grid", async (req, res): Promise<void> =>
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "projected_grid_failed" });
+  }
+});
+
+router.get("/insights/guarantee-backtest", async (req, res): Promise<void> => {
+  try {
+    const months = Number(req.query.months ?? 12) || 12;
+    const topN = Number(req.query.topN ?? 10) || 10;
+    const data = await getGuaranteeBacktest({ months, topN });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "guarantee_backtest_failed" });
   }
 });
 

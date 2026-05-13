@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign } from "lucide-react";
+import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign, Calculator, ShieldCheck, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
-import type { InsightsCell, AttentionKind, SwitchSavingsItem, SwitchProjectedCell } from "@/lib/types";
+import type { InsightsCell, AttentionKind, SwitchSavingsItem, SwitchProjectedCell, GuaranteeBacktestItem } from "@/lib/types";
 
 const DEAL_LABELS: Record<string, string> = {
   flat: "Flat",
@@ -42,6 +42,7 @@ export default function InsightsPage() {
           Same Deal type × deal size grid as Deal Analysis, but each cell names the dominant
           friction kind for those deals and clusters the actual recurring complaints behind it.
         </p>
+        <GuaranteeBacktestSection />
         <SwitchSavingsSection />
         <SwitchProjectedGridSection />
         <LoadingState label="Clustering complaint themes... this can take a minute on first load." />
@@ -83,6 +84,7 @@ export default function InsightsPage() {
         to extend coverage.
       </p>
 
+      <GuaranteeBacktestSection />
       <SwitchSavingsSection />
       <SwitchProjectedGridSection />
 
@@ -821,6 +823,372 @@ function CellBox({
             </div>
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+const DIRECTION_TONE: Record<string, { bg: string; fg: string; ring: string; chip: string }> = {
+  money_protected: {
+    bg: "bg-emerald-50/40",
+    fg: "text-emerald-700",
+    ring: "ring-emerald-200",
+    chip: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  },
+  money_overpaid: {
+    bg: "bg-rose-50/40",
+    fg: "text-rose-700",
+    ring: "ring-rose-200",
+    chip: "bg-rose-50 text-rose-700 ring-rose-200",
+  },
+  even: {
+    bg: "bg-ink-50/40",
+    fg: "text-ink-600",
+    ring: "ring-ink-200",
+    chip: "bg-ink-50 text-ink-600 ring-ink-200",
+  },
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  artist_at_venue: "this artist at this venue",
+  artist_anywhere: "this artist (any venue)",
+  agent_history: "agent's roster",
+  cell_mean: "deal-type × size cell",
+  venue_mean: "venue average",
+  capacity_proxy: "capacity proxy",
+  artist_history_2plus: "artist 2+ prior",
+  artist_history_1: "artist 1 prior",
+  genre_p75: "genre p75",
+};
+
+function srcLabel(s: string): string {
+  return SOURCE_LABEL[s] ?? s.replace(/_/g, " ");
+}
+
+function GuaranteeBacktestSection() {
+  const state = useApiData(() => api.guaranteeBacktest(12, 10), []);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (state.status === "loading")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-ink-400">Loading SGP backtest…</div>
+        </CardContent>
+      </Card>
+    );
+  if (state.status === "error")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-rose-600">
+            Couldn't load SGP backtest: {state.error.message}
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+  const data = state.data;
+  if (data.totalScored === 0) {
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="flex items-center gap-2 mb-1">
+            <Calculator className="h-4 w-4 text-brand-700" />
+            <span className="eyebrow text-[10px] text-ink-500">
+              Smart Guaranteed Price · last {data.windowMonths} months
+            </span>
+          </div>
+          <div className="text-[13px] text-ink-500">
+            No settled non-flat deals in the last {data.windowMonths} months — nothing to backtest
+            SGP against.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardContent>
+        <div className="flex items-baseline justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-brand-700" />
+            <h2 className="text-[15px] font-semibold text-ink-900">
+              Smart Guaranteed Price · backtest
+            </h2>
+            <span className="eyebrow text-[10px] text-ink-400">
+              · last {data.windowMonths} months
+            </span>
+          </div>
+          <div className="text-[11px] text-ink-400 font-mono tabular">
+            {data.items.length} of {data.totalScored} scored deals shown
+          </div>
+        </div>
+        <p className="text-[12px] text-ink-500 mb-4 leading-relaxed">
+          Past settled <span className="font-mono">vs / % of net / door / % of gross</span> deals
+          re-scored with the 7-step SGP using only data available before each show. The SGP
+          suggested price is compared to what the artist was actually paid; rows are sorted by
+          the largest divergence so the worst guarantee mismatches surface first.
+        </p>
+
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="rounded-md ring-1 ring-emerald-200/60 bg-emerald-50/40 p-3">
+            <div className="flex items-center gap-1.5 eyebrow text-[10px] text-emerald-700 mb-1">
+              <ShieldCheck className="h-3 w-3" />
+              Money protected
+            </div>
+            <div className="text-[22px] font-serif text-ink-900 tabular">
+              {fmtMoney(data.moneyProtected)}
+            </div>
+            <div className="text-[10px] text-ink-400">
+              actual payouts above SGP — venue would have saved
+            </div>
+          </div>
+          <div className="rounded-md ring-1 ring-rose-200/60 bg-rose-50/40 p-3">
+            <div className="flex items-center gap-1.5 eyebrow text-[10px] text-rose-700 mb-1">
+              <AlertTriangle className="h-3 w-3" />
+              Money overpaid (under SGP)
+            </div>
+            <div className="text-[22px] font-serif text-ink-900 tabular">
+              {fmtMoney(data.moneyOverpaid)}
+            </div>
+            <div className="text-[10px] text-ink-400">
+              SGP above actual — venue would have offered more
+            </div>
+          </div>
+          <div className="rounded-md ring-1 ring-ink-200/60 bg-white p-3">
+            <div className="eyebrow text-[10px] text-ink-500 mb-1">Net delta</div>
+            <div
+              className={`text-[22px] font-serif tabular ${
+                data.netDelta > 0
+                  ? "text-emerald-700"
+                  : data.netDelta < 0
+                    ? "text-rose-700"
+                    : "text-ink-700"
+              }`}
+            >
+              {data.netDelta >= 0 ? "+" : "−"}
+              {fmtMoney(Math.abs(data.netDelta))}
+            </div>
+            <div className="text-[10px] text-ink-400">
+              protected − overpaid across {data.totalScored} deals
+            </div>
+          </div>
+        </div>
+
+        <ul className="space-y-1.5">
+          {data.items.map((it) => (
+            <BacktestRow
+              key={it.showId}
+              item={it}
+              expanded={expandedId === it.showId}
+              onToggle={() =>
+                setExpandedId(expandedId === it.showId ? null : it.showId)
+              }
+            />
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BacktestRow({
+  item,
+  expanded,
+  onToggle,
+}: {
+  item: GuaranteeBacktestItem;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const tierClass = TIER_TONE[item.confidenceTier] ?? TIER_TONE.D;
+  const dirTone = DIRECTION_TONE[item.direction];
+  const sgpVsActual = item.deltaSgpVsActual;
+  const sgpVsAgent = item.deltaSgpVsAgent;
+  return (
+    <li className="rounded-md ring-1 ring-ink-200/60 bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-ink-50/60 rounded-md transition-colors"
+        aria-expanded={expanded}
+      >
+        <ChevronRight
+          className={`h-3.5 w-3.5 text-ink-400 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-medium text-ink-900 truncate">
+              {item.artistName ?? "—"}
+            </span>
+            <span className="text-[10px] font-mono tabular text-ink-400">{item.date}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-600 ring-1 ring-ink-200">
+              {DEAL_LABELS[item.dealType] ?? item.dealType}
+            </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded font-mono ring-1 ${tierClass}`}
+              title="Confidence tier"
+            >
+              Tier {item.confidenceTier}
+            </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded ring-1 ${dirTone.chip}`}
+            >
+              {item.direction === "money_protected"
+                ? "would have protected"
+                : item.direction === "money_overpaid"
+                  ? "would have overpaid"
+                  : "even"}
+            </span>
+          </div>
+          <div className="mt-1 grid grid-cols-3 gap-3 text-[10.5px] font-mono tabular text-ink-500">
+            <span>
+              <span className="text-ink-400">agent</span>{" "}
+              ${item.agentGuarantee.toLocaleString()}
+            </span>
+            <span>
+              <span className="text-ink-400">SGP</span>{" "}
+              ${item.sgpSuggestedPrice.toLocaleString()}
+              <span className={`ml-1 ${sgpVsAgent === 0 ? "text-ink-400" : sgpVsAgent > 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                ({sgpVsAgent >= 0 ? "+" : "−"}${Math.abs(sgpVsAgent).toLocaleString()} vs agent)
+              </span>
+            </span>
+            <span>
+              <span className="text-ink-400">paid</span>{" "}
+              ${item.actualToArtist.toLocaleString()}
+            </span>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div
+            className={`text-[13px] font-mono tabular font-semibold ${dirTone.fg}`}
+          >
+            {sgpVsActual >= 0 ? "+" : "−"}
+            {fmtMoney(Math.abs(sgpVsActual))}
+          </div>
+          <div className="text-[9px] text-ink-400 uppercase tracking-[0.06em]">
+            SGP − paid
+          </div>
+        </div>
+      </button>
+
+      {expanded && <BacktestBreakdown item={item} />}
+    </li>
+  );
+}
+
+function BacktestBreakdown({ item }: { item: GuaranteeBacktestItem }) {
+  const s = item.steps;
+  const rows: { n: number; label: string; value: string; aside?: string }[] = [
+    {
+      n: 1,
+      label: "Expected gross",
+      value: `$${Math.round(s.step1_expectedGross.value).toLocaleString()}`,
+      aside: `${srcLabel(s.step1_expectedGross.source)} · n=${s.step1_expectedGross.sampleSize}`,
+    },
+    {
+      n: 2,
+      label: "Ticketing fees",
+      value: `$${Math.round(s.step2_ticketingFees.value).toLocaleString()}`,
+      aside: `@ ${Math.round(s.step2_ticketingFees.rate * 100)}% of gross`,
+    },
+    {
+      n: 3,
+      label: "Net after fees",
+      value: `$${Math.round(s.step3_netAfterFees).toLocaleString()}`,
+      aside: "step 1 − step 2",
+    },
+    {
+      n: 4,
+      label: "Capped expense",
+      value: `$${Math.round(s.step4_expense.cappedValue).toLocaleString()}`,
+      aside: `raw $${Math.round(s.step4_expense.raw).toLocaleString()} (${srcLabel(s.step4_expense.source)}) · cap $${Math.round(s.step4_expense.effectiveCap).toLocaleString()}`,
+    },
+    {
+      n: 5,
+      label: "Net base",
+      value: `$${Math.round(s.step5_netBase).toLocaleString()}`,
+      aside: "max(0, step 3 − step 4)",
+    },
+    {
+      n: 6,
+      label: "Percentage payout",
+      value: `$${Math.round(s.step6_percentagePayout.value).toLocaleString()}`,
+      aside: `${Math.round(s.step6_percentagePayout.pct * 100)}% × $${Math.round(s.step6_percentagePayout.basis).toLocaleString()}`,
+    },
+    {
+      n: 7,
+      label: "Suggested price",
+      value: `$${Math.round(s.step7_winner.suggestedPrice).toLocaleString()}`,
+      aside: `winner: ${s.step7_winner.winner} · breakeven $${Math.round(s.step7_winner.breakevenGross).toLocaleString()}`,
+    },
+  ];
+  return (
+    <div className="border-t border-ink-200/50 px-3 py-3 bg-ink-50/30 rounded-b-md text-[12px] leading-relaxed space-y-3">
+      <div className="rounded ring-1 ring-ink-200/60 bg-white p-2.5">
+        <div className="eyebrow text-[10px] text-ink-500 mb-2">7-step SGP against historical data</div>
+        <ol className="space-y-1">
+          {rows.map((r) => (
+            <li
+              key={r.n}
+              className="grid grid-cols-[20px_120px_1fr_auto] gap-2 items-baseline text-[11px] font-mono tabular border-t border-ink-100/70 pt-1 first:border-t-0 first:pt-0"
+            >
+              <span className="text-ink-400">{r.n}.</span>
+              <span className="text-ink-600">{r.label}</span>
+              <span className="text-ink-400 text-[10.5px] truncate" title={r.aside ?? ""}>
+                {r.aside}
+              </span>
+              <span className="text-ink-900 font-semibold text-right">{r.value}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded ring-1 ring-ink-200/60 bg-white p-2.5">
+          <div className="eyebrow text-[10px] text-ink-500 mb-1">Agent's guarantee</div>
+          <div className="text-[15px] font-mono tabular text-ink-900">
+            ${item.agentGuarantee.toLocaleString()}
+          </div>
+        </div>
+        <div className="rounded ring-1 ring-brand-200 bg-brand-50/30 p-2.5">
+          <div className="eyebrow text-[10px] text-brand-700 mb-1">SGP suggested price</div>
+          <div className="text-[15px] font-mono tabular text-ink-900">
+            ${item.sgpSuggestedPrice.toLocaleString()}
+          </div>
+          <div className="text-[10px] text-ink-500 mt-0.5">
+            {item.deltaSgpVsAgent === 0
+              ? "matches the agent's guarantee"
+              : item.deltaSgpVsAgent > 0
+                ? `$${item.deltaSgpVsAgent.toLocaleString()} above the agent's guarantee`
+                : `$${Math.abs(item.deltaSgpVsAgent).toLocaleString()} below the agent's guarantee`}
+          </div>
+        </div>
+        <div className="rounded ring-1 ring-ink-200/60 bg-white p-2.5">
+          <div className="eyebrow text-[10px] text-ink-500 mb-1">Actually paid to artist</div>
+          <div className="text-[15px] font-mono tabular text-ink-900">
+            ${item.actualToArtist.toLocaleString()}
+          </div>
+          <div className="text-[10px] text-ink-500 mt-0.5">
+            on ${item.grossBoxOffice.toLocaleString()} gross
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded ring-1 ring-ink-200/60 bg-white p-2.5">
+        <div className="eyebrow text-[10px] text-ink-500 mb-1">Basis</div>
+        <div className="text-[11.5px] text-ink-700">{item.basis}</div>
+      </div>
+
+      <div className="text-right">
+        <Link
+          href={`/shows/${item.showId}`}
+          className="inline-flex items-center gap-1 text-[11px] text-brand-700 hover:text-brand-800 font-medium"
+        >
+          Open show <ArrowUpRight className="h-3 w-3" />
+        </Link>
       </div>
     </div>
   );
