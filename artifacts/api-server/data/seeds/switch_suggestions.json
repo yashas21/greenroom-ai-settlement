@@ -16,7 +16,9 @@
     "sample_size": 29,
     "basis": "Pure door deals at this venue lose money 93% of the time (avg net to venue −$1,007). Replace with a hybrid: artist gets a $500 floor regardless of walk-up, then 60% of the pool above an $800 expense cap. Projected artist payout ~$2,407 at the cell-average gross of $4,420; venue stops eating expense overruns on slow nights. Confidence tier B (first-time).",
     "status": "suggested",
-    "decided_at": null
+    "decided_at": null,
+    "source": null,
+    "band_width": null
   },
   {
     "id": "sug_demo_marble_index",
@@ -35,7 +37,9 @@
     "sample_size": 136,
     "basis": "Across 136 past vs deals in the $1–5K bucket, the artist was paid $4,928 on average (P10 $1,962 – P90 $8,507). A flat at $4,950 matches the historical expected payout, removing the post-show recoup arithmetic that drives most disputes. Confidence tier B (first-time).",
     "status": "accepted",
-    "decided_at": 1778626746
+    "decided_at": 1778626746,
+    "source": null,
+    "band_width": null
   },
   {
     "id": "sug_demo_north_frontier",
@@ -54,7 +58,9 @@
     "sample_size": 136,
     "basis": "Across 136 past vs deals in the $1–5K bucket, the artist was paid $4,928 on average (P10 $1,962 – P90 $8,507). A flat at $4,950 matches the historical expected payout, removing the post-show recoup arithmetic that drives most disputes. Confidence tier A (4 prior shows at the venue).",
     "status": "suggested",
-    "decided_at": null
+    "decided_at": null,
+    "source": null,
+    "band_width": null
   },
   {
     "id": "sug_demo_quartz_lantern",
@@ -73,6 +79,8 @@
     "sample_size": 29,
     "basis": "Pure door deals at this venue lose money 93% of the time (avg net to venue −$1,007). Replace with a hybrid: artist gets a $500 floor regardless of walk-up, then 60% of the pool above an $800 expense cap. Projected artist payout ~$2,407 at the cell-average gross of $4,420; venue stops eating expense overruns on slow nights. Confidence tier A (3 prior shows at the venue).",
     "status": "accepted",
-    "decided_at": 1778626746
+    "decided_at": 1778626746,
+    "source": null,
+    "band_width": null
   }
 ]

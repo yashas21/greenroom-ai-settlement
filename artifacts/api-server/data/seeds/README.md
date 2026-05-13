@@ -12,8 +12,8 @@ runs against without re-running any of the seed scripts.
 | `artists.json` | The 5 demo artists added by `scripts/seedSmartSwitchDemo.ts` (2 "familiar", 3 first-timers). |
 | `shows.json` | The 12 demo shows added by the same script (5 upcoming + 6 prior-show history rows used to give "familiar" artists a tier-A track record + 1 demo extra). |
 | `deals.json` | The 12 demo deals attached to those shows (mix of vs / % of net / door / flat). |
-| `settlements.json` | Empty array — demo upcoming shows intentionally have no settlement yet. |
-| `switch_suggestions.json` | Pre-generated Smart Switch suggestions for the demo upcoming shows. |
+| `settlements.json` | 6 settled prior shows that give the two "familiar" demo artists a tier-A track record at the venue. The 5 demo *upcoming* shows intentionally have no settlement yet. |
+| `switch_suggestions.json` | Pre-generated Smart Switch suggestions for the demo upcoming shows (4 — one upcoming `% of net` deal is intentionally outside the eligible band). Two are pre-accepted (one flat, one door-hybrid) so `/shows?switched=1` has clean examples; two stay as `suggested` for the worklist. |
 | `guarantee_suggestions.json` | Pre-generated Smart Guaranteed Price suggestions for the demo shows. |
 
 ## How this snapshot relates to the original starter
@@ -27,7 +27,7 @@ This fork's database is a **superset**:
 | `artists` | 59 | 64 | +5 | Demo seed (this folder) |
 | `shows` | 537 | 549 | +12 | Demo seed (this folder) |
 | `deals` | 537 | 549 | +12 | Demo seed (this folder) |
-| `settlements` | 537 | 537 | **0** | Unchanged |
+| `settlements` | 537 | 543 | +6 | Demo seed history rows (familiar artists' prior shows) |
 | `expenses` | 2,943 | 2,943 | **0** | Unchanged |
 | `comps` | 1,935 | 1,935 | **0** | Unchanged |
 | `ticket_sales` | 537 | 537 | **0** | Unchanged |
