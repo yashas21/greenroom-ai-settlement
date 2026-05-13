@@ -166,6 +166,11 @@ export default function ShowDetailPage() {
       </div>
 
       <div className="px-12 pb-12">
+        {show.internalNotes?.startsWith("[NEW DEMO]") && (
+          <div className="mb-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[10px] font-semibold tracking-wide ring-1 ring-violet-200">
+            NEW DEMO
+          </div>
+        )}
         {show.internalNotes && (
           <div className="mb-8 mt-1 rounded-lg bg-amber-50/50 ring-1 ring-amber-200/60 p-5 flex gap-3">
             <AlertCircle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
@@ -181,7 +186,7 @@ export default function ShowDetailPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-2">
-          {deal && deal.dealType !== "flat" && switchEligibleClient(deal) && (
+          {deal && deal.dealType !== "flat" && switchEligibleClient(deal) && isActionableStage(settlement) && (
             <SmartSwitchPanel
               showId={show.id}
               deal={deal}
@@ -190,7 +195,7 @@ export default function ShowDetailPage() {
               onApplied={reload}
             />
           )}
-          {deal && deal.dealType !== "flat" && !switchEligibleClient(deal) && (
+          {deal && deal.dealType !== "flat" && !switchEligibleClient(deal) && isActionableStage(settlement) && (
             <SmartGuaranteedPricePanel
               showId={show.id}
               deal={deal}
@@ -198,7 +203,7 @@ export default function ShowDetailPage() {
               initial={data.guaranteeSuggestion}
             />
           )}
-          {deal && deal.dealType !== "flat" && !switchEligibleClient(deal) && !settlement && (
+          {deal && deal.dealType !== "flat" && !switchEligibleClient(deal) && isActionableStage(settlement) && (
             <ImproveDealPanel
               showId={show.id}
               deal={deal}
@@ -494,6 +499,15 @@ function classifyBucketClient(deal: Deal): string {
   if (g < 5000) return "$1–5K";
   if (g < 15000) return "$5–15K";
   return "$15K+";
+}
+
+function isActionableStage(settlement: Settlement | null | undefined): boolean {
+  // Smart Switch / Improve Deal / SGP suggestions are only meaningful while
+  // the settlement is still being negotiated. Once it's signed/finalized/paid
+  // (or there's no settlement row at all), the deal terms are locked and
+  // surfacing a counterfactual would just confuse the booker.
+  if (!settlement) return false;
+  return settlement.status === "draft" || settlement.status === "submitted" || settlement.status === "in_review";
 }
 
 function switchEligibleClient(deal: Deal): boolean {
