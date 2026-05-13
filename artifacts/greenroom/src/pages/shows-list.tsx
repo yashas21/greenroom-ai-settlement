@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { ArrowUpRight, Search, Calendar, X, Shield } from "lucide-react";
+import { ArrowUpRight, Search, Calendar, X, Shield, Wrench } from "lucide-react";
 import { DealTypeBadge, PlainBadge } from "@/components/ui/badge";
 
 type Status = "booked" | "advanced" | "day_of" | "settled" | "closed";
@@ -391,7 +391,7 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
             className="text-[11px] text-brand-700 bg-brand-50/50 hover:bg-brand-50 px-2 py-1 rounded ring-1 ring-brand-200/60 inline-flex items-center gap-1 transition-colors"
           >
             <Shield className="h-2.5 w-2.5" />
-            {upcomingActionableCount} actionable now (Smart Switch or Smart Guaranteed Price) — narrow to these →
+            {upcomingActionableCount} actionable now (Smart Switch or Improve Deal) — narrow to these →
           </button>
         )}
         {isFilterActive(filters) && (
@@ -576,11 +576,11 @@ function ShowListRow({ row }: { row: ShowRow }) {
               </span>
             ) : (
               <span
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-sky-700 text-white ring-1 ring-sky-700 group-hover:bg-sky-800 transition-colors shadow-[0_1px_2px_rgba(8,80,120,0.18)]"
-                title="Open deal page to draft a guarantee with Smart Guaranteed Price"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-emerald-700 text-white ring-1 ring-emerald-700 group-hover:bg-emerald-800 transition-colors shadow-[0_1px_2px_rgba(8,100,80,0.18)]"
+                title="Open deal page to propose structural improvements (caps, conversions)"
               >
-                <Shield className="h-3 w-3" />
-                Use Smart Guaranteed Price
+                <Wrench className="h-3 w-3" />
+                Improve Deal
               </span>
             )
           ) : settlement ? (
