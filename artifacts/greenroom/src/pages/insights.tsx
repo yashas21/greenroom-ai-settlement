@@ -487,7 +487,7 @@ function deltaTone(actual: number, projected: number): string {
 }
 
 function SwitchProjectedGridSection() {
-  const state = useApiData(() => api.switchProjectedGrid(6), []);
+  const state = useApiData(() => api.switchProjectedGrid(12), []);
 
   if (state.status === "loading")
     return (
@@ -548,7 +548,7 @@ function SwitchProjectedGridSection() {
             {data.totalDealsModelled} of {data.totalCandidates} deals modelled
           </div>
         </div>
-        <p className="text-[12px] text-ink-500 mb-4 leading-relaxed">
+        <p className="text-[12px] text-ink-500 mb-3 leading-relaxed">
           The Deal Analysis cross-tab, recomputed with each settled vs / % of net / door deal
           replaced by its Smart Switch counterfactual. <span className="font-mono">losing</span>{" "}
           re-derived from the projected payout; <span className="font-mono">disputed</span> and{" "}
@@ -556,6 +556,34 @@ function SwitchProjectedGridSection() {
           eliminate recoup arithmetic, which is what every settlement-flow attention kind in
           this app traces back to).
         </p>
+
+        <details className="mb-5 rounded-md ring-1 ring-ink-200/60 bg-ink-50/30 px-3 py-2 text-[11px] text-ink-600">
+          <summary className="cursor-pointer text-ink-700 font-medium">
+            How the flat contract is computed
+          </summary>
+          <div className="mt-2 leading-relaxed space-y-2">
+            <p>
+              For each <span className="font-mono">vs</span> or{" "}
+              <span className="font-mono">% of net</span> deal, the suggested flat is the
+              historical average artist payout for deals in the same{" "}
+              <span className="font-mono">deal type × size bucket</span> cell, rounded to the
+              nearest $50:
+            </p>
+            <pre className="font-mono text-[10.5px] bg-white rounded px-2 py-1.5 ring-1 ring-ink-200/50 overflow-x-auto">
+{`bucket            = classifySizeBucket(deal)        // $0–1K | $1–5K | $5–15K | $15K+ | Uncapped %
+cell              = pastSettled[dealType][bucket]   // need cell.n >= 3, else no suggestion
+suggestedFlat     = roundTo50( cell.avgPayout )     // mean totalToArtist across the cell
+confidenceBand    = [ roundTo50(cell.p10Payout), roundTo50(cell.p90Payout) ]`}
+            </pre>
+            <p>
+              Counterfactual losing-money for the projection then uses{" "}
+              <span className="font-mono">gross − suggestedFlat − actualExpenses &lt; 0</span>.
+              Door deals use a separate hybrid:{" "}
+              <span className="font-mono">$500 floor + 60% × max(0, gross·0.9 − expenseCap)</span>{" "}
+              with <span className="font-mono">expenseCap = min($1,500, avg cell expenses)</span>.
+            </p>
+          </div>
+        </details>
 
         <div className="grid grid-cols-4 gap-3 mb-5">
           <ProjStatCard label="Money saved" value={fmtMoney(data.totalMoneySavedToVenue)} tone="emerald" />
