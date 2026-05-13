@@ -24,3 +24,9 @@ id = "BlsTTQjza26QaOWKM5Ey4"
 uri = "file://exports/greenroom-settlement-redesign-supporting-data.pdf"
 type = "pdf"
 title = "Greenroom — Settlement Redesign · Supporting Data (PDF)"
+
+[[outputs]]
+id = "xLUt4EQT6iHAVcW1-63NM"
+uri = "file://exports/greenroom-settlement-redesign-v2.pdf"
+type = "pdf"
+title = "Greenroom — Settlement Redesign v2 (data-reconciled, PDF)"
