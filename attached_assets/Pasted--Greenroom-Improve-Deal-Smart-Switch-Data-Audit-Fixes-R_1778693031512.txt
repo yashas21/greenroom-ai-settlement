@@ -1,0 +1,456 @@
+# Greenroom — Improve Deal + Smart Switch: Data-Audit Fixes
+### Replit Agent Prompt
+
+---
+
+## What this prompt is
+
+A targeted fix pass on the existing `Improve Deal` and `Smart Switch` engines, based on a full audit of 497 settled shows from the live database. Every change below is derived from real data. Do not invent new behaviour — only apply the changes described here.
+
+This prompt is organised as **REMOVE → CORRECT → KEEP**. Read all three sections before touching any code.
+
+---
+
+## Files you will touch
+
+- `lib/switchMath.ts` — Smart Switch engine
+- `lib/improveDeal.ts` (or wherever Improve Deal suggestions are generated)
+- `lib/switchConstants.ts` — pre-computed historical constants
+- `db/schema.ts` — no schema changes needed
+- Any UI components that render Improve Deal suggestion cards
+
+Do **not** modify `lib/dealMath.ts` (the settlement engine) or `app/shows/[id]/settle/page.tsx`.
+
+---
+
+## SECTION 1 — REMOVE: suggestions that are wrong or never trigger
+
+### 1a. REMOVE — cell-mean fallback for flat suggestion (Improve Deal)
+
+**Location:** The fallback path in `generateSwitchSuggestion` (and anywhere in Improve Deal) that computes:
+
+```typescript
+// ❌ DELETE THIS PATTERN wherever it appears:
+suggestedFlat = roundTo50(cell.avgPayout)
+band = [roundTo50(cell.p10), roundTo50(cell.p90)]
+```
+
+**Why:** The cell mean for vs×$1-5K is $2,058. The mean guarantee on those same deals is $1,466. Using cell mean as the flat suggestion overestimates by $591 per show — making the switch more expensive than the original deal. The fallback produces the wrong number in the wrong direction.
+
+**Replace with:** The guarantee amount from the specific deal. See Section 2a.
+
+---
+
+### 1b. REMOVE — "Convert to flat" from Improve Deal for vs deals above $5K gross
+
+**Location:** The `convertToFlat` suggestion block in Improve Deal.
+
+**Current (wrong) behaviour:** Improve Deal offers flat conversion for *any* non-flat deal where SGP confidence tier is A or B — including vs deals in the $5-15K and $15K+ buckets.
+
+**Why this is wrong:**
+- vs×$5-15K: the percentage calculation fires on 91% of shows. A flat at cell mean has an average error of $1,687 per show and a maximum error of $6,038 on a single show.
+- The cell earns Tier A (n=102) but individual show prediction is unreliable — gross drives payout, not the average.
+
+**What to remove:**
+
+```typescript
+// ❌ REMOVE the convertToFlat suggestion entirely for:
+//    deal.dealType === 'vs' AND classifyBucket(deal) !== '1_5k'
+//    deal.dealType === 'percentage_of_net' AND classifyBucket(deal) !== '1_5k'
+//
+// These two types above $5K stay as Improve Deal (caps only).
+// The flat conversion only belongs to Smart Switch, which already hard-limits at $5K.
+```
+
+After this change, `convertToFlat` in Improve Deal only fires for:
+- `percentage_of_gross` deals (any bucket) — percentage structure is already clean; flat is a cosmetic simplification
+- Any deal where Smart Switch does *not* apply and confidence is A/B — i.e. not vs or % of net above $5K
+
+---
+
+### 1c. REMOVE — bucket-scaled expense cap defaults ($800 / $1,500 / $3,500 / $7,500)
+
+**Location:** The `expenseCapDefaults` or equivalent constant in Improve Deal.
+
+**Current (wrong) defaults:**
+
+```typescript
+// ❌ DELETE:
+const expenseCapDefaults = {
+  '0_1k':      800,
+  '1_5k':    1500,
+  '5_15k':   3500,
+  '15k_plus': 7500,
+  'uncapped_pct': 1500,
+}
+```
+
+**Why wrong:**
+- Expenses at The Crescent are flat across all gross levels: $1,500–$1,700 median regardless of whether a show does $800 or $20K.
+- $0-1K default of $800 is $771 *below* median actual expenses — would routinely be exceeded.
+- $5-15K default of $3,500 is $1,953 *above* median — almost never triggers, making the cap suggestion useless.
+- 90–100% of deals in every bucket already have an expense cap set — this feature fires on fewer than 10% of eligible deals.
+
+**Replace with:** See Section 2b.
+
+---
+
+### 1d. REMOVE — bucket-scaled hospitality cap defaults ($250 / $500 / $1,000 / $2,000)
+
+**Location:** `hospitalityCapDefaults` or equivalent.
+
+**Current (wrong) defaults:**
+
+```typescript
+// ❌ DELETE:
+const hospitalityCapDefaults = {
+  '0_1k':       250,
+  '1_5k':       500,
+  '5_15k':     1000,
+  '15k_plus':  2000,
+}
+```
+
+**Why wrong:** Actual hospitality spend averages $304/show and is flat across all gross levels (P75 = $374–$424 in every bucket). The $2,000 cap for $15K+ shows would virtually never bind.
+
+**Replace with:** See Section 2c.
+
+---
+
+## SECTION 2 — CORRECT: fix partially right suggestions
+
+### 2a. CORRECT — flat suggestion source: use deal.guaranteeAmount, not cell mean
+
+**Applies to:** Smart Switch flat suggestion for `vs` deals in $1-5K bucket.
+
+**The data:** 43 vs deals under $5K, 100% paid the guarantee — the percentage calculation never fired once. The guarantee IS the flat answer. The SGP 7-step engine confirms this. The fallback must not use cell mean.
+
+**Implementation:**
+
+```typescript
+// In generateSwitchSuggestion, for deal.dealType === 'vs' AND bucket === '1_5k':
+
+function getSuggestedFlat(deal: Deal, sgpResult: SGPResult | null): FlatSuggestion {
+
+  // Preferred path: SGP 7-step engine ran successfully
+  if (sgpResult && sgpResult.confidenceTier !== null) {
+    return {
+      suggestedFlat:        sgpResult.suggestedPrice,
+      suggestedFlatRounded: roundTo50(sgpResult.suggestedPrice),
+      source:               'sgp_engine',
+      confidenceTier:       sgpResult.confidenceTier,
+    };
+  }
+
+  // ✅ CORRECT fallback for vs deals:
+  // The guarantee is the flat — verified by 43/43 historical shows.
+  if (deal.dealType === 'vs' && deal.guaranteeAmount > 0) {
+    return {
+      suggestedFlat:        deal.guaranteeAmount,
+      suggestedFlatRounded: roundTo50(deal.guaranteeAmount),
+      source:               'guarantee_amount',  // document this clearly
+      confidenceTier:       'A',
+      // Band width: guarantee is exact, but round-to-50 creates ±$25 rounding band
+      bandLow:  roundTo50(deal.guaranteeAmount) - 25,
+      bandHigh: roundTo50(deal.guaranteeAmount) + 25,
+    };
+  }
+
+  // ✅ CORRECT fallback for percentage_of_net deals in $1-5K:
+  // Use the deal's own percentage applied to expected gross with historical expense estimate.
+  // Do NOT use cell.avgPayout — it blends shows with different percentage rates.
+  if (deal.dealType === 'percentage_of_net') {
+    const expEstimate = resolveExpenseEstimate(deal.artistId, deal.venueId);
+    const cappedExp   = Math.min(expEstimate, SWITCH_CONSTANTS.expenseCap.pn_under5k);
+    const netBase     = Math.max(0, deal.expectedGross * 0.9 - cappedExp);
+    const flatEst     = netBase * deal.percentage;
+    return {
+      suggestedFlat:        flatEst,
+      suggestedFlatRounded: roundTo50(flatEst),
+      source:               'historical_expense_estimate',
+      confidenceTier:       expEstimate.tier,  // A if artist history, C/D if genre proxy
+      bandLow:  roundTo50(flatEst) - expEstimate.bandWidth,
+      bandHigh: roundTo50(flatEst) + expEstimate.bandWidth,
+    };
+  }
+
+  // ❌ No longer fall through to cell.avgPayout. Return null instead.
+  return null;  // Mariana sees no suggestion rather than a wrong one
+}
+```
+
+---
+
+### 2b. CORRECT — expense cap defaults: flat values derived from P75 of actual expenses
+
+**Replace the removed bucket-scaled defaults with these data-derived constants:**
+
+```typescript
+// ✅ In lib/switchConstants.ts — replace expenseCapDefaults entirely:
+
+export const EXPENSE_CAP_DEFAULTS = {
+  // Source: P75 of actual expenses per bucket, rounded to nearest $50.
+  // Expenses are flat across gross levels — the variation is ±$200, not 10×.
+  // P75 means 75% of expense nights are fully covered; the 25% tail is where insurance applies.
+  '0_1k':         1700,   // P75=$1,700  (n=10, median=$1,571)
+  '1_5k':         1850,   // P75=$1,836  (n=62, median=$1,681)
+  '5_15k':        1750,   // P75=$1,754  (n=107, median=$1,547)
+  '15k_plus':     1650,   // P75=$1,664  (n=30, median=$1,593)
+  'uncapped_pct': 1750,   // use venue-all P75 as fallback
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORTANT: These are MUCH closer together than the old defaults.
+// The $3,500 and $7,500 defaults are gone — they were 2–5× the actual median.
+// The new defaults will actually bind on high-expense nights (above P75),
+// which is exactly when artists need protection.
+// ─────────────────────────────────────────────────────────────────────────────
+```
+
+**Update the Improve Deal rationale text:**
+
+```typescript
+// When suggesting an expense cap, show this in the UI:
+const rationale = `Past ${dealType} shows at this venue in the ${bucketLabel} range `
+  + `spent a median of $${medianExpenses.toLocaleString()} on billable expenses `
+  + `(${comparableSettlements} comparable shows). `
+  + `A cap of $${recommendedCap.toLocaleString()} covers 75% of nights — `
+  + `the remaining 25% is where settlement disputes concentrate.`;
+```
+
+**Also update the "already capped" gate:** Before surfacing this suggestion, check `deal.expenseCap`. If it is already set, suppress the expense cap suggestion entirely — 90–100% of deals already have one. The suggestion is only useful for the ~7 deals per bucket that don't.
+
+---
+
+### 2c. CORRECT — hospitality cap: single flat default, not bucket-scaled
+
+```typescript
+// ✅ Replace bucket-scaled hospitality defaults with a single value:
+
+export const HOSPITALITY_CAP_DEFAULT = 400;
+// Source: P75 of 566 actual hospitality expense rows = $389, rounded to $400.
+// Hospitality spend is flat across all gross levels:
+//   $0-1K shows: P75 = $424
+//   $1-5K shows: P75 = $374
+//   $5-15K shows: P75 = $394
+//   $15K+ shows:  P75 = $408
+// Max variation across buckets: $50 — not enough to warrant bucketing.
+```
+
+**Update the Improve Deal hospitality cap suggestion:**
+
+```typescript
+// Show the suggestion only when:
+//   1. deal.hospitalityCap is null or 0
+//   2. The deal has a % structure (vs, % of net, door, % of gross) — flat deals rarely dispute hosp.
+
+const hospitalityRationale =
+  `Hospitality spend averages $304/show at this venue (median $317, n=566 expense records). `
+  + `A $400 cap covers 75% of nights and prevents the most common source of settlement ambiguity `
+  + `when expense receipts are submitted night-of.`;
+```
+
+---
+
+### 2d. CORRECT — confidence tier display: show range when band is wide
+
+**Current wrong behaviour:** Any cell with n≥20 earns Tier A and displays a single number. But the vs×$1-5K cell (n=43, Tier A) has a p10-to-p90 payout spread of **$1,600** ($1,097 to $2,698). Displaying this as a single flat suggestion is misleading.
+
+**Rule to add:**
+
+```typescript
+// After computing confidenceTier from cell.n, apply the band-width override:
+function adjustTierForBandWidth(
+  tier: 'A' | 'B' | 'C' | 'D',
+  bandWidth: number   // p90 - p10 of cell payouts
+): 'A' | 'B' | 'C' | 'D' {
+  // If the band is wider than $500, the suggestion is uncertain regardless of cell size.
+  // Demote display tier so the UI shows a range instead of a single number.
+  if (bandWidth > 1000) return tier === 'A' ? 'B' : tier;  // Tier A → B: show range ±$75
+  if (bandWidth > 500)  return tier === 'A' ? 'B' : tier;
+  return tier;  // band is tight: keep original tier, show single number
+}
+
+// For vs/$1-5K specifically: band = $1,600 → always demote to Tier B display
+// (Guarantee-based suggestion is still Tier A confidence, but the cell mean fallback is Tier B)
+// This distinction matters: if source === 'guarantee_amount', stay Tier A.
+// If source === 'cell_mean' (which we've now removed), it would be Tier B.
+```
+
+**UI impact:** Tier B shows `$X ± $75` instead of `$X`. This is more honest and reduces agent pushback when the actual number differs.
+
+---
+
+### 2e. CORRECT — door hybrid: explicitly handle dead-pool shows and the $15K+ edge case
+
+**Dead-pool shows (9 of 29 door deals):** When `gross × 0.9 − expenseCap ≤ 500`, the available pool doesn't exceed the floor. The current formula is silent about this.
+
+```typescript
+// In simulateHybridDoor:
+
+export function simulateHybridDoor(
+  expectedGross: number,
+  expectedExpenses: number,
+  floor  = 500,
+  split  = 0.60,
+  cap    = 1500
+): DoorHybridResult {
+
+  const expInput   = Math.min(expectedExpenses, cap);
+  const avail      = expectedGross * 0.9 - expInput;
+
+  // ✅ NEW: explicit dead-pool branch
+  if (avail <= floor) {
+    return {
+      artist:        floor,
+      venueShare:    0,
+      venueNet:      Math.round(avail - floor),  // negative — venue absorbs loss
+      insuranceGap:  Math.max(0, expectedExpenses - expInput),
+      isDeadPool:    true,
+      // UI should show: "Artist guaranteed $500 floor. Venue absorbs remaining loss.
+      //                  This show needs a minimum gross of ~$2,500 to be viable for both parties."
+    };
+  }
+
+  // Normal hybrid path
+  const above      = avail - floor;
+  const artist     = Math.round(floor + split * above);
+  const venueShare = Math.round((1 - split) * above);
+  const venueNet   = venueShare - Math.round(expectedExpenses - expInput);  // absorb overage
+  const insGap     = Math.max(0, (expectedExpenses - expInput) - venueShare);
+
+  return {
+    artist, venueShare, venueNet, insuranceGap: insGap,
+    isDeadPool: false,
+  };
+}
+```
+
+**$15K+ door edge case (Tier D, n=1):**
+
+```typescript
+// In generateSwitchSuggestion, for door deals:
+
+if (deal.dealType === 'door') {
+  const doorBucket = classifyBucket(deal.expectedGross, 'door', 0);
+
+  // ✅ NEW: suppress suggestion for $15K+ door deals — only 1 historical show (Pale Lake),
+  // not enough data to project confidently. Show a warning instead.
+  if (doorBucket === '15k_plus') {
+    return {
+      type:    'door_hybrid_suppressed',
+      reason:  'Insufficient historical data for door deals at this gross level (n=1). '
+             + 'Discuss hybrid terms directly with agent rather than using a system-generated projection.',
+      canStillEnrollInsurance: true,
+    };
+  }
+
+  // Normal door hybrid for all other buckets
+  return generateDoorHybrid(deal, ...);
+}
+```
+
+---
+
+## SECTION 3 — KEEP: correct logic, no changes needed
+
+### 3a. KEEP — Switch scope boundaries (A2: verified correct)
+
+The eligibility rules are correct as written. Do not change:
+
+```typescript
+function switchAppliesTo(deal: Deal): 'flat' | 'door_hybrid' | null {
+  if (deal.dealType === 'door') return 'door_hybrid';                     // ✅ any gross
+  if (deal.dealType === 'vs'   && bucket === '1_5k') return 'flat';       // ✅ $1-5K only
+  if (deal.dealType === 'percentage_of_net' && bucket === '1_5k') return 'flat'; // ✅ $1-5K only
+  return null;  // all others: Improve Deal only
+}
+```
+
+The mutual-exclusivity between Smart Switch and Improve Deal is correct. Leave it.
+
+**One implementation check to verify:** Confirm that `% of net` deals are being classified into the `1_5k` bucket correctly. The audit found these deals sometimes land in `uncapped_pct` (because they have a percentage but no guarantee). If your `classifyBucket` function routes `percentage_of_net` to `uncapped_pct` when there's no guarantee, those deals will be invisible to Smart Switch. Fix:
+
+```typescript
+function classifyBucket(gross: number, dealType: string, guarantee: number): string {
+  // 'uncapped_pct' is ONLY for percentage_of_gross with no guarantee —
+  // NOT for percentage_of_net. % of net always has a gross-based bucket.
+  if (dealType === 'percentage_of_gross' && !guarantee) return 'uncapped_pct';
+
+  // All other deal types: bin by gross
+  if (gross < 1000)  return '0_1k';
+  if (gross < 5000)  return '1_5k';
+  if (gross < 15000) return '5_15k';
+  return '15k_plus';
+}
+```
+
+---
+
+### 3b. KEEP — dispute rate as "convert to flat" rationale (A8: verified correct)
+
+The dispute rates by cell are real and usable. Keep this logic exactly as-is:
+
+```typescript
+// These rates are verified from the live database:
+const DISPUTE_RATES = {
+  'vs_1_5k':         0.047,   // 2 of 43 shows
+  'vs_5_15k':        0.088,   // 9 of 102 shows
+  'vs_15k_plus':     0.069,   // 2 of 29 shows
+  'pn_uncapped_pct': 0.059,   // 6 of 101 shows
+  'door_1_5k':       0.053,   // 1 of 19 shows
+} as const;
+
+// Rationale text (keep this pattern):
+const rationale = `${(disputeRate * 100).toFixed(1)}% of comparable ${dealType} shows `
+  + `in this gross range resulted in a disputed settlement (${disputes} of ${total} shows). `
+  + `A flat deal eliminates this risk entirely.`;
+```
+
+---
+
+### 3c. KEEP — first-timer Tier B cap logic (A9: dead path in current data, but correct for platform)
+
+The logic is correct — it just never triggers on The Crescent's dataset because all 59 artists have 2+ shows. Do not remove it. Leave in place for platform-wide use:
+
+```typescript
+// Keep this exactly as-is:
+if (artistShowsAtVenue < 2 && tier === 'A') {
+  tier = 'B';  // First-timers capped at B regardless of cell size
+}
+```
+
+---
+
+## Summary of changes
+
+| Item | Action | Reason |
+|------|--------|--------|
+| cell-mean fallback for flat suggestion | **REMOVE** | Overestimates by $591; use guarantee amount instead |
+| convertToFlat in Improve Deal for vs above $5K | **REMOVE** | 91% pct fires; $6,038 max error; would underpay artists |
+| bucket-scaled expense cap defaults ($800/$1,500/$3,500/$7,500) | **REMOVE** | Below median at low end, 10× above median at high end |
+| bucket-scaled hospitality defaults ($250/$500/$1,000/$2,000) | **REMOVE** | Hospitality is flat ($304 avg) across all gross levels |
+| Flat suggestion source → guarantee amount | **ADD** | 43/43 historical confirms guarantee = flat answer |
+| Expense cap defaults → P75-based flat values | **REPLACE** | $1,650–$1,850 range matches actual data |
+| Hospitality cap → single $400 default | **REPLACE** | P75 of 566 hospitality expenses; no bucket variation |
+| Confidence tier display → band-width override | **ADD** | vs×$1-5K has $1,600 spread; Tier A display is misleading |
+| Door hybrid dead-pool branch | **ADD** | 9/29 door shows need explicit avail≤floor handling |
+| Door $15K+ suppression | **ADD** | n=1 (Pale Lake only) — not enough data for projection |
+| Switch scope boundaries | **KEEP** | Verified correct against full dataset |
+| Dispute rate rationale | **KEEP** | Verified correct — 4.7–8.8% rates by cell |
+| First-timer Tier B cap | **KEEP** | Correct logic; dead path on current single-venue data |
+
+---
+
+## Acceptance criteria
+
+- [ ] No code path produces `suggestedFlat = roundTo50(cell.avgPayout)` — grep for `avgPayout` and confirm it is not used as the flat suggestion
+- [ ] `convertToFlat` in Improve Deal does not fire for `vs` deals where `classifyBucket(deal) !== '1_5k'`
+- [ ] Expense cap defaults are `{0_1k: 1700, 1_5k: 1850, 5_15k: 1750, 15k_plus: 1650}` — verify in constants
+- [ ] Hospitality cap default is `400` everywhere — no bucket-scaled values remain
+- [ ] `simulateHybridDoor` returns `isDeadPool: true` when `avail <= floor`
+- [ ] `generateSwitchSuggestion` returns a suppression object (not a hybrid projection) for door deals with expected gross ≥ $15,000
+- [ ] `classifyBucket` routes `percentage_of_net` deals to gross-based buckets, never to `uncapped_pct`
+- [ ] For vs×$1-5K: flat suggestion source field = `'guarantee_amount'` when SGP engine is unavailable
+- [ ] Dispute rates in rationale text match: vs/$1-5K = 4.7%, vs/$5-15K = 8.8%, pn/uncapped = 5.9%
+- [ ] First-timer Tier B cap logic still present and untouched
