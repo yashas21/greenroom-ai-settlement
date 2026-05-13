@@ -6,3 +6,9 @@ id = "hYrBuREt9gaXhfckB21oN"
 uri = "file://docs/smart-switch-vs-improve-deal.md"
 type = "text"
 title = "Smart Switch vs. Improve Deal"
+
+[[outputs]]
+id = "f7njAxtmwKce1jL1GMVhM"
+uri = "file://docs/settlement-redesign-supporting-data.md"
+type = "text"
+title = "Settlement Redesign · Supporting Data"
