@@ -1,0 +1,9 @@
+{
+  "generatedAt": "2026-05-13T23:03:24.427Z",
+  "counts": {
+    "shows": 564,
+    "artists": 79,
+    "settlementsWithDealContext": 558,
+    "settlementsWithLlmSummary": 523
+  }
+}

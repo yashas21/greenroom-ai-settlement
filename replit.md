@@ -343,6 +343,14 @@ in `exports/`:
 
 Older v1 PDFs were superseded by v2.1 and have been removed.
 
+## Code-review bundle
+
+`code-review/` is a self-contained snapshot of the live dataset (shows,
+artists, per-deal extracted insights) plus a schema/purpose guide written
+for an external code-review agent (Claude Code, etc.) so the prototype can
+be reviewed without running the app. Regenerate with
+`pnpm --filter @workspace/api-server exec tsx scripts/exportCodeReviewBundle.ts`.
+
 ## User preferences
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
