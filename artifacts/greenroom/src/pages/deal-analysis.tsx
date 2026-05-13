@@ -103,9 +103,148 @@ export default function DealAnalysisPage() {
       <ComplexitySection data={d} />
       <SizeSection data={d} />
       <ProfitabilitySection data={d} />
+      <DisputesSection data={d} />
       <CostsSection data={d} />
       <RevenueSection data={d} />
     </div>
+  );
+}
+
+function DisputesSection({ data }: { data: DealAnalysis }) {
+  const db = data.disputeBreakdown;
+  const cellByKey = new Map(db.cells.map((c) => [`${c.dealType}|${c.bucket}`, c]));
+  const activeBuckets = db.buckets.filter((b) => db.cells.some((c) => c.bucket === b));
+  const activeTypes = db.dealTypes.filter((dt) => db.cells.some((c) => c.dealType === dt));
+  const totalDisputed = db.cells.reduce((a, c) => a + c.disputed, 0);
+  const totalCorrect = db.cells.reduce((a, c) => a + c.correctDisputes, 0);
+
+  return (
+    <section className="mb-14">
+      <div className="mb-5">
+        <div className="eyebrow text-[10px] text-ink-500 mb-1.5">
+          Disputes · by deal type × deal size
+        </div>
+        <h2
+          className="font-display text-[26px] font-medium text-ink-900 leading-[1.1]"
+          style={{ letterSpacing: "-0.015em" }}
+        >
+          What artists pushed back on
+        </h2>
+        <p className="text-[13px] text-ink-500 mt-2 max-w-2xl leading-relaxed">
+          {totalDisputed} past settlements ended with a disputed status or a
+          contested recoup. {totalCorrect} of those (
+          {totalDisputed > 0 ? Math.round((totalCorrect / totalDisputed) * 100) : 0}%)
+          included a recoup line that was later withdrawn — meaning the artist's
+          challenge was upheld and the venue retracted the charge. Per cell:
+          number of disputes, average payout on disputed nights, share where the
+          artist was ultimately right, and the top recoup categories driving
+          the friction.
+        </p>
+      </div>
+      <Card>
+        <CardContent>
+          {db.cells.length === 0 ? (
+            <div className="text-[13px] text-ink-500 py-6 text-center">
+              No disputed settlements in the past 24 months.
+            </div>
+          ) : (
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left border-b border-ink-100/80">
+                  <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold">
+                    Deal type
+                  </th>
+                  {activeBuckets.map((b) => (
+                    <th
+                      key={b}
+                      className="py-2 px-2 eyebrow text-[10px] text-ink-400 font-semibold text-center"
+                    >
+                      {b}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100/60">
+                {activeTypes.map((dt) => (
+                  <tr key={dt} className="align-top">
+                    <td className="py-3 pr-3">
+                      <span className="text-ink-900 font-medium">
+                        {DEAL_LABELS[dt] ?? dt}
+                      </span>
+                    </td>
+                    {activeBuckets.map((b) => {
+                      const cell = cellByKey.get(`${dt}|${b}`);
+                      if (!cell) {
+                        return (
+                          <td
+                            key={b}
+                            className="py-3 px-2 text-center text-ink-300 font-mono tabular text-[11px]"
+                          >
+                            —
+                          </td>
+                        );
+                      }
+                      const correctHot = cell.correctDisputeRate >= 0.4;
+                      return (
+                        <td key={b} className="py-3 px-2 align-top">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="font-mono tabular text-[14px] text-ink-800 font-semibold">
+                                {cell.disputed}
+                              </span>
+                              <span className="text-[10px] text-ink-400 uppercase tracking-[0.06em]">
+                                disp
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-mono tabular text-ink-600">
+                              avg {formatMoneyCompact(cell.avgDisputedPayout)}
+                            </div>
+                            <div
+                              className={`text-[11px] font-mono tabular ${
+                                correctHot ? "text-emerald-700 font-semibold" : "text-ink-500"
+                              }`}
+                              title={`${cell.correctDisputes} of ${cell.disputed} disputes ended with a withdrawn recoup`}
+                            >
+                              {cell.correctDisputes}/{cell.disputed} correct
+                            </div>
+                            {cell.topTopics.length > 0 && (
+                              <div className="flex flex-wrap justify-center gap-1 mt-1 max-w-[140px]">
+                                {cell.topTopics.map((t) => (
+                                  <span
+                                    key={t.topic}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-ink-100/70 text-[10px] text-ink-700"
+                                    title={`${t.count} disputed/withdrawn line${t.count === 1 ? "" : "s"}`}
+                                  >
+                                    {RECOUP_LABELS[t.topic] ?? t.topic}
+                                    <span className="text-ink-400 font-mono tabular">
+                                      {t.count}
+                                    </span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="mt-4 pt-3 border-t border-ink-100/60 flex items-center gap-4 text-[10px] text-ink-400">
+            <span>
+              <strong className="text-ink-600">disp</strong> = settlements ended
+              disputed or had a contested recoup
+            </span>
+            <span>
+              <strong className="text-ink-600">correct</strong> = at least one
+              recoup line later withdrawn (artist won)
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 

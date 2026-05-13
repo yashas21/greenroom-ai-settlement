@@ -430,6 +430,86 @@ export async function getDealAnalysis() {
     }
   }
 
+  // Dispute breakdown — per (dealType × bucket) cell:
+  //   - disputed: count of past settlements where the settlement was disputed
+  //     OR had any disputed/withdrawn recoup line.
+  //   - avgDisputedPayout: mean totalToArtist across those disputed deals.
+  //   - correctDisputes: count of disputed deals where at least one recoup
+  //     line ended up with status "withdrawn" (the artist's challenge was
+  //     upheld and the recoup was retracted).
+  //   - topTopics: top 3 recoup categories that appeared on a disputed or
+  //     withdrawn line, ranked by occurrence count.
+  type DisputeCell = {
+    disputed: number;
+    payoutSum: number;
+    payoutN: number;
+    correctDisputes: number;
+    topicCounts: Record<string, number>;
+  };
+  const disputeAcc: Map<string, Map<string, DisputeCell>> = new Map();
+  function disputeCell(dealType: string, bucket: string): DisputeCell {
+    let row = disputeAcc.get(dealType);
+    if (!row) { row = new Map(); disputeAcc.set(dealType, row); }
+    let cell = row.get(bucket);
+    if (!cell) {
+      cell = { disputed: 0, payoutSum: 0, payoutN: 0, correctDisputes: 0, topicCounts: {} };
+      row.set(bucket, cell);
+    }
+    return cell;
+  }
+  for (const d of pastDeals) {
+    const s = settlementByShowId.get(d.showId);
+    if (!s) continue;
+    const recoups = parseRecoups(s.recoupsJson);
+    const hasDisputedRecoup = recoups.some((r) => r?.status === "disputed");
+    const hasWithdrawnRecoup = recoups.some((r) => r?.status === "withdrawn");
+    const isDisputed = s.status === "disputed" || hasDisputedRecoup || hasWithdrawnRecoup;
+    if (!isDisputed) continue;
+    const bucket = classifySizeBucket(d);
+    const cell = disputeCell(d.dealType, bucket);
+    cell.disputed++;
+    if (s.totalToArtist != null) {
+      cell.payoutSum += s.totalToArtist;
+      cell.payoutN++;
+    }
+    if (hasWithdrawnRecoup) cell.correctDisputes++;
+    for (const r of recoups) {
+      if (r?.status === "disputed" || r?.status === "withdrawn") {
+        cell.topicCounts[r.category] = (cell.topicCounts[r.category] ?? 0) + 1;
+      }
+    }
+  }
+
+  const disputeBreakdown = {
+    dealTypes: Array.from(dealTypesSeen).sort(),
+    buckets: SIZE_ORDER,
+    cells: [] as Array<{
+      dealType: string; bucket: string;
+      disputed: number; correctDisputes: number;
+      avgDisputedPayout: number;
+      correctDisputeRate: number;
+      topTopics: { topic: string; count: number }[];
+    }>,
+  };
+  for (const dealType of disputeBreakdown.dealTypes) {
+    for (const bucket of SIZE_ORDER) {
+      const c = disputeAcc.get(dealType)?.get(bucket);
+      if (!c || c.disputed === 0) continue;
+      const topTopics = Object.entries(c.topicCounts)
+        .map(([topic, count]) => ({ topic, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3);
+      disputeBreakdown.cells.push({
+        dealType, bucket,
+        disputed: c.disputed,
+        correctDisputes: c.correctDisputes,
+        avgDisputedPayout: c.payoutN > 0 ? c.payoutSum / c.payoutN : 0,
+        correctDisputeRate: c.disputed > 0 ? c.correctDisputes / c.disputed : 0,
+        topTopics,
+      });
+    }
+  }
+
   const crossTabBySizeAndType = {
     dealTypes: Array.from(dealTypesSeen).sort(),
     buckets: SIZE_ORDER,
@@ -595,6 +675,7 @@ export async function getDealAnalysis() {
       months,
       crossTabBySizeAndType,
     },
+    disputeBreakdown,
   };
 }
 

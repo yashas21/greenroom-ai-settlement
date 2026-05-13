@@ -552,4 +552,17 @@ export interface DealAnalysis {
       }[];
     };
   };
+  disputeBreakdown: {
+    dealTypes: string[];
+    buckets: string[];
+    cells: {
+      dealType: string;
+      bucket: string;
+      disputed: number;
+      correctDisputes: number;
+      avgDisputedPayout: number;
+      correctDisputeRate: number;
+      topTopics: { topic: string; count: number }[];
+    }[];
+  };
 }
