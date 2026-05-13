@@ -4,7 +4,7 @@ import { buildShowExport } from "../lib/showExport";
 import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insights";
 import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
 import { generateAndPersist, decideSuggestion } from "../lib/smartSwitch";
-import { generateAndPersistGuarantee } from "../lib/smartGuarantee";
+import { generateAndPersistGuarantee, backfillUpcomingGuarantees } from "../lib/smartGuarantee";
 import { getSwitchSavings, getSwitchProjectedGrid } from "../lib/switchSavings";
 
 const router: IRouter = Router();
@@ -96,6 +96,16 @@ router.get("/insights", async (_req, res): Promise<void> => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "insights_failed" });
+  }
+});
+
+router.post("/guarantee/backfill", async (req, res): Promise<void> => {
+  try {
+    const forceAll = req.query.force === "1" || req.query.force === "true";
+    const result = await backfillUpcomingGuarantees({ forceAll });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "backfill_failed" });
   }
 });
 

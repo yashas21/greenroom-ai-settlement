@@ -519,6 +519,91 @@ export async function getGuaranteeForShow(
   return rows[0] ?? null;
 }
 
+export type BackfillResult = {
+  scanned: number;
+  generated: number;
+  recomputed: number;
+  skipped: number;
+  failed: number;
+};
+
+export async function backfillUpcomingGuarantees(
+  opts: { forceAll?: boolean } = {},
+): Promise<BackfillResult> {
+  const today = todayDateString();
+  const [allShows, allDeals, existing] = await Promise.all([
+    db.select().from(shows),
+    db.select().from(deals),
+    db.select().from(guaranteeSuggestions),
+  ]);
+  const dealByShow = new Map(allDeals.map((d) => [d.showId, d]));
+  const sugByShow = new Map(existing.map((g) => [g.showId, g]));
+
+  // Refresh ctx cache so a fresh scan reflects any newly-added past data.
+  clearGuaranteeCache();
+
+  const candidates = allShows.filter(
+    (s) =>
+      s.date >= today &&
+      (s.status === "booked" || s.status === "advanced"),
+  );
+
+  let generated = 0;
+  let recomputed = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const show of candidates) {
+    const deal = dealByShow.get(show.id);
+    if (!deal || deal.dealType === "flat") {
+      skipped++;
+      continue;
+    }
+    const existingSug = sugByShow.get(show.id);
+    let needs = opts.forceAll || !existingSug;
+    if (existingSug && !needs) {
+      try {
+        const audit = JSON.parse(existingSug.auditJson) as {
+          inputs?: {
+            dealType?: string;
+            guarantee?: number | null;
+            percentage?: number | null;
+            dealExpenseCap?: number | null;
+          };
+        };
+        const inp = audit.inputs ?? {};
+        if (
+          inp.dealType !== deal.dealType ||
+          (inp.guarantee ?? 0) !== (deal.guaranteeAmount ?? 0) ||
+          (inp.percentage ?? null) !== (deal.percentage ?? null) ||
+          (inp.dealExpenseCap ?? null) !== (deal.expenseCap ?? null)
+        ) {
+          needs = true;
+        }
+      } catch {
+        needs = true;
+      }
+    }
+    if (!needs) {
+      skipped++;
+      continue;
+    }
+    try {
+      const out = await generateAndPersistGuarantee(show.id);
+      if (out.suggestion) {
+        if (existingSug) recomputed++;
+        else generated++;
+      } else {
+        failed++;
+      }
+    } catch {
+      failed++;
+    }
+  }
+
+  return { scanned: candidates.length, generated, recomputed, skipped, failed };
+}
+
 export async function generateAndPersistGuarantee(
   showId: string,
 ): Promise<{ suggestion: GuaranteeSuggestion | null; reason?: string }> {
