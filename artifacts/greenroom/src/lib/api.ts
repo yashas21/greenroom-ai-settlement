@@ -17,7 +17,8 @@ export const api = {
   dealAnalysis: () => get<DealAnalysis>("/deal-analysis"),
   needsAttention: () => get<AttentionItem[]>("/needs-attention"),
   insights: () => get<InsightsPayload>("/insights"),
-  switchSavings: (months = 3) => get<SwitchSavingsPayload>(`/insights/switch-savings?months=${months}`),
+  switchSavings: (months = 3, topN = 10) =>
+    get<SwitchSavingsPayload>(`/insights/switch-savings?months=${months}&topN=${topN}`),
   switchProjectedGrid: (months = 6) => get<SwitchProjectedGridPayload>(`/insights/switch-projected-grid?months=${months}`),
   guaranteeBacktest: (months = 12, topN = 10) => get<GuaranteeBacktestPayload>(`/insights/guarantee-backtest?months=${months}&topN=${topN}`),
   showExport: (id: string) => get<unknown>(`/shows/${encodeURIComponent(id)}/export`),

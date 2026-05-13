@@ -256,8 +256,18 @@ const DEAL_TYPE_LABEL: Record<string, string> = {
   door: "Door",
 };
 
+const SAVINGS_WINDOW_OPTIONS: { label: string; months: number }[] = [
+  { label: "3 mo", months: 3 },
+  { label: "6 mo", months: 6 },
+  { label: "12 mo", months: 12 },
+  { label: "All", months: 600 },
+];
+const SAVINGS_TOPN_OPTIONS = [10, 25, 50];
+
 function SwitchSavingsSection() {
-  const state = useApiData(() => api.switchSavings(3), []);
+  const [months, setMonths] = useState(3);
+  const [topN, setTopN] = useState(10);
+  const state = useApiData(() => api.switchSavings(months, topN), [months, topN]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (state.status === "loading")
@@ -312,11 +322,47 @@ function SwitchSavingsSection() {
               Smart Switch could have helped
             </h2>
             <span className="eyebrow text-[10px] text-ink-400">
-              · last {data.windowMonths} months
+              · last {data.windowMonths === 600 ? "all time" : `${data.windowMonths} months`}
             </span>
           </div>
-          <div className="text-[11px] text-ink-400 font-mono tabular">
-            {data.items.length} of {data.totalCandidates} eligible deals shown
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1" role="group" aria-label="Time window">
+              {SAVINGS_WINDOW_OPTIONS.map((opt) => (
+                <button
+                  key={opt.months}
+                  type="button"
+                  onClick={() => setMonths(opt.months)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono ring-1 transition-colors ${
+                    months === opt.months
+                      ? "bg-brand-50 text-brand-700 ring-brand-200"
+                      : "bg-white text-ink-500 ring-ink-200 hover:bg-ink-50"
+                  }`}
+                  aria-pressed={months === opt.months}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1" role="group" aria-label="Rows shown">
+              {SAVINGS_TOPN_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setTopN(n)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono ring-1 transition-colors ${
+                    topN === n
+                      ? "bg-brand-50 text-brand-700 ring-brand-200"
+                      : "bg-white text-ink-500 ring-ink-200 hover:bg-ink-50"
+                  }`}
+                  aria-pressed={topN === n}
+                >
+                  Top {n}
+                </button>
+              ))}
+            </div>
+            <div className="text-[11px] text-ink-400 font-mono tabular">
+              {data.items.length} of {data.totalCandidates}
+            </div>
           </div>
         </div>
         <p className="text-[12px] text-ink-500 mb-4 leading-relaxed">
