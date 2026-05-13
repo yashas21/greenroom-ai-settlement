@@ -4,6 +4,7 @@ import { buildShowExport } from "../lib/showExport";
 import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insights";
 import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
 import { generateAndPersist, decideSuggestion } from "../lib/smartSwitch";
+import { generateAndPersistGuarantee } from "../lib/smartGuarantee";
 import { getSwitchSavings, getSwitchProjectedGrid } from "../lib/switchSavings";
 
 const router: IRouter = Router();
@@ -95,6 +96,20 @@ router.get("/insights", async (_req, res): Promise<void> => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "insights_failed" });
+  }
+});
+
+router.post("/shows/:id/guarantee/generate", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  try {
+    const out = await generateAndPersistGuarantee(raw);
+    if (!out.suggestion) {
+      res.status(409).json({ error: out.reason ?? "could_not_generate" });
+      return;
+    }
+    res.json(out.suggestion);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "generate_failed" });
   }
 });
 

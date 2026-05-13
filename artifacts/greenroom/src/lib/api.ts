@@ -1,4 +1,4 @@
-import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, SwitchSavingsPayload, SwitchProjectedGridPayload, LlmStatus, SaveLlmSettingsInput, SwitchSuggestion } from "./types";
+import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, SwitchSavingsPayload, SwitchProjectedGridPayload, LlmStatus, SaveLlmSettingsInput, SwitchSuggestion, GuaranteeSuggestion } from "./types";
 
 const BASE = `${import.meta.env.BASE_URL}api`;
 
@@ -50,5 +50,13 @@ export const api = {
     const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/switch/decline`, { method: "POST" });
     if (!res.ok) throw new Error(`API error ${res.status}`);
     return res.json() as Promise<SwitchSuggestion>;
+  },
+  generateGuarantee: async (id: string): Promise<GuaranteeSuggestion> => {
+    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/guarantee/generate`, { method: "POST" });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(j.error ?? `API error ${res.status}`);
+    }
+    return res.json() as Promise<GuaranteeSuggestion>;
   },
 };

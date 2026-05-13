@@ -146,6 +146,7 @@ export interface ShowListRow {
   isDisputed: boolean;
   tense: ShowTense;
   switchStatus: SwitchStatus | null;
+  guaranteeSuggestion: { suggestedPrice: number; delta: number } | null;
   expenseCategories: string[];
   recoupCategories: string[];
   disputedRecoupCategories: string[];
@@ -174,6 +175,34 @@ export interface SwitchSuggestion {
   decidedAt: string | null;
 }
 
+export interface GuaranteeSuggestion {
+  id: string;
+  showId: string;
+  dealId: string;
+  generatedAt: string;
+  agentGuarantee: number | null;
+  suggestedPrice: number;
+  delta: number;
+  expectedGross: number;
+  expectedGrossSource: string;
+  ticketingFees: number;
+  netAfterFees: number;
+  expenseEstimate: number;
+  expenseSource: string;
+  expenseCap: number | null;
+  netBase: number;
+  percentagePayout: number;
+  winner: "guarantee" | "percentage" | "tie";
+  winnerMargin: number;
+  breakevenGross: number;
+  artistShowCount: number;
+  agentShowCount: number;
+  confidenceTier: ConfidenceTier;
+  insuranceTier: number;
+  basis: string;
+  auditJson: string;
+}
+
 export interface ShowDetail {
   show: Show;
   artist: Artist | null;
@@ -187,6 +216,7 @@ export interface ShowDetail {
   comps: Comp[];
   recoups: Recoup[];
   switchSuggestion: SwitchSuggestion | null;
+  guaranteeSuggestion: GuaranteeSuggestion | null;
   isUnsupportedDeal: boolean;
   isDisputed: boolean;
 }

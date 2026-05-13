@@ -167,6 +167,34 @@ export const switchSuggestions = sqliteTable("switch_suggestions", {
   decidedAt: integer("decided_at", { mode: "timestamp" }),
 });
 
+export const guaranteeSuggestions = sqliteTable("guarantee_suggestions", {
+  id: text("id").primaryKey(),
+  showId: text("show_id").notNull().unique().references(() => shows.id),
+  dealId: text("deal_id").notNull().references(() => deals.id),
+  generatedAt: integer("generated_at", { mode: "timestamp" }).notNull(),
+  agentGuarantee: real("agent_guarantee"),
+  suggestedPrice: real("suggested_price").notNull(),
+  delta: real("delta").notNull(),
+  expectedGross: real("expected_gross").notNull(),
+  expectedGrossSource: text("expected_gross_source").notNull(),
+  ticketingFees: real("ticketing_fees").notNull(),
+  netAfterFees: real("net_after_fees").notNull(),
+  expenseEstimate: real("expense_estimate").notNull(),
+  expenseSource: text("expense_source").notNull(),
+  expenseCap: real("expense_cap"),
+  netBase: real("net_base").notNull(),
+  percentagePayout: real("percentage_payout").notNull(),
+  winner: text("winner", { enum: ["guarantee", "percentage", "tie"] }).notNull(),
+  winnerMargin: real("winner_margin").notNull(),
+  breakevenGross: real("breakeven_gross").notNull(),
+  artistShowCount: integer("artist_show_count").notNull(),
+  agentShowCount: integer("agent_show_count").notNull(),
+  confidenceTier: text("confidence_tier", { enum: ["A", "B", "C", "D"] }).notNull(),
+  insuranceTier: integer("insurance_tier").notNull(),
+  basis: text("basis").notNull(),
+  auditJson: text("audit_json").notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type Venue = typeof venues.$inferSelect;
 export type Agency = typeof agencies.$inferSelect;

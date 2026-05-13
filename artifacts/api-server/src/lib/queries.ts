@@ -1,7 +1,7 @@
 import { db } from "../db";
 import {
   shows, artists, agents, agencies, deals, ticketSales, comps, expenses,
-  settlements, venues, switchSuggestions, type Recoup,
+  settlements, venues, switchSuggestions, guaranteeSuggestions, type Recoup,
 } from "../db/schema";
 import { desc, asc, eq, sql, lte } from "drizzle-orm";
 
@@ -65,6 +65,12 @@ export async function getAllShows() {
   const switchStatusByShowId = new Map<string, "suggested" | "accepted" | "declined">();
   for (const s of allSuggestions) switchStatusByShowId.set(s.showId, s.status);
 
+  const allGuarantees = await db.select().from(guaranteeSuggestions);
+  const guaranteeByShowId = new Map<string, { suggestedPrice: number; delta: number }>();
+  for (const g of allGuarantees) {
+    guaranteeByShowId.set(g.showId, { suggestedPrice: g.suggestedPrice, delta: g.delta });
+  }
+
   return rows.map((r) => {
     const recoups = parseRecoups(r.settlement?.recoupsJson ?? null);
     return {
@@ -73,6 +79,7 @@ export async function getAllShows() {
       isDisputed: isDisputedSettlement(r.settlement),
       tense: (r.show.date > today ? "upcoming" : "past") as "past" | "upcoming",
       switchStatus: switchStatusByShowId.get(r.show.id) ?? null,
+      guaranteeSuggestion: guaranteeByShowId.get(r.show.id) ?? null,
       expenseCategories: Array.from(
         expenseCategoriesByShowId.get(r.show.id) ?? [],
       ),
@@ -118,6 +125,12 @@ export async function getShowById(id: string) {
     .where(eq(switchSuggestions.showId, id));
   const switchSuggestion = suggestionRows[0] ?? null;
 
+  const guaranteeRows = await db
+    .select()
+    .from(guaranteeSuggestions)
+    .where(eq(guaranteeSuggestions.showId, id));
+  const guaranteeSuggestion = guaranteeRows[0] ?? null;
+
   return {
     ...row,
     ticketSales: showTicketSales,
@@ -125,6 +138,7 @@ export async function getShowById(id: string) {
     comps: showComps,
     recoups,
     switchSuggestion,
+    guaranteeSuggestion,
     isUnsupportedDeal: isUnsupportedDeal(row.deal),
     isDisputed: isDisputedSettlement(row.settlement),
   };

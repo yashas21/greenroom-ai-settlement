@@ -39,6 +39,7 @@ export default function ShowsPage() {
     isDisputed: r.isDisputed,
     tense: r.tense,
     switchStatus: r.switchStatus ?? null,
+    guaranteeSuggestion: r.guaranteeSuggestion ?? null,
     complexity: r.deal ? classifyComplexity(r.deal) : null,
     sizeBucket: r.deal ? classifySizeBucket(r.deal) : null,
     dealType: r.deal?.dealType ?? null,

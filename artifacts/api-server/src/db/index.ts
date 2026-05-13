@@ -27,6 +27,35 @@ export const migrationsReady = (async () => {
     "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
   );
   await client.execute(`
+    CREATE TABLE IF NOT EXISTS guarantee_suggestions (
+      id TEXT PRIMARY KEY,
+      show_id TEXT NOT NULL UNIQUE REFERENCES shows(id),
+      deal_id TEXT NOT NULL REFERENCES deals(id),
+      generated_at INTEGER NOT NULL,
+      agent_guarantee REAL,
+      suggested_price REAL NOT NULL,
+      delta REAL NOT NULL,
+      expected_gross REAL NOT NULL,
+      expected_gross_source TEXT NOT NULL,
+      ticketing_fees REAL NOT NULL,
+      net_after_fees REAL NOT NULL,
+      expense_estimate REAL NOT NULL,
+      expense_source TEXT NOT NULL,
+      expense_cap REAL,
+      net_base REAL NOT NULL,
+      percentage_payout REAL NOT NULL,
+      winner TEXT NOT NULL,
+      winner_margin REAL NOT NULL,
+      breakeven_gross REAL NOT NULL,
+      artist_show_count INTEGER NOT NULL,
+      agent_show_count INTEGER NOT NULL,
+      confidence_tier TEXT NOT NULL,
+      insurance_tier INTEGER NOT NULL,
+      basis TEXT NOT NULL,
+      audit_json TEXT NOT NULL
+    )
+  `);
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS switch_suggestions (
       id TEXT PRIMARY KEY,
       show_id TEXT NOT NULL UNIQUE REFERENCES shows(id),
