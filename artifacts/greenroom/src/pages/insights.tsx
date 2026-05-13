@@ -400,14 +400,14 @@ function SwitchSavingsSection() {
               Vs % clause never fired
             </div>
             <div className="text-[22px] font-serif text-ink-900 tabular">
-              {data.vsPercentageFiredStats.vsDealsScanned > 0
+              {data.vsPercentageFiredStats && data.vsPercentageFiredStats.vsDealsScanned > 0
                 ? `${(data.vsPercentageFiredStats.vsPercentageNeverFiredRate * 100).toFixed(1)}%`
                 : "—"}
             </div>
             <div className="text-[10px] text-ink-400">
-              {data.vsPercentageFiredStats.vsPercentageNeverFired} of{" "}
-              {data.vsPercentageFiredStats.vsDealsScanned} settled vs deals · avg
-              guarantee-win ${data.vsPercentageFiredStats.avgGuaranteeWin.toLocaleString()}
+              {data.vsPercentageFiredStats
+                ? `${data.vsPercentageFiredStats.vsPercentageNeverFired} of ${data.vsPercentageFiredStats.vsDealsScanned} settled vs deals · avg guarantee-win $${data.vsPercentageFiredStats.avgGuaranteeWin.toLocaleString()}`
+                : "data unavailable"}
             </div>
           </div>
         </div>
@@ -1756,6 +1756,7 @@ function GuaranteeBacktestSection() {
           </div>
         </div>
 
+        {data.gapCoverage && (
         <div
           className="rounded-md ring-1 ring-amber-200/60 bg-amber-50/40 p-3 mb-5"
           title="Distribution of |SGP − actual| across all scored deals. Each bar is the share of deals that would have fit fully inside an insurance cap of $T."
@@ -1801,6 +1802,7 @@ function GuaranteeBacktestSection() {
             of historical SGP-vs-actual gaps in full.
           </div>
         </div>
+        )}
 
         <ul className="space-y-1.5">
           {data.items.map((it) => (
