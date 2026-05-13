@@ -143,12 +143,21 @@ const DOOR_FLOOR = 500;
 const DOOR_SPLIT_PCT = 0.6;
 const DOOR_EXPENSE_CAP = 1500;
 
+export function switchAppliesTo(dealType: string, bucket: string): boolean {
+  // Policy: replace any door deal with the door hybrid; replace vs / % of net
+  // deals in the $1–5K bucket with a flat; leave everything else alone.
+  if (dealType === "door") return true;
+  if ((dealType === "vs" || dealType === "percentage_of_net") && bucket === "$1–5K") return true;
+  return false;
+}
+
 export async function generateSuggestion(
   deal: Deal,
   artistShowsAtVenue = 0,
 ): Promise<GeneratedSuggestion | null> {
   const stats = await getCellStats();
   const bucket = classifySizeBucket(deal);
+  if (!switchAppliesTo(deal.dealType, bucket)) return null;
   const familiarity =
     artistShowsAtVenue === 0
       ? "first-time"

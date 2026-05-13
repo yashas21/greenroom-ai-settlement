@@ -4,7 +4,7 @@ import {
   shows, artists, deals, settlements, expenses, type Deal,
 } from "../db/schema";
 import { parseRecoups, classifySizeBucket, getNeedsAttention } from "./queries";
-import { generateSuggestion, type ConfidenceTier } from "./smartSwitch";
+import { generateSuggestion, switchAppliesTo, type ConfidenceTier } from "./smartSwitch";
 
 export type SavingsItem = {
   showId: string;
@@ -130,16 +130,6 @@ function monthsAgoString(months: number): string {
 
 const SETTLED_STATUSES = new Set(["signed", "finalized", "paid", "disputed"]);
 const PROJECTED_DEAL_TYPES: ProjectedCell["dealType"][] = ["vs", "percentage_of_net", "door", "flat", "percentage_of_gross"];
-
-function switchAppliesTo(dealType: string, bucket: string): boolean {
-  // Smart Switch policy:
-  //  - Replace any door deal with the door hybrid (any bucket).
-  //  - Replace any vs / % of net deal in the $1–5K bucket with a flat.
-  //  - Leave everything else (flat, % of gross, and vs / % of net outside $1–5K) alone.
-  if (dealType === "door") return true;
-  if ((dealType === "vs" || dealType === "percentage_of_net") && bucket === "$1–5K") return true;
-  return false;
-}
 const PROJECTED_BUCKETS = ["$0–1K", "$1–5K", "$5–15K", "$15K+", "Uncapped %"];
 
 async function buildPriorShowIndex(): Promise<Map<string, string[]>> {
@@ -456,8 +446,8 @@ export async function getSwitchProjectedGrid(
     (a, c) => a + (c.actualLosingMoney - c.projectedLosingMoney),
     0,
   );
-  const totalDisputesAvoided = cells.reduce((a, c) => a + c.actualDisputed, 0);
-  const totalAttentionAvoided = cells.reduce((a, c) => a + c.actualAttention, 0);
+  const totalDisputesAvoided = cells.reduce((a, c) => a + (c.actualDisputed - c.projectedDisputed), 0);
+  const totalAttentionAvoided = cells.reduce((a, c) => a + (c.actualAttention - c.projectedAttention), 0);
   const totalMoneySaved = cells.reduce((a, c) => a + c.moneySavedToVenue, 0);
 
   // Buckets in canonical order, only those that appear
