@@ -13,6 +13,11 @@ export const db = drizzle(client, { schema });
 export type DB = typeof db;
 
 async function ensureColumn(table: string, column: string, decl: string) {
+  const exists = await client.execute({
+    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+    args: [table],
+  });
+  if (exists.rows.length === 0) return;
   const cols = await client.execute(`PRAGMA table_info(${table})`);
   const has = cols.rows.some((r) => (r as Record<string, unknown>).name === column);
   if (!has) {

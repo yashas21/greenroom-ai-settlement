@@ -42,7 +42,8 @@ CREATE TABLE settlements (
   completed_by_user_id TEXT,
   gross_box_office REAL, net_box_office REAL, total_expenses REAL,
   total_to_artist REAL, calculation_json TEXT, recoups_json TEXT,
-  signoff_text TEXT, notes TEXT
+  signoff_text TEXT, notes TEXT,
+  positive_summary TEXT, negative_summary TEXT
 );
 CREATE TABLE ticket_sales (
   id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL,
