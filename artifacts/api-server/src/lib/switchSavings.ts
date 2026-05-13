@@ -3,7 +3,11 @@ import { db } from "../db";
 import {
   shows, artists, deals, settlements, expenses, type Deal,
 } from "../db/schema";
-import { parseRecoups, classifySizeBucket, getNeedsAttention } from "./queries";
+import {
+  parseRecoups,
+  classifyAnalyticsSizeBucket as classifySizeBucket,
+  getNeedsAttention,
+} from "./queries";
 import { generateSuggestion, switchAppliesTo, type ConfidenceTier } from "./smartSwitch";
 
 export type SavingsItem = {

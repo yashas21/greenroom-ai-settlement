@@ -4,7 +4,7 @@ import { settlements, deals, shows } from "../db/schema";
 import {
   parseRecoups,
   getNeedsAttention,
-  classifySizeBucket,
+  classifyAnalyticsSizeBucket as classifySizeBucket,
   type AttentionKind,
 } from "./queries";
 import { logger } from "./logger";

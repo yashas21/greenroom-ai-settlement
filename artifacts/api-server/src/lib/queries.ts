@@ -271,11 +271,35 @@ function classifyComplexity(d: typeof deals.$inferSelect): ComplexityBucket {
 
 export function classifySizeBucket(d: typeof deals.$inferSelect): string {
   if (d.guaranteeAmount == null || d.guaranteeAmount === 0) {
-    // Audit fix #8: "Uncapped %" is reserved for percentage_of_gross deals
-    // (the only shape where uncapped percentage is the literal contract
-    // structure). vs / percentage_of_net deals with a $0 guarantee fall into
-    // the smallest gross-size bucket so they're analyzed alongside their
-    // peers, not lumped with the uncapped-%g line.
+    if (d.percentage != null) return "Uncapped %";
+    return "$0–1K";
+  }
+  const g = d.guaranteeAmount;
+  if (g < 1000) return "$0–1K";
+  if (g < 5000) return "$1–5K";
+  if (g < 15000) return "$5–15K";
+  return "$15K+";
+}
+
+/**
+ * Audit fix #8: analytics-side bucket classifier.
+ *
+ * Identical to `classifySizeBucket` EXCEPT that "Uncapped %" is reserved
+ * for `percentage_of_gross` deals (the only shape where uncapped percentage
+ * is the literal contract structure). vs / percentage_of_net / door deals
+ * with a $0 guarantee fall into the smallest gross-size bucket so they're
+ * analyzed alongside their gross-size peers in the deal-analysis grid,
+ * Smart Switch cell stats, Insights, and the savings rollups — instead of
+ * being lumped onto the same "Uncapped %" line as percentage_of_gross deals.
+ *
+ * Smart Guaranteed Price (smartGuarantee.ts) intentionally keeps using the
+ * shared `classifySizeBucket` above so its expense-estimate lookup table
+ * (keyed by bucket) stays stable across this audit change.
+ */
+export function classifyAnalyticsSizeBucket(
+  d: typeof deals.$inferSelect,
+): string {
+  if (d.guaranteeAmount == null || d.guaranteeAmount === 0) {
     if (d.percentage != null && d.dealType === "percentage_of_gross") {
       return "Uncapped %";
     }
@@ -393,7 +417,7 @@ export async function getDealAnalysis() {
       complexityAcc[c].payoutN++;
     }
 
-    const bucket = classifySizeBucket(d);
+    const bucket = classifyAnalyticsSizeBucket(d);
     sizeAcc[bucket].count++;
     dealTypesSeen.add(d.dealType);
     const cc = crossCell(d.dealType, bucket);
@@ -492,7 +516,7 @@ export async function getDealAnalysis() {
     const hasWithdrawnRecoup = recoups.some((r) => r?.status === "withdrawn");
     const isDisputed = s.status === "disputed" || hasDisputedRecoup || hasWithdrawnRecoup;
     if (!isDisputed) continue;
-    const bucket = classifySizeBucket(d);
+    const bucket = classifyAnalyticsSizeBucket(d);
     const cell = disputeCell(d.dealType, bucket);
     cell.disputed++;
     if (s.totalToArtist != null) {

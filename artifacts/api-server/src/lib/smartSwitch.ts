@@ -5,7 +5,7 @@ import {
   deals, settlements, shows, expenses, switchSuggestions,
   type Deal,
 } from "../db/schema";
-import { classifySizeBucket } from "./queries";
+import { classifyAnalyticsSizeBucket as classifySizeBucket } from "./queries";
 import { generateGuarantee } from "./smartGuarantee";
 
 export type ConfidenceTier = "A" | "B" | "C" | "D";
