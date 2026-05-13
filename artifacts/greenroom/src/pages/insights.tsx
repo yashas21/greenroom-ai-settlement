@@ -44,6 +44,7 @@ export default function InsightsPage() {
         </p>
         <GuaranteeBacktestSection />
         <SwitchSavingsSection />
+        <BeforeAfterCrossTabSection />
         <SwitchProjectedGridSection />
         <LoadingState label="Clustering complaint themes... this can take a minute on first load." />
       </section>
@@ -86,6 +87,7 @@ export default function InsightsPage() {
 
       <GuaranteeBacktestSection />
       <SwitchSavingsSection />
+      <BeforeAfterCrossTabSection />
       <SwitchProjectedGridSection />
 
       <Card>
@@ -487,6 +489,304 @@ function pct(n: number): string {
 
 function deltaPts(actual: number, projected: number): number {
   return Math.round((actual - projected) * 100);
+}
+
+function BeforeAfterCrossTabSection() {
+  const state = useApiData(() => api.switchProjectedGrid(12), []);
+  const [, setLocation] = useLocation();
+
+  if (state.status === "loading")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-ink-400">Loading before/after cross-tab…</div>
+        </CardContent>
+      </Card>
+    );
+  if (state.status === "error")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-rose-600">
+            Couldn't load before/after cross-tab: {state.error.message}
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+  const data = state.data;
+  if (data.cells.length === 0) {
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="h-4 w-4 text-brand-700" />
+            <span className="eyebrow text-[10px] text-ink-500">
+              Before vs after · last {data.windowMonths} months
+            </span>
+          </div>
+          <div className="text-[13px] text-ink-500">
+            No deals in this window — nothing to compare.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const cellByKey = new Map(
+    data.cells.map((c) => [`${c.dealType}|${c.bucket}`, c]),
+  );
+  const activeBuckets = data.buckets.filter((b) =>
+    data.cells.some((c) => c.bucket === b && c.count > 0),
+  );
+
+  return (
+    <Card className="mb-6">
+      <CardContent>
+        <div className="flex items-baseline justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-brand-700" />
+            <h2 className="text-[15px] font-semibold text-ink-900">
+              Performance — actual vs Smart Switch projection
+            </h2>
+            <span className="eyebrow text-[10px] text-ink-400">
+              · last {data.windowMonths} months
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-ink-400">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-rose-500/80" />
+              losing money
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-amber-500/80" />
+              disputed
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-violet-500/80" />
+              needs attention
+            </span>
+          </div>
+        </div>
+        <p className="text-[12px] text-ink-500 mb-5 leading-relaxed">
+          The same Deal type × deal size grid as Deal Analysis, shown twice:{" "}
+          <strong className="text-ink-700">Before</strong> = what actually settled.{" "}
+          <strong className="text-ink-700">After</strong> = the same nights, recomputed if Smart Switch
+          had been used. vs / % of net / door deals get a flat or door-hybrid counterfactual; flat /
+          % of gross deals are left untouched (no switch needed).
+        </p>
+
+        <BeforeAfterGrid
+          variant="actual"
+          dealTypes={data.dealTypes}
+          buckets={activeBuckets}
+          cellByKey={cellByKey}
+          onCellClick={(dt, b) => {
+            const params = new URLSearchParams({ dealType: dt, size: b });
+            setLocation(`/shows?${params.toString()}`);
+          }}
+        />
+
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px bg-ink-200/60 flex-1" />
+          <span className="eyebrow text-[10px] text-brand-700 font-semibold">
+            ↓ recomputed under Smart Switch
+          </span>
+          <div className="h-px bg-ink-200/60 flex-1" />
+        </div>
+
+        <BeforeAfterGrid
+          variant="projected"
+          dealTypes={data.dealTypes}
+          buckets={activeBuckets}
+          cellByKey={cellByKey}
+          onCellClick={(dt, b) => {
+            const params = new URLSearchParams({ dealType: dt, size: b });
+            setLocation(`/shows?${params.toString()}`);
+          }}
+        />
+
+        <div className="grid grid-cols-4 gap-3 mt-5">
+          <BAStatCard
+            label="Loss-making nights avoided"
+            value={String(data.totalLosingMoneyAvoided)}
+            tone={data.totalLosingMoneyAvoided >= 0 ? "emerald" : "rose"}
+          />
+          <BAStatCard
+            label="Disputes avoided"
+            value={String(data.totalDisputesAvoided)}
+            tone="emerald"
+          />
+          <BAStatCard
+            label="Attention items avoided"
+            value={String(data.totalAttentionAvoided)}
+            tone="emerald"
+          />
+          <BAStatCard
+            label="Money kept by venue"
+            value={fmtMoney(data.totalMoneySavedToVenue)}
+            tone={data.totalMoneySavedToVenue >= 0 ? "emerald" : "rose"}
+          />
+        </div>
+
+        <p className="text-[11px] text-ink-400 mt-3 leading-relaxed">
+          Each cell shows count of deals (n=), then losing-money rate · dispute rate ·
+          needs-attention rate. Thresholds: ≥50% losing money (red), ≥10% disputed (amber), ≥10%
+          needs attention (violet). Projected disputes/attention assumed to drop to 0 for switched
+          deals (pre-agreed terms eliminate recoup arithmetic). Click a cell to see the underlying
+          shows.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BeforeAfterGrid({
+  variant,
+  dealTypes,
+  buckets,
+  cellByKey,
+  onCellClick,
+}: {
+  variant: "actual" | "projected";
+  dealTypes: string[];
+  buckets: string[];
+  cellByKey: Map<string, SwitchProjectedCell>;
+  onCellClick: (dt: string, b: string) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-2 mb-2">
+        <span
+          className={`eyebrow text-[10px] font-semibold ${
+            variant === "actual" ? "text-ink-600" : "text-brand-700"
+          }`}
+        >
+          {variant === "actual" ? "Before · actual settlements" : "After · under Smart Switch"}
+        </span>
+      </div>
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="text-left border-b border-ink-100/80">
+            <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold w-[110px]">
+              Deal type
+            </th>
+            {buckets.map((b) => (
+              <th
+                key={b}
+                className="py-2 px-2 eyebrow text-[10px] text-ink-400 font-semibold text-center"
+              >
+                {b}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ink-100/60">
+          {dealTypes.map((dt) => (
+            <tr key={dt} className="align-middle">
+              <td className="py-2.5 pr-3">
+                <span className="text-ink-900 font-medium">
+                  {DEAL_LABELS[dt] ?? dt}
+                </span>
+              </td>
+              {buckets.map((b) => {
+                const cell = cellByKey.get(`${dt}|${b}`);
+                if (!cell || cell.count === 0) {
+                  return (
+                    <td
+                      key={b}
+                      className="py-2.5 px-2 text-center text-ink-300 font-mono tabular text-[11px]"
+                    >
+                      —
+                    </td>
+                  );
+                }
+                const losingRate =
+                  variant === "actual" ? cell.actualLosingRate : cell.projectedLosingRate;
+                const disputeRate =
+                  variant === "actual" ? cell.actualDisputeRate : cell.projectedDisputeRate;
+                const attentionRate =
+                  variant === "actual"
+                    ? cell.actualAttentionRate
+                    : cell.projectedAttentionRate;
+                const losingN =
+                  variant === "actual" ? cell.actualLosingMoney : cell.projectedLosingMoney;
+                const disputeN =
+                  variant === "actual" ? cell.actualDisputed : cell.projectedDisputed;
+                const attentionN =
+                  variant === "actual" ? cell.actualAttention : cell.projectedAttention;
+
+                const losingHot = losingRate >= 0.5;
+                const disputeHot = disputeRate >= 0.1;
+                const attentionHot = attentionRate >= 0.1;
+
+                const muted = variant === "projected" && !cell.switchApplies;
+
+                const title = `${cell.count} deals · ${losingN} losing money · ${disputeN} disputed · ${attentionN} needs attention${
+                  variant === "projected" && !cell.switchApplies ? " (Smart Switch does not apply — projection = actual)" : ""
+                }`;
+                return (
+                  <td
+                    key={b}
+                    onClick={() => onCellClick(dt, b)}
+                    className={`py-2 px-2 cursor-pointer transition-colors ${
+                      muted ? "bg-ink-50/30 hover:bg-ink-50/60" : "hover:bg-brand-50/40"
+                    }`}
+                    title={title}
+                  >
+                    <div className="text-center">
+                      <div className="text-[10px] font-mono tabular text-ink-400 mb-0.5">
+                        n={cell.count}
+                      </div>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span
+                          className={`font-mono tabular text-[12px] ${
+                            losingHot ? "text-rose-700 font-semibold" : "text-ink-700"
+                          } ${muted ? "opacity-50" : ""}`}
+                          title="Losing money rate"
+                        >
+                          {`${(losingRate * 100).toFixed(0)}%`}
+                        </span>
+                        <span className="text-ink-300">·</span>
+                        <span
+                          className={`font-mono tabular text-[12px] ${
+                            disputeHot ? "text-amber-700 font-semibold" : "text-ink-500"
+                          } ${muted ? "opacity-50" : ""}`}
+                          title="Dispute rate"
+                        >
+                          {`${(disputeRate * 100).toFixed(0)}%`}
+                        </span>
+                        <span className="text-ink-300">·</span>
+                        <span
+                          className={`font-mono tabular text-[12px] ${
+                            attentionHot ? "text-violet-700 font-semibold" : "text-ink-500"
+                          } ${muted ? "opacity-50" : ""}`}
+                          title="Needs-attention rate"
+                        >
+                          {`${(attentionRate * 100).toFixed(0)}%`}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BAStatCard({ label, value, tone }: { label: string; value: string; tone: "emerald" | "rose" }) {
+  const ring = tone === "emerald" ? "ring-emerald-200/60 bg-emerald-50/40" : "ring-rose-200/60 bg-rose-50/40";
+  const eyeb = tone === "emerald" ? "text-emerald-700" : "text-rose-700";
+  return (
+    <div className={`rounded-md ring-1 p-3 ${ring}`}>
+      <div className={`eyebrow text-[10px] mb-1 ${eyeb}`}>{label}</div>
+      <div className="text-[18px] font-serif text-ink-900 tabular">{value}</div>
+    </div>
+  );
 }
 
 function SwitchProjectedGridSection() {
