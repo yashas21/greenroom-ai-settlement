@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign, Calculator, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign, Calculator, ShieldCheck, AlertTriangle, Wrench } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
@@ -78,12 +78,14 @@ export default function InsightsPage() {
         names the dominant friction kind for those deals and clusters the
         actual recurring complaints behind it.
       </p>
-      <p className="text-[12px] text-ink-400 mb-8">
+      <p className="text-[12px] text-ink-400 mb-6">
         Per-deal positive/negative summaries from <span className="font-mono tabular">{coverage.withSummary}</span> of{" "}
         <span className="font-mono tabular">{coverage.total}</span> settlements ({coveragePct}%) — call{" "}
         <code className="text-[11px] bg-ink-50 px-1 py-0.5 rounded">POST /api/insights/enrich</code>{" "}
         to extend coverage.
       </p>
+
+      <TakeActionPanel />
 
       <GuaranteeBacktestSection />
       <SwitchSavingsSection />
@@ -138,6 +140,87 @@ export default function InsightsPage() {
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function TakeActionPanel() {
+  return (
+    <Card className="mb-6">
+      <CardContent>
+        <div className="flex items-baseline justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <ArrowUpRight className="h-4 w-4 text-brand-700" />
+            <h2 className="text-[15px] font-semibold text-ink-900">
+              Take action on upcoming deals
+            </h2>
+          </div>
+          <span className="eyebrow text-[10px] text-ink-400">jump to a focused worklist</span>
+        </div>
+        <p className="text-[12px] text-ink-500 mb-4 leading-relaxed">
+          Everything below shows what these two engines would have done historically. To act
+          on the same opportunity for upcoming shows, jump to one of the three filtered
+          worklists — each opens Shows narrowed to deals where exactly that action applies.
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          <ActionLinkCard
+            href="/shows?action=improve"
+            tone="emerald"
+            icon={<Wrench className="h-3.5 w-3.5" />}
+            title="Improve Deal"
+            blurb="Upcoming non-flat deals where Smart Switch doesn't apply. Propose caps, convert to flat, or apply individual line items in-thread."
+            cta="Open Improve Deal worklist"
+          />
+          <ActionLinkCard
+            href="/shows?action=switch"
+            tone="brand"
+            icon={<Shield className="h-3.5 w-3.5" />}
+            title="Smart Switch"
+            blurb="Upcoming vs / % of net deals in $1–5K. Smart Switch proposes a clean flat (or door-hybrid) at the same expected payout."
+            cta="Open Smart Switch worklist"
+          />
+          <ActionLinkCard
+            href="/shows?action=switch_door"
+            tone="brand"
+            icon={<Shield className="h-3.5 w-3.5" />}
+            title="Smart Switch — Door"
+            blurb="Upcoming door deals. Smart Switch proposes a door-hybrid (floor + capped split) so settlement night isn't a recoup argument."
+            cta="Open door worklist"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActionLinkCard({
+  href, tone, icon, title, blurb, cta,
+}: {
+  href: string;
+  tone: "emerald" | "brand";
+  icon: React.ReactNode;
+  title: string;
+  blurb: string;
+  cta: string;
+}) {
+  const ring = tone === "emerald"
+    ? "ring-emerald-200/60 bg-emerald-50/40 hover:bg-emerald-50/70"
+    : "ring-brand-200/60 bg-brand-50/40 hover:bg-brand-50/70";
+  const accent = tone === "emerald" ? "text-emerald-700" : "text-brand-700";
+  return (
+    <Link
+      href={href}
+      className={`group rounded-md ring-1 p-3 transition-colors flex flex-col ${ring}`}
+    >
+      <div className={`flex items-center gap-1.5 eyebrow text-[10px] mb-1 ${accent}`}>
+        {icon}
+        {title}
+      </div>
+      <p className="text-[11.5px] text-ink-600 leading-relaxed mb-3 flex-1">{blurb}</p>
+      <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${accent} group-hover:underline underline-offset-2`}>
+        {cta}
+        <ArrowUpRight className="h-3 w-3" />
+      </span>
+    </Link>
   );
 }
 
@@ -547,7 +630,7 @@ function BeforeAfterCrossTabSection() {
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-brand-700" />
             <h2 className="text-[15px] font-semibold text-ink-900">
-              Performance — actual vs Smart Switch + Smart Guaranteed Price projection
+              Performance — actual vs Smart Switch + Improve Deal projection
             </h2>
             <span className="eyebrow text-[10px] text-ink-400">
               · all {data.totalCandidates} deals
@@ -572,10 +655,12 @@ function BeforeAfterCrossTabSection() {
           The same Deal type × deal size grid as Deal Analysis, shown twice:{" "}
           <strong className="text-ink-700">Before</strong> = what actually settled.{" "}
           <strong className="text-ink-700">After</strong> = the same nights, recomputed under whichever
-          engine applies. Door (any size) and vs / % of net in $1–5K get a Smart Switch counterfactual
-          (flat or door-hybrid). vs / % of net outside $1–5K and % of gross are SGP-only — Smart
-          Guaranteed Price would redraft the guarantee at proposal time, but we don't backtest payouts
-          on already-signed deals, so the "after" cell mirrors actual. Flat deals have no engine and
+          engine applies. Door (any size) and vs / % of net in $1–5K get a{" "}
+          <strong className="text-brand-700">Smart Switch</strong> counterfactual (flat or door-hybrid).
+          vs / % of net outside $1–5K and % of gross are{" "}
+          <strong className="text-emerald-700">Improve Deal</strong> territory — the engine would have
+          redrafted caps or proposed a flat at proposal time, but we don't backtest payouts on
+          already-signed deals, so the "after" cell mirrors actual. Flat deals have no engine and
           are left untouched.
         </p>
 
@@ -729,7 +814,7 @@ function BeforeAfterGrid({
                   variant === "projected" && !cell.switchApplies
                     ? cell.dealType === "flat"
                       ? " (flat deal — no engine applies, projection = actual)"
-                      : " (SGP-only — Smart Guaranteed Price would redraft at proposal time; not backtested on signed deals)"
+                      : " (Improve Deal territory — would redraft at proposal time; not backtested on signed deals)"
                     : ""
                 }`;
                 return (
@@ -848,7 +933,7 @@ function SwitchProjectedGridSection() {
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-brand-700" />
             <h2 className="text-[15px] font-semibold text-ink-900">
-              If Smart Switch + Smart Guaranteed Price had been used
+              If Smart Switch + Improve Deal had been used
             </h2>
             <span className="eyebrow text-[10px] text-ink-400">
               · last {data.windowMonths} months · projected grid
@@ -865,8 +950,8 @@ function SwitchProjectedGridSection() {
           <span className="font-mono">disputed</span> and <span className="font-mono">attention</span>{" "}
           assumed to drop to 0 (pre-agreed terms eliminate recoup arithmetic, which is what every
           settlement-flow attention kind in this app traces back to). vs / % of net outside $1–5K
-          and % of gross are SGP-only and shown muted — Smart Guaranteed Price would redraft the
-          guarantee at proposal time, but isn't backtested on already-signed deals here.
+          and % of gross are Improve Deal territory and shown muted — Improve Deal would redraft
+          caps or propose a flat at proposal time, but isn't backtested on already-signed deals here.
         </p>
 
         <details className="mb-5 rounded-md ring-1 ring-ink-200/60 bg-ink-50/30 px-3 py-2 text-[11px] text-ink-600">
@@ -978,10 +1063,10 @@ function ProjCellBox({ cell }: { cell: SwitchProjectedCell | null }) {
             title={
               cell.dealType === "flat"
                 ? "Flat deal — no engine applies"
-                : "SGP-only — Smart Guaranteed Price would redraft the guarantee at proposal time; not backtested on signed deals"
+                : "Improve Deal territory — would redraft caps or propose a flat at proposal time; not backtested on signed deals"
             }
           >
-            {cell.dealType === "flat" ? "no engine" : "SGP-only"}
+            {cell.dealType === "flat" ? "no engine" : "Improve Deal"}
           </span>
         ) : (
           <span

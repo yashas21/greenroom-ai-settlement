@@ -98,6 +98,8 @@ function groupByMonth(rows: ShowRow[]): { month: string; rows: ShowRow[] }[] {
   return Array.from(groups.entries()).map(([month, rows]) => ({ month, rows }));
 }
 
+type ActionKind = "improve" | "switch" | "switch_door";
+
 type Filters = {
   query: string;
   unsupportedOnly: boolean;
@@ -106,6 +108,7 @@ type Filters = {
   upcomingOnly: boolean;
   switchEligibleOnly: boolean;
   switchedOnly: boolean;
+  action: ActionKind | null;
   complexity: string | null;
   size: string | null;
   dealType: string | null;
@@ -122,6 +125,7 @@ const EMPTY_FILTERS: Filters = {
   upcomingOnly: false,
   switchEligibleOnly: false,
   switchedOnly: false,
+  action: null,
   complexity: null,
   size: null,
   dealType: null,
@@ -183,6 +187,24 @@ function isActionableUpcoming(row: ShowRow): boolean {
   return true;
 }
 
+// Splits the actionable-upcoming universe into the three real CTAs.
+// Mirrors the per-row pill logic in ShowListRow exactly: a row that gets the
+// "Improve Deal" pill must also pass actionMatches(row, "improve").
+function actionForRow(row: ShowRow): ActionKind | null {
+  if (!isActionableUpcoming(row)) return null;
+  if (!isSwitchEligible(row)) return "improve";
+  if (row.dealType === "door") return "switch_door";
+  return "switch";
+}
+
+function actionMatches(row: ShowRow, kind: ActionKind): boolean {
+  return actionForRow(row) === kind;
+}
+
+function parseAction(raw: string | null): ActionKind | null {
+  return raw === "improve" || raw === "switch" || raw === "switch_door" ? raw : null;
+}
+
 function parseFilters(search: string): Filters {
   const params = new URLSearchParams(search);
   return {
@@ -193,6 +215,7 @@ function parseFilters(search: string): Filters {
     upcomingOnly: params.get("upcoming") === "1",
     switchEligibleOnly: params.get("switchEligible") === "1",
     switchedOnly: params.get("switched") === "1",
+    action: parseAction(params.get("action")),
     complexity: params.get("complexity"),
     size: params.get("size"),
     dealType: params.get("dealType"),
@@ -211,6 +234,7 @@ function buildQueryString(f: Filters): string {
   if (f.upcomingOnly) params.set("upcoming", "1");
   if (f.switchEligibleOnly) params.set("switchEligible", "1");
   if (f.switchedOnly) params.set("switched", "1");
+  if (f.action) params.set("action", f.action);
   if (f.complexity) params.set("complexity", f.complexity);
   if (f.size) params.set("size", f.size);
   if (f.dealType) params.set("dealType", f.dealType);
@@ -230,6 +254,7 @@ function isFilterActive(f: Filters): boolean {
     f.upcomingOnly ||
     f.switchEligibleOnly ||
     f.switchedOnly ||
+    !!f.action ||
     !!f.complexity ||
     !!f.size ||
     !!f.dealType ||
@@ -267,10 +292,24 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
     () => rows.filter((r) => r.switchStatus === "suggested").length,
     [rows],
   );
+  const actionCounts = useMemo(() => {
+    let improve = 0, sw = 0, swDoor = 0;
+    for (const r of rows) {
+      const a = actionForRow(r);
+      if (a === "improve") improve++;
+      else if (a === "switch") sw++;
+      else if (a === "switch_door") swDoor++;
+    }
+    return { improve, switch: sw, switch_door: swDoor };
+  }, [rows]);
   const filtered = useMemo(() => {
     let out = rows;
     if (filters.upcomingOnly) out = out.filter((r) => r.tense === "upcoming");
     if (filters.switchEligibleOnly) out = out.filter(isActionableUpcoming);
+    if (filters.action) {
+      const k = filters.action;
+      out = out.filter((r) => actionMatches(r, k));
+    }
     if (filters.switchedOnly) out = out.filter((r) => r.switchStatus === "accepted");
     if (filters.unsupportedOnly) out = out.filter((r) => r.isUnsupported);
     if (filters.disputedOnly) out = out.filter((r) => r.isDisputed);
@@ -326,16 +365,44 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
             className="w-64 pl-9 pr-3 py-2 text-[13px] bg-white border border-ink-200/60 rounded-lg text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-300 transition-all"
           />
         </div>
-        <FilterToggle
-          active={filters.switchEligibleOnly}
+        <ActionPill
+          active={filters.action === "improve"}
           onClick={() => update({
-            switchEligibleOnly: !filters.switchEligibleOnly,
+            action: filters.action === "improve" ? null : "improve",
+            switchEligibleOnly: false,
             upcomingOnly: false,
           })}
-          variant="brand"
-          label="Actionable upcoming"
-          count={upcomingActionableCount}
+          tone="emerald"
+          icon={<Wrench className="h-3 w-3" />}
+          label="Improve Deal"
+          count={actionCounts.improve}
+          title="Upcoming non-flat deals where Smart Switch doesn't apply — propose caps or convert to flat"
+        />
+        <ActionPill
+          active={filters.action === "switch"}
+          onClick={() => update({
+            action: filters.action === "switch" ? null : "switch",
+            switchEligibleOnly: false,
+            upcomingOnly: false,
+          })}
+          tone="brand"
           icon={<Shield className="h-3 w-3" />}
+          label="Smart Switch"
+          count={actionCounts.switch}
+          title="Upcoming vs / % of net deals in $1–5K — Smart Switch can propose a clean flat or door-hybrid"
+        />
+        <ActionPill
+          active={filters.action === "switch_door"}
+          onClick={() => update({
+            action: filters.action === "switch_door" ? null : "switch_door",
+            switchEligibleOnly: false,
+            upcomingOnly: false,
+          })}
+          tone="brand"
+          icon={<Shield className="h-3 w-3" />}
+          label="Smart Switch (Door)"
+          count={actionCounts.switch_door}
+          title="Upcoming door deals — Smart Switch can propose a door-hybrid (floor + capped split)"
         />
         <FilterToggle
           active={filters.upcomingOnly}
@@ -384,14 +451,14 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           label="Smart Switch pending"
           count={switchSuggestedCount}
         />
-        {filters.upcomingOnly && upcomingActionableCount > 0 && !filters.switchEligibleOnly && (
+        {filters.upcomingOnly && upcomingActionableCount > 0 && !filters.action && !filters.switchEligibleOnly && (
           <button
             type="button"
             onClick={() => update({ switchEligibleOnly: true, upcomingOnly: false })}
             className="text-[11px] text-brand-700 bg-brand-50/50 hover:bg-brand-50 px-2 py-1 rounded ring-1 ring-brand-200/60 inline-flex items-center gap-1 transition-colors"
           >
             <Shield className="h-2.5 w-2.5" />
-            {upcomingActionableCount} actionable now (Smart Switch or Improve Deal) — narrow to these →
+            {upcomingActionableCount} actionable now — narrow to these →
           </button>
         )}
         {isFilterActive(filters) && (
@@ -660,6 +727,46 @@ function FilterToggle({
       )}
       {label}
       <span className={`font-mono tabular text-[10.5px] ${active ? "" : "text-ink-400"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function ActionPill({
+  active, onClick, tone, label, count, icon, title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  tone: "emerald" | "brand";
+  label: string;
+  count: number;
+  icon: React.ReactNode;
+  title?: string;
+}) {
+  const palette = tone === "emerald"
+    ? {
+        on: "bg-emerald-50 text-emerald-800 ring-emerald-300 hover:bg-emerald-100/80",
+        off: "bg-white text-ink-600 ring-ink-200/60 hover:bg-emerald-50/50 hover:text-emerald-800",
+        countOn: "text-emerald-700",
+      }
+    : {
+        on: "bg-brand-50 text-brand-800 ring-brand-300 hover:bg-brand-100/80",
+        off: "bg-white text-ink-600 ring-ink-200/60 hover:bg-brand-50/50 hover:text-brand-800",
+        countOn: "text-brand-700",
+      };
+  const dim = count === 0 && !active;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={title}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium ring-1 ring-inset transition-all ${active ? palette.on : palette.off} ${dim ? "opacity-60" : ""}`}
+    >
+      <span className={active ? "" : "text-ink-400"}>{icon}</span>
+      {label}
+      <span className={`font-mono tabular text-[10.5px] ${active ? palette.countOn : "text-ink-400"}`}>
         {count}
       </span>
     </button>
