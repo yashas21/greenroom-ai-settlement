@@ -196,23 +196,32 @@ export async function generateSuggestion(
       const sgp = await generateGuarantee(showId, { allowPast: true });
       if (sgp.suggestion) {
         const g = sgp.suggestion;
-        return {
-          shape: "flat",
-          dealTypeFrom: deal.dealType,
-          suggestedFlat: g.suggestedPrice,
-          doorFloor: null,
-          doorSplitPct: null,
-          doorExpenseCap: null,
-          confidenceTier: g.confidenceTier as ConfidenceTier,
-          bandLow: cell ? roundTo50(cell.p10Payout) : null,
-          bandHigh: cell ? roundTo50(cell.p90Payout) : null,
-          bandWidth: cellBandWidth,
-          source: "sgp_engine",
-          sampleSize: cell?.n ?? g.artistShowCount + g.agentShowCount,
-          basis: g.basis,
-        };
+        const sgpTier = g.confidenceTier as ConfidenceTier;
+        // Audit safety rule: SGP is only authoritative at tier A or B. When
+        // SGP itself is uncertain (C/D), prefer the contract guarantee — a
+        // known number on paper beats a low-confidence estimate.
+        const sgpIsConfident = sgpTier === "A" || sgpTier === "B";
+        if (sgpIsConfident) {
+          return {
+            shape: "flat",
+            dealTypeFrom: deal.dealType,
+            suggestedFlat: g.suggestedPrice,
+            doorFloor: null,
+            doorSplitPct: null,
+            doorExpenseCap: null,
+            confidenceTier: sgpTier,
+            bandLow: cell ? roundTo50(cell.p10Payout) : null,
+            bandHigh: cell ? roundTo50(cell.p90Payout) : null,
+            bandWidth: cellBandWidth,
+            source: "sgp_engine",
+            sampleSize: cell?.n ?? g.artistShowCount + g.agentShowCount,
+            basis: g.basis,
+          };
+        }
+        // SGP returned tier C/D — fall through to guarantee_amount fallback.
       }
       // fall through to guarantee/cell-mean path if SGP couldn't compute
+      // OR returned a low-confidence (C/D) suggestion.
     }
 
     // Audit fix: for vs / % of net at $1–5K, fall back to the contract
@@ -228,7 +237,10 @@ export async function generateSuggestion(
       // rounding) — the suggestion is anchored to the real number on the
       // contract, not a synthesized average.
       const flat = deal.guaranteeAmount;
-      const tier = computeTier(cell?.n ?? 0, artistShowsAtVenue);
+      // Audit acceptance: tier is pinned to A. The contract guarantee IS the
+      // answer here — there's no statistical uncertainty to discount, so the
+      // sample-size / familiarity demotion does not apply.
+      const tier: ConfidenceTier = "A";
       const dealName = deal.dealType === "vs" ? "vs" : "percentage-of-net";
       return {
         shape: "flat",

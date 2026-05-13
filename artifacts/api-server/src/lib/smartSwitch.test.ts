@@ -118,6 +118,25 @@ describe("smartSwitch — audit fixes", () => {
     expect(sug!.suggestedFlat).toBe(2237);
   });
 
+  it("guarantee_amount source pins tier to A regardless of sample size or familiarity", async () => {
+    // Audit acceptance: the guarantee IS the answer — there's no statistical
+    // uncertainty to discount, so a first-time artist with thin cell history
+    // should still get tier A on the guarantee_amount path.
+    // (No history seeded → cell.n = 0 → would normally produce tier D.)
+    clearSmartSwitchCache();
+    const sug = await generateSuggestion(
+      {
+        id: "d-firsttimer", showId: "s-firsttimer", dealType: "vs",
+        guaranteeAmount: 2000, percentage: 80, percentageBasis: null,
+        expenseCap: null, hospitalityCap: null, bonusesJson: null,
+        dealNotesFreetext: null, createdAt: new Date(),
+      },
+      0, // first-time artist
+    );
+    expect(sug!.source).toBe("guarantee_amount");
+    expect(sug!.confidenceTier).toBe("A");
+  });
+
   it("door at $15K+ returns source=suppressed (not enough history)", async () => {
     const sug = await generateSuggestion(
       {
