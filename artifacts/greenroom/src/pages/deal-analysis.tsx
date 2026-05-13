@@ -121,6 +121,10 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
     (a, c) => a + (c.disputedAmount ?? 0),
     0,
   );
+  const totalDisputedPayout = db.cells.reduce(
+    (a, c) => a + (c.totalDisputedPayout ?? 0),
+    0,
+  );
 
   return (
     <section className="mb-14">
@@ -138,9 +142,11 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
           {totalDisputed} past settlements ended with a disputed status or at
           least one contested recoup line, with{" "}
           {formatMoneyCompact(totalDisputedAmount)} of recoup value under
-          contention. Per cell: number of disputes, average payout on disputed
-          nights, total disputed dollars, and the top recoup categories driving
-          the friction.
+          contention and {formatMoneyCompact(totalDisputedPayout)} of artist
+          payout flowing through those nights. Per cell: number of disputes,
+          total payout across all disputed shows, average payout on the ones
+          that ended in payment, total disputed dollars, and the top recoup
+          categories driving the friction.
         </p>
       </div>
       <Card>
@@ -197,8 +203,23 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
                                 disp
                               </span>
                             </div>
-                            <div className="text-[11px] font-mono tabular text-ink-600">
-                              avg payout {formatMoneyCompact(cell.avgDisputedPayout)}
+                            <div
+                              className="text-[11px] font-mono tabular text-ink-600"
+                              title={`Sum of totalToArtist across all ${cell.disputed} disputed show${cell.disputed === 1 ? "" : "s"} in this cell`}
+                            >
+                              total payout {formatMoneyCompact(cell.totalDisputedPayout ?? 0)}
+                            </div>
+                            <div
+                              className="text-[11px] font-mono tabular text-ink-500"
+                              title={`Mean totalToArtist across the ${cell.paidDisputedCount ?? 0} disputed show${(cell.paidDisputedCount ?? 0) === 1 ? "" : "s"} that ended with a paid settlement`}
+                            >
+                              avg paid {formatMoneyCompact(cell.avgDisputedPayout)}
+                              {(cell.paidDisputedCount ?? 0) < cell.disputed && (
+                                <span className="text-ink-400">
+                                  {" "}
+                                  ({cell.paidDisputedCount ?? 0}/{cell.disputed})
+                                </span>
+                              )}
                             </div>
                             <div
                               className="text-[11px] font-mono tabular text-rose-700"
@@ -231,10 +252,18 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
               </tbody>
             </table>
           )}
-          <div className="mt-4 pt-3 border-t border-ink-100/60 flex items-center gap-4 text-[10px] text-ink-400">
+          <div className="mt-4 pt-3 border-t border-ink-100/60 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-ink-400">
             <span>
               <strong className="text-ink-600">disp</strong> = settlements ended
               disputed or had a contested recoup line
+            </span>
+            <span>
+              <strong className="text-ink-600">total payout</strong> = sum of
+              artist payout across all disputed shows in the cell
+            </span>
+            <span>
+              <strong className="text-ink-600">avg paid</strong> = mean payout
+              across only the disputed shows that ended with a paid settlement
             </span>
             <span>
               <strong className="text-ink-600">disputed</strong> = total dollar

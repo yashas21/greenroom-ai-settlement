@@ -436,16 +436,26 @@ export async function getDealAnalysis() {
   //     by definition former disputes that were retracted, so they belong in
   //     the lifecycle even though the seed dataset doesn't currently contain
   //     any.)
-  //   - avgDisputedPayout: mean totalToArtist across those disputed deals.
+  //   - totalDisputedPayout: sum of totalToArtist across ALL disputed deals
+  //     in the cell — i.e. how much money actually moved on the disputed
+  //     shows in aggregate.
+  //   - avgDisputedPayout: mean totalToArtist across the subset of disputed
+  //     deals whose settlement actually closed with a payment (status
+  //     signed | finalized | paid). Still-open disputes are excluded so
+  //     the average reflects what was paid out, not what was claimed.
+  //   - paidDisputedCount: # of disputed deals contributing to the avg
+  //     (settlements that ended in a paid status). Surfaces the sample
+  //     size behind the average for the tooltip.
   //   - disputedAmount: total dollar value of disputed recoup lines in the
-  //     cell — the actual money under contention. This is what makes the
-  //     metric concrete instead of a pure rate.
+  //     cell — the actual money under contention.
   //   - topTopics: top 3 recoup categories that appeared on a disputed or
   //     withdrawn line, ranked by occurrence count.
+  const PAID_STATUSES = new Set(["signed", "finalized", "paid"]);
   type DisputeCell = {
     disputed: number;
-    payoutSum: number;
-    payoutN: number;
+    totalPayoutSum: number;
+    paidPayoutSum: number;
+    paidPayoutN: number;
     disputedAmount: number;
     topicCounts: Record<string, number>;
   };
@@ -455,7 +465,14 @@ export async function getDealAnalysis() {
     if (!row) { row = new Map(); disputeAcc.set(dealType, row); }
     let cell = row.get(bucket);
     if (!cell) {
-      cell = { disputed: 0, payoutSum: 0, payoutN: 0, disputedAmount: 0, topicCounts: {} };
+      cell = {
+        disputed: 0,
+        totalPayoutSum: 0,
+        paidPayoutSum: 0,
+        paidPayoutN: 0,
+        disputedAmount: 0,
+        topicCounts: {},
+      };
       row.set(bucket, cell);
     }
     return cell;
@@ -472,8 +489,11 @@ export async function getDealAnalysis() {
     const cell = disputeCell(d.dealType, bucket);
     cell.disputed++;
     if (s.totalToArtist != null) {
-      cell.payoutSum += s.totalToArtist;
-      cell.payoutN++;
+      cell.totalPayoutSum += s.totalToArtist;
+      if (PAID_STATUSES.has(s.status ?? "")) {
+        cell.paidPayoutSum += s.totalToArtist;
+        cell.paidPayoutN++;
+      }
     }
     for (const r of recoups) {
       if (r?.status === "disputed" || r?.status === "withdrawn") {
@@ -489,7 +509,9 @@ export async function getDealAnalysis() {
     cells: [] as Array<{
       dealType: string; bucket: string;
       disputed: number;
+      totalDisputedPayout: number;
       avgDisputedPayout: number;
+      paidDisputedCount: number;
       disputedAmount: number;
       topTopics: { topic: string; count: number }[];
     }>,
@@ -505,7 +527,9 @@ export async function getDealAnalysis() {
       disputeBreakdown.cells.push({
         dealType, bucket,
         disputed: c.disputed,
-        avgDisputedPayout: c.payoutN > 0 ? c.payoutSum / c.payoutN : 0,
+        totalDisputedPayout: c.totalPayoutSum,
+        avgDisputedPayout: c.paidPayoutN > 0 ? c.paidPayoutSum / c.paidPayoutN : 0,
+        paidDisputedCount: c.paidPayoutN,
         disputedAmount: c.disputedAmount,
         topTopics,
       });
