@@ -492,7 +492,7 @@ function deltaPts(actual: number, projected: number): number {
 }
 
 function BeforeAfterCrossTabSection() {
-  const state = useApiData(() => api.switchProjectedGrid(12), []);
+  const state = useApiData(() => api.switchProjectedGrid(600), []);
   const [, setLocation] = useLocation();
 
   if (state.status === "loading")
@@ -522,7 +522,7 @@ function BeforeAfterCrossTabSection() {
           <div className="flex items-center gap-2 mb-1">
             <Shield className="h-4 w-4 text-brand-700" />
             <span className="eyebrow text-[10px] text-ink-500">
-              Before vs after · last {data.windowMonths} months
+              Before vs after · all deals
             </span>
           </div>
           <div className="text-[13px] text-ink-500">
@@ -550,7 +550,7 @@ function BeforeAfterCrossTabSection() {
               Performance — actual vs Smart Switch projection
             </h2>
             <span className="eyebrow text-[10px] text-ink-400">
-              · last {data.windowMonths} months
+              · all {data.totalCandidates} deals
             </span>
           </div>
           <div className="flex items-center gap-3 text-[10px] text-ink-400">
