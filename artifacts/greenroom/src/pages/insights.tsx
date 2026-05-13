@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign, Calculator, ShieldCheck, AlertTriangle, Wrench } from "lucide-react";
+import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign, Calculator, ShieldCheck, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
@@ -158,18 +158,12 @@ function TakeActionPanel() {
         </div>
         <p className="text-[12px] text-ink-500 mb-4 leading-relaxed">
           Everything below shows what these two engines would have done historically. To act
-          on the same opportunity for upcoming shows, jump to one of the three filtered
+          on the same opportunity for upcoming shows, jump to one of the two filtered
           worklists — each opens Shows narrowed to deals where exactly that action applies.
+          Caps-only structural improvements appear inline on each individual show's deal
+          panel rather than as a separate worklist.
         </p>
-        <div className="grid grid-cols-3 gap-3">
-          <ActionLinkCard
-            href="/shows?action=improve"
-            tone="emerald"
-            icon={<Wrench className="h-3.5 w-3.5" />}
-            title="Improve Deal"
-            blurb="Upcoming non-flat deals where Smart Switch doesn't apply. Propose caps, convert to flat, or apply individual line items in-thread."
-            cta="Open Improve Deal worklist"
-          />
+        <div className="grid grid-cols-2 gap-3">
           <ActionLinkCard
             href="/shows?action=switch"
             tone="brand"

@@ -366,19 +366,6 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
           />
         </div>
         <ActionPill
-          active={filters.action === "improve"}
-          onClick={() => update({
-            action: filters.action === "improve" ? null : "improve",
-            switchEligibleOnly: false,
-            upcomingOnly: false,
-          })}
-          tone="emerald"
-          icon={<Wrench className="h-3 w-3" />}
-          label="Improve Deal"
-          count={actionCounts.improve}
-          title="Upcoming non-flat deals where Smart Switch doesn't apply — propose caps or convert to flat"
-        />
-        <ActionPill
           active={filters.action === "switch"}
           onClick={() => update({
             action: filters.action === "switch" ? null : "switch",

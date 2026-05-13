@@ -280,38 +280,13 @@ export async function generateSuggestion(
       };
     }
 
-    // Last resort: cell-mean. Demote tier when the historical band is wide
-    // (audit's "honest range" rule) so the UI shows $X ± $Y instead of a
-    // single number that pretends to be precise.
-    if (!cell || cell.n < 3) return null;
-    let tier = computeTier(cell.n, artistShowsAtVenue);
-    if ((cellBandWidth ?? 0) > WIDE_BAND_THRESHOLD && tier === "A") tier = "B";
-    const flat = roundTo50(cell.avgPayout);
-    const bandLow = roundTo50(cell.p10Payout);
-    const bandHigh = roundTo50(cell.p90Payout);
-    const dealName = deal.dealType === "vs" ? "vs" : "percentage-of-net";
-    return {
-      shape: "flat",
-      dealTypeFrom: deal.dealType,
-      suggestedFlat: flat,
-      doorFloor: null,
-      doorSplitPct: null,
-      doorExpenseCap: null,
-      confidenceTier: tier,
-      bandLow,
-      bandHigh,
-      bandWidth: cellBandWidth,
-      source: "cell_mean",
-      isDeadPool: false,
-      sampleSize: cell.n,
-      basis:
-        `Across ${cell.n} past ${dealName} deals in the ${bucket} bucket, the artist ` +
-        `was paid ${formatMoney(cell.avgPayout)} on average ` +
-        `(P10 ${formatMoney(cell.p10Payout)} – P90 ${formatMoney(cell.p90Payout)}). ` +
-        `A flat at ${formatMoney(flat)} matches the historical expected payout, ` +
-        `removing the post-show recoup arithmetic that drives most disputes. ` +
-        `Confidence tier ${tier} (${familiarity}).`,
-    };
+    // Audit fix #1a: when neither SGP nor a contract guarantee gives us an
+    // anchor, do NOT fall back to cell-mean. The audit found cell-mean
+    // overestimates the flat by ~$591 on vs/$1–5K (43/43 historical shows
+    // paid the guarantee, the percentage never fired) — emitting a wrong
+    // single number is worse than emitting nothing. The booker simply sees
+    // no Smart Switch suggestion and continues with the original deal.
+    return null;
   }
 
   if (deal.dealType === "door") {
