@@ -146,7 +146,7 @@
 
   <!-- Masthead -->
   <div class="masthead">
-    <div class="eyebrow">Greenroom · Settlement Redesign · v2 · data-reconciled · May 2026</div>
+    <div class="eyebrow">Greenroom · Settlement Redesign · v2.1 · data-reconciled · May 2026</div>
     <h1>Simpler Deals, Smarter Tools</h1>
     <p class="intro">Greenroom's settlement tool works for flat guarantees but breaks on three deal types. The fix is not to build more sophisticated analytics on top of a complex system — it is to simplify the underlying deal structures, then let the tools do more with less.</p>
     <div class="source-line">Every figure in this revision sourced from <code>/api/deal-analysis</code>, <code>/api/reports</code>, <code>/api/insights/switch-savings</code> &amp; <code>/api/insights/switch-projected-grid</code> at this commit. 24-month window unless otherwise noted.</div>
@@ -339,6 +339,10 @@
           </div>
 
           <p>The disputes savings are not a free assumption. They follow from the structural change: a pre-agreed flat has nothing to argue about at midnight, and every settlement-flow attention rule in this app — disputed recoups, status-vs-notes mismatches, stale disputes — traces back to the recoup arithmetic that flats eliminate.</p>
+
+          <div class="callout amber">
+            <strong>The percentage clause does fire — just unevenly.</strong> Across <strong>180 settled vs deals</strong> in the window, the artist's percentage out-paid the guarantee in <strong>156 (86.7%)</strong> of them; in the other 13.3% the artist was paid the floor exactly (avg guarantee-win = $0). So the percentage clause is doing real work for artists most of the time — which means the case for switching to flat is <em>not</em> "the percentage produces nothing." It is "the dispute cost outweighs the artist-side benefit on average," and Smart Switch's cell-mean flat ($23K savings on 137 deals) is what calibrates that trade-off honestly. Surfaced as a top-line tile on <code>/insights</code> via <code>vsPercentageFiredStats</code>.
+          </div>
         </div>
       </div>
 
@@ -390,7 +394,7 @@
         <div class="pfse-content">
           <p>Insurance is the safety net that makes committing to a pre-agreed settlement safe for both parties. Two independent products, priced per show at booking:</p>
           <p><strong>Product 1 — Instant Dispute Pay.</strong> When a settlement enters disputed status, Greenroom pays the resolution amount immediately — no back-and-forth. Recovered in the next billing cycle. Sized against The Crescent's actual data: <strong>22 of 509 settlements (4.3%) were disputed in the last 24 months, with $7,582 of disputed-recoup value across them — an average disputed amount of $345 per disputed settlement</strong>.</p>
-          <p><strong>Product 2 — Suggestion Accuracy Pay.</strong> When the accepted flat suggestion differs from what the artist would have earned under the original deal by more than $50, Greenroom pays the gap up to $400. The cap should be sized against the live Smart-Guaranteed-Price backtest (<code>/api/insights/sgp-backtest</code>) — which already computes the per-show gap distribution; surfacing the &quot;share of gaps ≤ $400&quot; rollup is on the next-steps list below.</p>
+          <p><strong>Product 2 — Suggestion Accuracy Pay.</strong> When the accepted flat suggestion differs from what the artist would have earned under the original deal by more than $50, Greenroom pays the gap up to a cap. The cap has now been sized against the live SGP backtest (<code>/api/insights/guarantee-backtest</code>): across <strong>321 scored deals</strong>, the median absolute gap is <strong>$1,119</strong>, with p75 = <strong>$1,939</strong> and p90 = <strong>$3,344</strong>. A $400 cap would have fully covered only <strong>25.2%</strong> of historical gaps; for honest pricing the launch cap should be set at the median ($1,100, ≈50% full coverage) or p75 ($1,900, ≈75% full coverage), with the smaller cap pitched as partial coverage. The full coverage curve — $100 → 6.9%, $200 → 13.1%, $400 → 25.2%, $800 → 39.6%, $1,500 → 64.2% — is now surfaced as a top-line tile on the SGP backtest section of <code>/insights</code>.</p>
         </div>
       </div>
 
@@ -421,7 +425,7 @@
             <div class="rev-row"><span class="rk">Platform · 300 venues · 50% adoption</span><span class="rv">~$270K / yr</span></div>
           </div>
 
-          <p>These figures are from Product 1 alone and assume no Product 2 enrollment. Pricing inputs are from the live Crescent dataset; the across-platform extrapolation assumes The Crescent's dispute economics are typical, which is a modelling assumption that should be re-tested against per-venue dispute rates as the platform scales. The direction of the economics is not sensitive to the adoption assumption; at any adoption rate above 15%, the product covers its expected claim costs from month one.</p>
+          <p>These figures are from Product 1 alone and assume no Product 2 enrollment. Pricing inputs are from the live Crescent dataset; the across-platform extrapolation assumes The Crescent's <strong>4.3% headline dispute rate</strong> is typical. With no second-venue dataset available yet, the only honest sensitivity test is intra-venue: dispute rates across this dataset's cells span <strong>3.8% (flat / $1–5K)</strong> to <strong>12.4% (vs / $1–5K)</strong> and <strong>21.4% (vs / $0–1K)</strong>. Bracketing platform extrapolation at <strong>3.5% – 6.0%</strong> (the headline ± a conservative band that excludes the most-disputed exotic cells, since simplified deals will under-represent them) gives an expected cost / show of <strong>$12.08 – $20.70</strong> versus the $14.84 point estimate, and a platform-wide annual revenue band of roughly <strong>$130K – $310K</strong> versus the $162K – $270K point range — overlapping but wider on both sides. The direction of the economics is not sensitive to either band; at any adoption rate above 15% and any dispute rate inside this band, the product covers its expected claim costs from month one. <em>This intra-venue band is a placeholder until a second venue's dataset lands; the right comparison is per-venue, not per-cell.</em></p>
         </div>
       </div>
 
@@ -537,13 +541,13 @@
 
   <h4 style="font-family:var(--mono); font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim); margin:28px 0 10px">Recommended next steps before publishing</h4>
   <ol class="reco-list">
-    <li><strong>Surface the &quot;% never fired&quot; column on switch-savings.</strong> The strongest single Phase-2 claim — that the percentage clause on vs deals never out-pays the guarantee in this gross range — is currently derivable from the existing per-show payload but not exposed as a top-line figure. One loop comparing <code>actualToArtist</code> against <code>guaranteeAmount</code> per settled vs deal turns this into a one-click verifiable number.</li>
-    <li><strong>Surface the &quot;suggestion gap ≤ $400&quot; rollup on the SGP backtest.</strong> Phase 3's Product 2 cap sizing depends on it and the per-show gap distribution is already computed inside <code>/api/insights/sgp-backtest</code> — it just isn't aggregated into a coverage percentage yet.</li>
-    <li><strong>Re-test the platform extrapolation against per-venue dispute rates.</strong> The $162K–$270K platform-wide figure assumes The Crescent's 4.3% dispute rate is typical. Once a second venue's dataset lands, re-run the Phase-3 revenue strip with a weighted average and a sensitivity band rather than a single-venue point estimate.</li>
+    <li><strong>✓ Done — &quot;% never fired&quot; rollup on switch-savings.</strong> Now exposed as a top-line tile (<code>vsPercentageFiredStats</code>) in the Switch Savings section of <code>/insights</code>. The honest answer reconciled here: the percentage clause out-paid the guarantee in <strong>156 of 180 (86.7%)</strong> settled vs deals, with the remaining 13.3% paid at the guarantee floor (avg guarantee-win $0). The Phase-2 case for switching to flat is therefore the dispute-cost trade-off (12.4% disputes vs 3.8% on flat), not a claim that the percentage produces nothing.</li>
+    <li><strong>✓ Done — &quot;suggestion gap ≤ $T&quot; rollup on the SGP backtest.</strong> A <code>gapCoverage</code> tile now ships with the SGP backtest endpoint and is rendered above the per-deal table on <code>/insights</code>. Crescent distribution: median $1,119, p75 $1,939, p90 $3,344. Phase-3 Product 2 cap sizing has been updated above with the live coverage curve.</li>
+    <li><strong>✓ Done (provisionally) — sensitivity band on platform extrapolation.</strong> The Phase-3 revenue strip now reports a <strong>$130K – $310K</strong> intra-venue band around the $162K–$270K point figures, derived from per-cell dispute-rate spread (3.8% – 12.4%) and clipped to a 3.5% – 6.0% modelling range that excludes the most-disputed exotic cells (since simplified deals will under-represent them). Marked explicitly as a placeholder until a second venue's dataset lands — the right comparison is per-venue, not per-cell.</li>
     <li><strong>Add a Phase-1 hybrid backtest for the suppressed-above-$15K cohort.</strong> Today the engine intentionally returns no suggestion above $15K gross because the historical sample is thin. Before publishing, document the size of that suppressed cohort (currently zero deals at The Crescent in the door bucket above $15K, but the policy needs an explicit footnote for venues where it isn't).</li>
   </ol>
 
-  <p class="pfse-content" style="margin-top:18px">All four are tightenings, not rewrites. The structural argument — <em>simplify the deal types Smart Switch already covers, then layer Improve-Deal caps and insurance on top</em> — is fully supported by the live data as of this revision.</p>
+  <p class="pfse-content" style="margin-top:18px">Three of the four next-steps are now applied in the live app and reflected above; the fourth (suppressed-cohort footnote) remains a small documentation tightening. The structural argument — <em>simplify the deal types Smart Switch already covers, then layer Improve-Deal caps and insurance on top</em> — is fully supported by the live data as of this revision.</p>
 
 </div>
 </body>

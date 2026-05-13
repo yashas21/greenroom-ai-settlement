@@ -92,6 +92,14 @@ export type ProjectedGridPayload = {
   cells: ProjectedCell[];
 };
 
+export type VsPercentageFiredStats = {
+  vsDealsScanned: number;
+  vsPercentageFired: number;
+  vsPercentageNeverFired: number;
+  vsPercentageNeverFiredRate: number;
+  avgGuaranteeWin: number;
+};
+
 export type SavingsPayload = {
   generatedAt: string;
   windowMonths: number;
@@ -99,6 +107,7 @@ export type SavingsPayload = {
   totalMoneySavedToVenue: number;
   totalMinutesSaved: number;
   items: SavingsItem[];
+  vsPercentageFiredStats: VsPercentageFiredStats;
 };
 
 const MINUTES = {
@@ -293,6 +302,38 @@ export async function getSwitchSavings(opts: { months?: number; topN?: number } 
   const totalMoney = trimmed.reduce((a, b) => a + b.moneySavedToVenue, 0);
   const totalMinutes = trimmed.reduce((a, b) => a + b.minutesSaved, 0);
 
+  // Vs-percentage-clause coverage: across every settled `vs` deal in the
+  // window (not just the top-N or even the candidate set above), how many
+  // had the percentage clause out-pay the guarantee? "Never fired" =
+  // actualToArtist <= guaranteeAmount, meaning the venue paid the
+  // guarantee floor and the artist's percentage upside never produced
+  // anything extra. This is the strongest single Phase-2 evidence point
+  // — it answers "could we just cap at the guarantee with no economic
+  // change?" directly from data.
+  let vsScanned = 0;
+  let vsFired = 0;
+  let vsGuaranteeWinSum = 0;
+  for (const r of rows) {
+    if (!r.deal || !r.settlement) continue;
+    if (r.deal.dealType !== "vs") continue;
+    if (r.settlement.totalToArtist == null) continue;
+    if (!SETTLED_STATUSES.has(r.settlement.status)) continue;
+    const guarantee = r.deal.guaranteeAmount ?? 0;
+    const paid = r.settlement.totalToArtist;
+    vsScanned++;
+    // Use a small tolerance ($1) to absorb rounding so a guarantee paid
+    // exactly at the floor isn't mistakenly flagged as the percentage
+    // "firing" by a sub-dollar amount.
+    if (paid > guarantee + 1) {
+      vsFired++;
+    } else {
+      vsGuaranteeWinSum += guarantee - paid;
+    }
+  }
+  const vsNever = vsScanned - vsFired;
+  const vsNeverRate = vsScanned > 0 ? vsNever / vsScanned : 0;
+  const avgGuaranteeWin = vsNever > 0 ? Math.round(vsGuaranteeWinSum / vsNever) : 0;
+
   return {
     generatedAt: new Date().toISOString(),
     windowMonths: months,
@@ -300,6 +341,13 @@ export async function getSwitchSavings(opts: { months?: number; topN?: number } 
     totalMoneySavedToVenue: totalMoney,
     totalMinutesSaved: totalMinutes,
     items: trimmed,
+    vsPercentageFiredStats: {
+      vsDealsScanned: vsScanned,
+      vsPercentageFired: vsFired,
+      vsPercentageNeverFired: vsNever,
+      vsPercentageNeverFiredRate: vsNeverRate,
+      avgGuaranteeWin,
+    },
   };
 }
 

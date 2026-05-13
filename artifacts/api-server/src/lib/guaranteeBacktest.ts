@@ -47,6 +47,20 @@ export type GuaranteeBacktestItem = {
   steps: BacktestSteps;
 };
 
+export type GapCoverageBucket = {
+  threshold: number;
+  count: number;
+  rate: number;
+};
+
+export type GapCoverage = {
+  totalScored: number;
+  buckets: GapCoverageBucket[];
+  medianAbsDelta: number;
+  p75AbsDelta: number;
+  p90AbsDelta: number;
+};
+
 export type GuaranteeBacktestPayload = {
   generatedAt: string;
   windowMonths: number;
@@ -56,6 +70,7 @@ export type GuaranteeBacktestPayload = {
   moneyOverpaid: number;
   netDelta: number;
   items: GuaranteeBacktestItem[];
+  gapCoverage: GapCoverage;
 };
 
 const SETTLED_STATUSES = new Set(["signed", "finalized", "paid", "disputed"]);
@@ -154,6 +169,33 @@ export async function getGuaranteeBacktest(
     else if (it.deltaSgpVsActual > 0) moneyOverpaid += it.deltaSgpVsActual;
   }
 
+  // Gap-coverage rollup: for each threshold T, what share of scored deals
+  // have |SGP − actual| ≤ T? This is the input Phase-3 Product 2 cap
+  // sizing needs — the fraction of the historical book that would have
+  // been fully covered by a $T cap on the suggestion-accuracy payout.
+  const GAP_THRESHOLDS = [100, 200, 400, 800, 1500];
+  const sortedAbs = [...items.map((i) => i.absDeltaActual)].sort((a, b) => a - b);
+  const percentile = (p: number): number => {
+    if (sortedAbs.length === 0) return 0;
+    const idx = Math.min(sortedAbs.length - 1, Math.floor((p / 100) * sortedAbs.length));
+    return Math.round(sortedAbs[idx] ?? 0);
+  };
+  const gapBuckets: GapCoverageBucket[] = GAP_THRESHOLDS.map((threshold) => {
+    const count = items.filter((i) => i.absDeltaActual <= threshold).length;
+    return {
+      threshold,
+      count,
+      rate: items.length > 0 ? count / items.length : 0,
+    };
+  });
+  const gapCoverage: GapCoverage = {
+    totalScored: items.length,
+    buckets: gapBuckets,
+    medianAbsDelta: percentile(50),
+    p75AbsDelta: percentile(75),
+    p90AbsDelta: percentile(90),
+  };
+
   // Sort by absolute SGP-vs-actual divergence descending, keep top N.
   items.sort((a, b) => b.absDeltaActual - a.absDeltaActual);
   const trimmed = items.slice(0, topN);
@@ -167,5 +209,6 @@ export async function getGuaranteeBacktest(
     moneyOverpaid: Math.round(moneyOverpaid),
     netDelta: Math.round(moneyProtected - moneyOverpaid),
     items: trimmed,
+    gapCoverage,
   };
 }

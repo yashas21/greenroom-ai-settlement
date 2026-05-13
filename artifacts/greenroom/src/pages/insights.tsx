@@ -366,7 +366,7 @@ function SwitchSavingsSection() {
           back-of-the-envelope estimate from recoups + sign-off thread length.
         </p>
 
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="grid grid-cols-3 gap-3 mb-5">
           <div className="rounded-md ring-1 ring-emerald-200/60 bg-emerald-50/40 p-3">
             <div className="flex items-center gap-1.5 eyebrow text-[10px] text-emerald-700 mb-1">
               <DollarSign className="h-3 w-3" />
@@ -389,6 +389,25 @@ function SwitchSavingsSection() {
             </div>
             <div className="text-[10px] text-ink-400">
               fewer minutes spent on settlement-night arithmetic + back-and-forth
+            </div>
+          </div>
+          <div
+            className="rounded-md ring-1 ring-amber-200/60 bg-amber-50/40 p-3"
+            title="Across every settled vs deal in the window: how often the percentage clause out-paid the guarantee. ‘Never fired’ = artist was paid the guarantee floor and the % upside produced nothing extra."
+          >
+            <div className="flex items-center gap-1.5 eyebrow text-[10px] text-amber-700 mb-1">
+              <Shield className="h-3 w-3" />
+              Vs % clause never fired
+            </div>
+            <div className="text-[22px] font-serif text-ink-900 tabular">
+              {data.vsPercentageFiredStats.vsDealsScanned > 0
+                ? `${(data.vsPercentageFiredStats.vsPercentageNeverFiredRate * 100).toFixed(1)}%`
+                : "—"}
+            </div>
+            <div className="text-[10px] text-ink-400">
+              {data.vsPercentageFiredStats.vsPercentageNeverFired} of{" "}
+              {data.vsPercentageFiredStats.vsDealsScanned} settled vs deals · avg
+              guarantee-win ${data.vsPercentageFiredStats.avgGuaranteeWin.toLocaleString()}
             </div>
           </div>
         </div>
@@ -1692,7 +1711,7 @@ function GuaranteeBacktestSection() {
           the largest divergence so the worst guarantee mismatches surface first.
         </p>
 
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-3 gap-3 mb-3">
           <div className="rounded-md ring-1 ring-emerald-200/60 bg-emerald-50/40 p-3">
             <div className="flex items-center gap-1.5 eyebrow text-[10px] text-emerald-700 mb-1">
               <ShieldCheck className="h-3 w-3" />
@@ -1734,6 +1753,52 @@ function GuaranteeBacktestSection() {
             <div className="text-[10px] text-ink-400">
               protected − overpaid across {data.totalScored} deals
             </div>
+          </div>
+        </div>
+
+        <div
+          className="rounded-md ring-1 ring-amber-200/60 bg-amber-50/40 p-3 mb-5"
+          title="Distribution of |SGP − actual| across all scored deals. Each bar is the share of deals that would have fit fully inside an insurance cap of $T."
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 eyebrow text-[10px] text-amber-700">
+              <Calculator className="h-3 w-3" />
+              Suggestion-gap coverage · |SGP − paid| ≤ $T
+            </div>
+            <div className="text-[10px] font-mono tabular text-ink-500">
+              median ${data.gapCoverage.medianAbsDelta.toLocaleString()} · p75 $
+              {data.gapCoverage.p75AbsDelta.toLocaleString()} · p90 $
+              {data.gapCoverage.p90AbsDelta.toLocaleString()}
+            </div>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {data.gapCoverage.buckets.map((b) => (
+              <div
+                key={b.threshold}
+                className="rounded ring-1 ring-amber-200/40 bg-white p-2 text-center"
+              >
+                <div className="text-[9px] font-mono tabular text-ink-500">
+                  ≤ ${b.threshold.toLocaleString()}
+                </div>
+                <div className="text-[16px] font-serif text-ink-900 tabular leading-tight">
+                  {(b.rate * 100).toFixed(1)}%
+                </div>
+                <div className="text-[9px] text-ink-400 font-mono tabular">
+                  {b.count}/{data.gapCoverage.totalScored}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] text-ink-500 mt-2 leading-relaxed">
+            Used for Phase-3 Product 2 cap sizing: a $400 cap would have covered{" "}
+            <span className="font-mono tabular text-ink-700">
+              {(
+                (data.gapCoverage.buckets.find((b) => b.threshold === 400)?.rate ?? 0) *
+                100
+              ).toFixed(1)}
+              %
+            </span>{" "}
+            of historical SGP-vs-actual gaps in full.
           </div>
         </div>
 

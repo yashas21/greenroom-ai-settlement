@@ -441,6 +441,20 @@ export interface GuaranteeBacktestItem {
   steps: GuaranteeBacktestSteps;
 }
 
+export interface GapCoverageBucket {
+  threshold: number;
+  count: number;
+  rate: number;
+}
+
+export interface GapCoverage {
+  totalScored: number;
+  buckets: GapCoverageBucket[];
+  medianAbsDelta: number;
+  p75AbsDelta: number;
+  p90AbsDelta: number;
+}
+
 export interface GuaranteeBacktestPayload {
   generatedAt: string;
   windowMonths: number;
@@ -450,6 +464,15 @@ export interface GuaranteeBacktestPayload {
   moneyOverpaid: number;
   netDelta: number;
   items: GuaranteeBacktestItem[];
+  gapCoverage: GapCoverage;
+}
+
+export interface VsPercentageFiredStats {
+  vsDealsScanned: number;
+  vsPercentageFired: number;
+  vsPercentageNeverFired: number;
+  vsPercentageNeverFiredRate: number;
+  avgGuaranteeWin: number;
 }
 
 export interface SwitchSavingsPayload {
@@ -459,6 +482,7 @@ export interface SwitchSavingsPayload {
   totalMoneySavedToVenue: number;
   totalMinutesSaved: number;
   items: SwitchSavingsItem[];
+  vsPercentageFiredStats: VsPercentageFiredStats;
 }
 
 export interface InsightsPayload {
