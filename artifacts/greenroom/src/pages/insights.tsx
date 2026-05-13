@@ -4,7 +4,7 @@ import { Sparkles, Shield, ChevronRight, ArrowUpRight, Clock, DollarSign } from 
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
-import type { InsightsCell, AttentionKind, SwitchSavingsItem } from "@/lib/types";
+import type { InsightsCell, AttentionKind, SwitchSavingsItem, SwitchProjectedCell } from "@/lib/types";
 
 const DEAL_LABELS: Record<string, string> = {
   flat: "Flat",
@@ -43,6 +43,7 @@ export default function InsightsPage() {
           friction kind for those deals and clusters the actual recurring complaints behind it.
         </p>
         <SwitchSavingsSection />
+        <SwitchProjectedGridSection />
         <LoadingState label="Clustering complaint themes... this can take a minute on first load." />
       </section>
     );
@@ -83,6 +84,7 @@ export default function InsightsPage() {
       </p>
 
       <SwitchSavingsSection />
+      <SwitchProjectedGridSection />
 
       <Card>
         <CardContent>
@@ -465,6 +467,222 @@ function SavingsBreakdown({ item }: { item: SwitchSavingsItem }) {
           Open show <ArrowUpRight className="h-3 w-3" />
         </Link>
       </div>
+    </div>
+  );
+}
+
+const PROJ_DEAL_LABEL: Record<string, string> = {
+  vs: "Vs",
+  percentage_of_net: "% of net",
+  door: "Door",
+};
+
+function pct(n: number): string {
+  return `${Math.round(n * 100)}%`;
+}
+
+function deltaTone(actual: number, projected: number): string {
+  if (actual === projected) return "text-ink-400";
+  return projected < actual ? "text-emerald-700" : "text-rose-700";
+}
+
+function SwitchProjectedGridSection() {
+  const state = useApiData(() => api.switchProjectedGrid(6), []);
+
+  if (state.status === "loading")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-ink-400">Loading projected grid…</div>
+        </CardContent>
+      </Card>
+    );
+  if (state.status === "error")
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="text-[12px] text-rose-600">
+            Couldn't load projected grid: {state.error.message}
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+  const data = state.data;
+  if (data.cells.length === 0) {
+    return (
+      <Card className="mb-6">
+        <CardContent>
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="h-4 w-4 text-brand-700" />
+            <span className="eyebrow text-[10px] text-ink-500">
+              Projected grid · last {data.windowMonths} months
+            </span>
+          </div>
+          <div className="text-[13px] text-ink-500">
+            No vs / % of net / door deals settled in this window — nothing to project.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const cellByKey = new Map(
+    data.cells.map((c) => [`${c.dealType}|${c.bucket}`, c]),
+  );
+
+  return (
+    <Card className="mb-6">
+      <CardContent>
+        <div className="flex items-baseline justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-brand-700" />
+            <h2 className="text-[15px] font-semibold text-ink-900">
+              If Smart Switch had been used
+            </h2>
+            <span className="eyebrow text-[10px] text-ink-400">
+              · last {data.windowMonths} months · projected grid
+            </span>
+          </div>
+          <div className="text-[11px] text-ink-400 font-mono tabular">
+            {data.totalDealsModelled} of {data.totalCandidates} deals modelled
+          </div>
+        </div>
+        <p className="text-[12px] text-ink-500 mb-4 leading-relaxed">
+          The Deal Analysis cross-tab, recomputed with each settled vs / % of net / door deal
+          replaced by its Smart Switch counterfactual. <span className="font-mono">losing</span>{" "}
+          re-derived from the projected payout; <span className="font-mono">disputed</span> and{" "}
+          <span className="font-mono">attention</span> assumed to drop to 0 (pre-agreed terms
+          eliminate recoup arithmetic, which is what every settlement-flow attention kind in
+          this app traces back to).
+        </p>
+
+        <div className="grid grid-cols-4 gap-3 mb-5">
+          <ProjStatCard label="Money saved" value={fmtMoney(data.totalMoneySavedToVenue)} tone="emerald" />
+          <ProjStatCard label="Loss-making nights avoided" value={String(data.totalLosingMoneyAvoided)} tone="emerald" />
+          <ProjStatCard label="Disputes avoided" value={String(data.totalDisputesAvoided)} tone="emerald" />
+          <ProjStatCard label="Attention items avoided" value={String(data.totalAttentionAvoided)} tone="emerald" />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] border-separate border-spacing-y-1.5">
+            <thead>
+              <tr className="text-left">
+                <th className="py-1.5 eyebrow text-[10px] text-ink-400 font-semibold pr-3 align-bottom w-[110px]">
+                  Deal type
+                </th>
+                {data.buckets.map((b) => (
+                  <th
+                    key={b}
+                    className="py-1.5 px-2 eyebrow text-[10px] text-ink-400 font-semibold text-left align-bottom"
+                  >
+                    {b}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.dealTypes.map((dt) => (
+                <tr key={dt} className="align-top">
+                  <td className="py-1.5 pr-3 align-top">
+                    <div className="text-ink-900 font-medium text-[12px] leading-tight pt-2">
+                      {PROJ_DEAL_LABEL[dt] ?? dt}
+                    </div>
+                  </td>
+                  {data.buckets.map((b) => (
+                    <td key={b} className="px-1 align-top">
+                      <ProjCellBox cell={cellByKey.get(`${dt}|${b}`) ?? null} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProjStatCard({ label, value, tone }: { label: string; value: string; tone: "emerald" | "sky" }) {
+  const ring = tone === "emerald" ? "ring-emerald-200/60 bg-emerald-50/40" : "ring-sky-200/60 bg-sky-50/40";
+  const eyeb = tone === "emerald" ? "text-emerald-700" : "text-sky-700";
+  return (
+    <div className={`rounded-md ring-1 p-3 ${ring}`}>
+      <div className={`eyebrow text-[10px] mb-1 ${eyeb}`}>{label}</div>
+      <div className="text-[18px] font-serif text-ink-900 tabular">{value}</div>
+    </div>
+  );
+}
+
+function ProjCellBox({ cell }: { cell: SwitchProjectedCell | null }) {
+  if (!cell || cell.count === 0) {
+    return (
+      <div className="rounded-md ring-1 ring-ink-200/40 p-2 text-[10px] text-ink-300 bg-ink-50/30">
+        no deals
+      </div>
+    );
+  }
+  const moneyPositive = cell.moneySavedToVenue > 0;
+  return (
+    <div className="rounded-md ring-1 ring-ink-200/60 bg-white p-2">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] font-mono tabular text-ink-500">n={cell.count}</span>
+        <span className={`text-[10px] font-mono tabular font-semibold ${moneyPositive ? "text-emerald-700" : "text-ink-400"}`}>
+          {moneyPositive ? "+" : ""}
+          {fmtMoney(cell.moneySavedToVenue)}
+        </span>
+      </div>
+      <ProjMetricRow
+        label="losing"
+        actual={cell.actualLosingRate}
+        projected={cell.projectedLosingRate}
+        actualN={cell.actualLosingMoney}
+        projectedN={cell.projectedLosingMoney}
+      />
+      <ProjMetricRow
+        label="disputed"
+        actual={cell.actualDisputeRate}
+        projected={cell.projectedDisputeRate}
+        actualN={cell.actualDisputed}
+        projectedN={cell.projectedDisputed}
+      />
+      <ProjMetricRow
+        label="attention"
+        actual={cell.actualAttentionRate}
+        projected={cell.projectedAttentionRate}
+        actualN={cell.actualAttention}
+        projectedN={cell.projectedAttention}
+      />
+    </div>
+  );
+}
+
+function ProjMetricRow({
+  label,
+  actual,
+  projected,
+  actualN,
+  projectedN,
+}: {
+  label: string;
+  actual: number;
+  projected: number;
+  actualN: number;
+  projectedN: number;
+}) {
+  const tone = deltaTone(actual, projected);
+  return (
+    <div className="flex items-center justify-between text-[10.5px] font-mono tabular leading-tight py-0.5">
+      <span className="text-ink-400">{label}</span>
+      <span className="flex items-center gap-1">
+        <span className="text-ink-600">
+          {pct(actual)}
+          <span className="text-ink-300"> ({actualN})</span>
+        </span>
+        <span className="text-ink-300">→</span>
+        <span className={`font-semibold ${tone}`}>{pct(projected)}</span>
+      </span>
     </div>
   );
 }

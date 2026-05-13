@@ -3,7 +3,7 @@ import { db } from "../db";
 import {
   shows, artists, deals, settlements, expenses, type Deal,
 } from "../db/schema";
-import { parseRecoups } from "./queries";
+import { parseRecoups, classifySizeBucket, getNeedsAttention } from "./queries";
 import { generateSuggestion, type ConfidenceTier } from "./smartSwitch";
 
 export type SavingsItem = {
@@ -49,6 +49,44 @@ export type SavingsItem = {
   };
 };
 
+export type ProjectedCell = {
+  dealType: "vs" | "percentage_of_net" | "door";
+  bucket: string;
+  count: number;
+  // Actual past-period stats
+  actualLosingMoney: number;
+  actualDisputed: number;
+  actualAttention: number;
+  actualLosingRate: number;
+  actualDisputeRate: number;
+  actualAttentionRate: number;
+  // Projected (counterfactual) stats under Smart Switch
+  projectedLosingMoney: number;
+  projectedDisputed: number;
+  projectedAttention: number;
+  projectedLosingRate: number;
+  projectedDisputeRate: number;
+  projectedAttentionRate: number;
+  // Money rollup for the cell
+  actualPayoutSum: number;
+  projectedPayoutSum: number;
+  moneySavedToVenue: number;
+};
+
+export type ProjectedGridPayload = {
+  generatedAt: string;
+  windowMonths: number;
+  totalCandidates: number;
+  totalDealsModelled: number;
+  totalLosingMoneyAvoided: number;
+  totalDisputesAvoided: number;
+  totalAttentionAvoided: number;
+  totalMoneySavedToVenue: number;
+  dealTypes: ProjectedCell["dealType"][];
+  buckets: string[];
+  cells: ProjectedCell[];
+};
+
 export type SavingsPayload = {
   generatedAt: string;
   windowMonths: number;
@@ -90,6 +128,8 @@ function monthsAgoString(months: number): string {
 }
 
 const SETTLED_STATUSES = new Set(["signed", "finalized", "paid", "disputed"]);
+const PROJECTED_DEAL_TYPES: ProjectedCell["dealType"][] = ["vs", "percentage_of_net", "door"];
+const PROJECTED_BUCKETS = ["$0–1K", "$1–5K", "$5–15K", "$15K+", "Uncapped %"];
 
 async function buildPriorShowIndex(): Promise<Map<string, string[]>> {
   // One pass over `shows`. Index by `${artistId}::${venueId}` → sorted ascending dates.
@@ -255,5 +295,169 @@ export async function getSwitchSavings(opts: { months?: number; topN?: number } 
     totalMoneySavedToVenue: totalMoney,
     totalMinutesSaved: totalMinutes,
     items: trimmed,
+  };
+}
+
+export async function getSwitchProjectedGrid(
+  opts: { months?: number } = {},
+): Promise<ProjectedGridPayload> {
+  const months = opts.months ?? 6;
+  const today = todayDateString();
+  const since = monthsAgoString(months);
+
+  const rows = await db
+    .select({ show: shows, deal: deals, settlement: settlements })
+    .from(shows)
+    .leftJoin(deals, eq(deals.showId, shows.id))
+    .leftJoin(settlements, eq(settlements.showId, shows.id))
+    .where(and(gte(shows.date, since), lte(shows.date, today)));
+
+  const candidates = rows.filter((r) => {
+    if (!r.deal || !r.settlement) return false;
+    if (r.settlement.totalToArtist == null || r.settlement.grossBoxOffice == null) return false;
+    if (!SETTLED_STATUSES.has(r.settlement.status)) return false;
+    return PROJECTED_DEAL_TYPES.includes(
+      r.deal.dealType as ProjectedCell["dealType"],
+    );
+  });
+
+  const [allExpenses, priorIndex, attention] = await Promise.all([
+    db.select().from(expenses),
+    buildPriorShowIndex(),
+    getNeedsAttention(),
+  ]);
+  const expByShow = new Map<string, number>();
+  for (const e of allExpenses) {
+    expByShow.set(e.showId, (expByShow.get(e.showId) ?? 0) + e.amount);
+  }
+  const attentionByShow = new Set<string>();
+  for (const a of attention) attentionByShow.add(a.showId);
+
+  type Acc = {
+    count: number;
+    actualLosingMoney: number;
+    actualDisputed: number;
+    actualAttention: number;
+    projectedLosingMoney: number;
+    actualPayoutSum: number;
+    projectedPayoutSum: number;
+  };
+  const cellAcc = new Map<string, Acc>();
+  const seenBuckets = new Set<string>();
+  let totalDealsModelled = 0;
+
+  for (const r of candidates) {
+    const deal = r.deal!;
+    const settlement = r.settlement!;
+    const show = r.show;
+    const bucket = classifySizeBucket(deal);
+    seenBuckets.add(bucket);
+    const key = `${deal.dealType}::${bucket}`;
+    if (!cellAcc.has(key)) {
+      cellAcc.set(key, {
+        count: 0,
+        actualLosingMoney: 0,
+        actualDisputed: 0,
+        actualAttention: 0,
+        projectedLosingMoney: 0,
+        actualPayoutSum: 0,
+        projectedPayoutSum: 0,
+      });
+    }
+    const acc = cellAcc.get(key)!;
+
+    const gross = settlement.grossBoxOffice!;
+    const actualPayout = settlement.totalToArtist!;
+    const totalExp = expByShow.get(show.id) ?? settlement.totalExpenses ?? 0;
+    const recoups = parseRecoups(settlement.recoupsJson);
+    const isDisputed =
+      settlement.status === "disputed" ||
+      recoups.some((x) => x.status === "disputed");
+    const hasAttention = attentionByShow.has(show.id);
+    const actualNet = gross - actualPayout - totalExp;
+
+    const artistN = countPriorBefore(
+      priorIndex.get(`${show.artistId}::${show.venueId}`),
+      show.date,
+    );
+    const generated = await generateSuggestion(deal, artistN);
+    if (!generated) continue;
+
+    let projectedPayout: number;
+    if (generated.shape === "flat") {
+      projectedPayout = generated.suggestedFlat ?? 0;
+    } else {
+      const cap = generated.doorExpenseCap ?? 1500;
+      const pool = Math.max(0, gross * 0.9 - cap);
+      projectedPayout = Math.round(
+        (generated.doorFloor ?? 0) + (generated.doorSplitPct ?? 0) * pool,
+      );
+    }
+    const projectedNet = gross - projectedPayout - totalExp;
+
+    acc.count++;
+    if (actualNet < 0) acc.actualLosingMoney++;
+    if (isDisputed) acc.actualDisputed++;
+    if (hasAttention) acc.actualAttention++;
+    if (projectedNet < 0) acc.projectedLosingMoney++;
+    acc.actualPayoutSum += actualPayout;
+    acc.projectedPayoutSum += projectedPayout;
+    totalDealsModelled++;
+  }
+
+  // Build cells; under Smart Switch we model disputes and attention going to 0
+  // (pre-agreed terms eliminate recoup arithmetic, the source of every
+  // settlement-flow attention kind in this app).
+  const cells: ProjectedCell[] = [];
+  for (const dealType of PROJECTED_DEAL_TYPES) {
+    for (const bucket of PROJECTED_BUCKETS) {
+      const acc = cellAcc.get(`${dealType}::${bucket}`);
+      if (!acc || acc.count === 0) continue;
+      cells.push({
+        dealType,
+        bucket,
+        count: acc.count,
+        actualLosingMoney: acc.actualLosingMoney,
+        actualDisputed: acc.actualDisputed,
+        actualAttention: acc.actualAttention,
+        actualLosingRate: acc.actualLosingMoney / acc.count,
+        actualDisputeRate: acc.actualDisputed / acc.count,
+        actualAttentionRate: acc.actualAttention / acc.count,
+        projectedLosingMoney: acc.projectedLosingMoney,
+        projectedDisputed: 0,
+        projectedAttention: 0,
+        projectedLosingRate: acc.projectedLosingMoney / acc.count,
+        projectedDisputeRate: 0,
+        projectedAttentionRate: 0,
+        actualPayoutSum: Math.round(acc.actualPayoutSum),
+        projectedPayoutSum: Math.round(acc.projectedPayoutSum),
+        moneySavedToVenue: Math.round(acc.actualPayoutSum - acc.projectedPayoutSum),
+      });
+    }
+  }
+
+  const totalLosingAvoided = cells.reduce(
+    (a, c) => a + (c.actualLosingMoney - c.projectedLosingMoney),
+    0,
+  );
+  const totalDisputesAvoided = cells.reduce((a, c) => a + c.actualDisputed, 0);
+  const totalAttentionAvoided = cells.reduce((a, c) => a + c.actualAttention, 0);
+  const totalMoneySaved = cells.reduce((a, c) => a + c.moneySavedToVenue, 0);
+
+  // Buckets in canonical order, only those that appear
+  const buckets = PROJECTED_BUCKETS.filter((b) => seenBuckets.has(b));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    windowMonths: months,
+    totalCandidates: candidates.length,
+    totalDealsModelled,
+    totalLosingMoneyAvoided: totalLosingAvoided,
+    totalDisputesAvoided,
+    totalAttentionAvoided,
+    totalMoneySavedToVenue: totalMoneySaved,
+    dealTypes: PROJECTED_DEAL_TYPES,
+    buckets,
+    cells,
   };
 }

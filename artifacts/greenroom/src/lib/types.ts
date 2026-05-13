@@ -246,6 +246,41 @@ export interface InsightsCell {
   llmError: string | null;
 }
 
+export interface SwitchProjectedCell {
+  dealType: "vs" | "percentage_of_net" | "door";
+  bucket: string;
+  count: number;
+  actualLosingMoney: number;
+  actualDisputed: number;
+  actualAttention: number;
+  actualLosingRate: number;
+  actualDisputeRate: number;
+  actualAttentionRate: number;
+  projectedLosingMoney: number;
+  projectedDisputed: number;
+  projectedAttention: number;
+  projectedLosingRate: number;
+  projectedDisputeRate: number;
+  projectedAttentionRate: number;
+  actualPayoutSum: number;
+  projectedPayoutSum: number;
+  moneySavedToVenue: number;
+}
+
+export interface SwitchProjectedGridPayload {
+  generatedAt: string;
+  windowMonths: number;
+  totalCandidates: number;
+  totalDealsModelled: number;
+  totalLosingMoneyAvoided: number;
+  totalDisputesAvoided: number;
+  totalAttentionAvoided: number;
+  totalMoneySavedToVenue: number;
+  dealTypes: SwitchProjectedCell["dealType"][];
+  buckets: string[];
+  cells: SwitchProjectedCell[];
+}
+
 export interface SwitchSavingsItem {
   showId: string;
   date: string;

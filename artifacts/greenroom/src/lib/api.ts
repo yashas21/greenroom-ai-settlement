@@ -1,4 +1,4 @@
-import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, SwitchSavingsPayload, LlmStatus, SaveLlmSettingsInput, SwitchSuggestion } from "./types";
+import type { ShowListRow, ShowDetail, ArtistRow, Reports, DealAnalysis, AttentionItem, InsightsPayload, SwitchSavingsPayload, SwitchProjectedGridPayload, LlmStatus, SaveLlmSettingsInput, SwitchSuggestion } from "./types";
 
 const BASE = `${import.meta.env.BASE_URL}api`;
 
@@ -18,6 +18,7 @@ export const api = {
   needsAttention: () => get<AttentionItem[]>("/needs-attention"),
   insights: () => get<InsightsPayload>("/insights"),
   switchSavings: (months = 3) => get<SwitchSavingsPayload>(`/insights/switch-savings?months=${months}`),
+  switchProjectedGrid: (months = 6) => get<SwitchProjectedGridPayload>(`/insights/switch-projected-grid?months=${months}`),
   showExport: (id: string) => get<unknown>(`/shows/${encodeURIComponent(id)}/export`),
   llmSettings: () => get<LlmStatus>("/settings/llm"),
   saveLlmSettings: async (input: SaveLlmSettingsInput): Promise<LlmStatus> => {

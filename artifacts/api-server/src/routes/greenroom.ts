@@ -4,7 +4,7 @@ import { buildShowExport } from "../lib/showExport";
 import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insights";
 import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
 import { generateAndPersist, decideSuggestion } from "../lib/smartSwitch";
-import { getSwitchSavings } from "../lib/switchSavings";
+import { getSwitchSavings, getSwitchProjectedGrid } from "../lib/switchSavings";
 
 const router: IRouter = Router();
 
@@ -65,6 +65,16 @@ router.post("/insights/enrich", async (req, res): Promise<void> => {
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "enrich_failed" });
+  }
+});
+
+router.get("/insights/switch-projected-grid", async (req, res): Promise<void> => {
+  try {
+    const months = Number(req.query.months ?? 6) || 6;
+    const data = await getSwitchProjectedGrid({ months });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "projected_grid_failed" });
   }
 });
 
