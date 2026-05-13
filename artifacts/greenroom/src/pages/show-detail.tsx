@@ -464,6 +464,35 @@ const TIER_COLOR: Record<"A" | "B" | "C" | "D", string> = {
   D: "bg-ink-100 text-ink-600 ring-ink-200/60",
 };
 
+function classifyBucketClient(deal: Deal): string {
+  if (deal.guaranteeAmount == null || deal.guaranteeAmount === 0) {
+    if (deal.percentage != null) return "Uncapped %";
+    return "$0–1K";
+  }
+  const g = deal.guaranteeAmount;
+  if (g < 1000) return "$0–1K";
+  if (g < 5000) return "$1–5K";
+  if (g < 15000) return "$5–15K";
+  return "$15K+";
+}
+
+function switchEligibleClient(deal: Deal): boolean {
+  const bucket = classifyBucketClient(deal);
+  if (deal.dealType === "door") return true;
+  if ((deal.dealType === "vs" || deal.dealType === "percentage_of_net") && bucket === "$1–5K") return true;
+  return false;
+}
+
+const SWITCH_ERROR_MESSAGES: Record<string, string> = {
+  not_eligible: "Smart Switch only applies to door deals and to vs / % of net deals in the $1–5K bucket. This deal isn't eligible.",
+  no_deal: "This show doesn't have a deal attached, so there's nothing to recompute.",
+  could_not_generate: "Couldn't compute a suggestion right now. Try again in a moment.",
+};
+
+function friendlySwitchError(raw: string): string {
+  return SWITCH_ERROR_MESSAGES[raw] ?? raw;
+}
+
 function SmartSwitchPanel({
   showId, deal, settlement, initial,
 }: {
@@ -475,15 +504,18 @@ function SmartSwitchPanel({
   const [sug, setSug] = useState<SwitchSuggestion | null>(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const eligible = switchEligibleClient(deal);
+  const bucket = classifyBucketClient(deal);
 
   async function call(fn: () => Promise<SwitchSuggestion>) {
     setBusy(true); setErr(null);
     try { setSug(await fn()); }
-    catch (e) { setErr(e instanceof Error ? e.message : "failed"); }
+    catch (e) { setErr(friendlySwitchError(e instanceof Error ? e.message : "failed")); }
     finally { setBusy(false); }
   }
 
   const generate = () => call(() => api.generateSwitch(showId));
+  const recompute = () => call(() => api.generateSwitch(showId, { force: true }));
   const accept = () => call(() => api.acceptSwitch(showId));
   const decline = () => call(() => api.declineSwitch(showId));
 
@@ -509,7 +541,7 @@ function SmartSwitchPanel({
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {!sug && (
+        {!sug && eligible && (
           <div className="flex items-center justify-between gap-4">
             <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
               {settlement
@@ -521,6 +553,16 @@ function SmartSwitchPanel({
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               {busy ? "Computing…" : "Generate suggestion"}
             </Button>
+          </div>
+        )}
+
+        {!sug && !eligible && (
+          <div className="flex items-start gap-3 rounded-lg bg-ink-50/60 ring-1 ring-ink-200/50 p-3">
+            <AlertTriangle className="h-4 w-4 text-ink-500 mt-0.5 shrink-0" />
+            <div className="text-[12.5px] text-ink-700 leading-relaxed">
+              Smart Switch only applies to <strong>door</strong> deals and to <strong>vs / % of net</strong>{" "}
+              deals in the <strong>$1–5K</strong> bucket. This deal is <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> in the <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{bucket}</code> bucket — not eligible.
+            </div>
           </div>
         )}
 
@@ -647,6 +689,16 @@ function SmartSwitchPanel({
                       <X className="h-3.5 w-3.5" />
                       Decline — keep as-is
                     </Button>
+                    <button
+                      type="button"
+                      onClick={recompute}
+                      disabled={busy}
+                      className="text-[11px] text-ink-500 hover:text-brand-700 underline-offset-2 hover:underline inline-flex items-center gap-1 self-start mt-1 disabled:opacity-50"
+                      title="Discard this suggestion and recompute against the latest pricing engine"
+                    >
+                      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      {busy ? "Recomputing…" : "Recompute with latest pricing"}
+                    </button>
                   </div>
                 )}
                 {sug.status !== "suggested" && sug.decidedAt && (

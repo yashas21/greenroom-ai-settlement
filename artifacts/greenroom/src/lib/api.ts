@@ -34,8 +34,9 @@ export const api = {
     }
     return res.json() as Promise<LlmStatus>;
   },
-  generateSwitch: async (id: string): Promise<SwitchSuggestion> => {
-    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/switch/generate`, { method: "POST" });
+  generateSwitch: async (id: string, opts: { force?: boolean } = {}): Promise<SwitchSuggestion> => {
+    const qs = opts.force ? "?force=1" : "";
+    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/switch/generate${qs}`, { method: "POST" });
     if (!res.ok) {
       const j = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(j.error ?? `API error ${res.status}`);

@@ -137,8 +137,9 @@ router.post("/shows/:id/guarantee/generate", async (req, res): Promise<void> => 
 
 router.post("/shows/:id/switch/generate", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const force = req.query.force === "1" || req.query.force === "true";
   try {
-    const out = await generateAndPersist(raw);
+    const out = await generateAndPersist(raw, { force });
     if (!out.suggestion) {
       res.status(409).json({ error: out.reason ?? "could_not_generate" });
       return;

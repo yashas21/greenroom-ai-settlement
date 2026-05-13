@@ -282,7 +282,7 @@ export async function getSuggestionForShow(showId: string): Promise<SwitchSugges
   return rows[0] ?? null;
 }
 
-export async function generateAndPersist(showId: string): Promise<{
+export async function generateAndPersist(showId: string, opts: { force?: boolean } = {}): Promise<{
   suggestion: SwitchSuggestion | null;
   reason?: string;
 }> {
@@ -291,7 +291,15 @@ export async function generateAndPersist(showId: string): Promise<{
   if (!deal) return { suggestion: null, reason: "no_deal" };
 
   const existing = await getSuggestionForShow(showId);
-  if (existing) return { suggestion: existing };
+  if (existing) {
+    // Force-recompute is only allowed on still-pending suggestions.
+    // Once a booker has accepted or declined, that decision is the record.
+    if (opts.force && existing.status === "suggested") {
+      await db.delete(switchSuggestions).where(eq(switchSuggestions.showId, showId));
+    } else {
+      return { suggestion: existing };
+    }
+  }
 
   const showRows = await db.select().from(shows).where(eq(shows.id, showId));
   const show = showRows[0];
