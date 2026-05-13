@@ -268,6 +268,16 @@ Both LLM call sites route through this helper:
 - **API client + types** — `artifacts/greenroom/src/lib/api.ts`,
   `artifacts/greenroom/src/lib/types.ts`.
 - **Sidebar / nav** — `artifacts/greenroom/src/components/layout/nav-links.tsx`.
+- **Portable seed snapshot** — `artifacts/api-server/data/seeds/`. JSON
+  exports of every row added on top of the upstream starter dataset
+  (`artists.json`, `shows.json`, `deals.json`, `settlements.json`,
+  `switch_suggestions.json`, `guarantee_suggestions.json`) plus a
+  byte-for-byte copy of the live
+  `greenroom.db`. The folder's `README.md` explains how this fork's data
+  relates to [`samay-cbh/greenroom-starter`](https://github.com/samay-cbh/greenroom-starter)
+  and gives a recipe for recreating the dataset from scratch. Refresh the
+  snapshot after any structural data change with
+  `pnpm --filter @workspace/api-server exec tsx scripts/exportSeedsSnapshot.ts`.
 
 ## Architecture decisions
 

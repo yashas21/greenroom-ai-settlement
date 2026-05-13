@@ -559,9 +559,8 @@ export interface DealAnalysis {
       dealType: string;
       bucket: string;
       disputed: number;
-      correctDisputes: number;
       avgDisputedPayout: number;
-      correctDisputeRate: number;
+      disputedAmount: number;
       topTopics: { topic: string; count: number }[];
     }[];
   };

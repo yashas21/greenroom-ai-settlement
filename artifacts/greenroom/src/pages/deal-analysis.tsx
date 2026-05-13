@@ -117,7 +117,7 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
   const activeBuckets = db.buckets.filter((b) => db.cells.some((c) => c.bucket === b));
   const activeTypes = db.dealTypes.filter((dt) => db.cells.some((c) => c.dealType === dt));
   const totalDisputed = db.cells.reduce((a, c) => a + c.disputed, 0);
-  const totalCorrect = db.cells.reduce((a, c) => a + c.correctDisputes, 0);
+  const totalDisputedAmount = db.cells.reduce((a, c) => a + c.disputedAmount, 0);
 
   return (
     <section className="mb-14">
@@ -132,13 +132,11 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
           What artists pushed back on
         </h2>
         <p className="text-[13px] text-ink-500 mt-2 max-w-2xl leading-relaxed">
-          {totalDisputed} past settlements ended with a disputed status or a
-          contested recoup. {totalCorrect} of those (
-          {totalDisputed > 0 ? Math.round((totalCorrect / totalDisputed) * 100) : 0}%)
-          included a recoup line that was later withdrawn — meaning the artist's
-          challenge was upheld and the venue retracted the charge. Per cell:
-          number of disputes, average payout on disputed nights, share where the
-          artist was ultimately right, and the top recoup categories driving
+          {totalDisputed} past settlements ended with a disputed status or at
+          least one contested recoup line, with{" "}
+          {formatMoneyCompact(totalDisputedAmount)} of recoup value under
+          contention. Per cell: number of disputes, average payout on disputed
+          nights, total disputed dollars, and the top recoup categories driving
           the friction.
         </p>
       </div>
@@ -185,7 +183,6 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
                           </td>
                         );
                       }
-                      const correctHot = cell.correctDisputeRate >= 0.4;
                       return (
                         <td key={b} className="py-3 px-2 align-top">
                           <div className="flex flex-col items-center gap-1">
@@ -198,15 +195,13 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
                               </span>
                             </div>
                             <div className="text-[11px] font-mono tabular text-ink-600">
-                              avg {formatMoneyCompact(cell.avgDisputedPayout)}
+                              avg payout {formatMoneyCompact(cell.avgDisputedPayout)}
                             </div>
                             <div
-                              className={`text-[11px] font-mono tabular ${
-                                correctHot ? "text-emerald-700 font-semibold" : "text-ink-500"
-                              }`}
-                              title={`${cell.correctDisputes} of ${cell.disputed} disputes ended with a withdrawn recoup`}
+                              className="text-[11px] font-mono tabular text-rose-700"
+                              title={`${cell.disputedAmount.toLocaleString("en-US", {style:"currency", currency:"USD"})} of recoup value disputed`}
                             >
-                              {cell.correctDisputes}/{cell.disputed} correct
+                              {formatMoneyCompact(cell.disputedAmount)} disputed
                             </div>
                             {cell.topTopics.length > 0 && (
                               <div className="flex flex-wrap justify-center gap-1 mt-1 max-w-[140px]">
@@ -236,11 +231,11 @@ function DisputesSection({ data }: { data: DealAnalysis }) {
           <div className="mt-4 pt-3 border-t border-ink-100/60 flex items-center gap-4 text-[10px] text-ink-400">
             <span>
               <strong className="text-ink-600">disp</strong> = settlements ended
-              disputed or had a contested recoup
+              disputed or had a contested recoup line
             </span>
             <span>
-              <strong className="text-ink-600">correct</strong> = at least one
-              recoup line later withdrawn (artist won)
+              <strong className="text-ink-600">disputed</strong> = total dollar
+              value of contested recoup lines in the cell
             </span>
           </div>
         </CardContent>
