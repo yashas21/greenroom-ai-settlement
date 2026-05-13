@@ -112,6 +112,7 @@ export default function DealAnalysisPage() {
 
 function DisputesSection({ data }: { data: DealAnalysis }) {
   const db = data.disputeBreakdown;
+  if (!db) return null;
   const cellByKey = new Map(db.cells.map((c) => [`${c.dealType}|${c.bucket}`, c]));
   const activeBuckets = db.buckets.filter((b) => db.cells.some((c) => c.bucket === b));
   const activeTypes = db.dealTypes.filter((dt) => db.cells.some((c) => c.dealType === dt));
