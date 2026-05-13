@@ -130,7 +130,24 @@ const EMPTY_FILTERS: Filters = {
   recoupDisputedOnly: false,
 };
 
-const ELIGIBLE_DEAL_TYPES = new Set(["vs", "percentage_of_net", "door"]);
+// Smart Guaranteed Price applies to any non-flat deal (vs, % of net, % of gross,
+// door). Smart Switch is narrower — door (any size) or vs/% of net in $1–5K.
+// "Actionable upcoming" uses the SGP set, since either lever counts as action.
+const SGP_ELIGIBLE_DEAL_TYPES = new Set([
+  "vs",
+  "percentage_of_net",
+  "percentage_of_gross",
+  "door",
+]);
+const SWITCH_ELIGIBLE_DEAL_TYPES = new Set(["vs", "percentage_of_net", "door"]);
+const SWITCH_BUCKETS_FOR_VS_PN = new Set(["$1–5K"]);
+
+function isSwitchEligible(row: ShowRow): boolean {
+  if (row.dealType === null) return false;
+  if (!SWITCH_ELIGIBLE_DEAL_TYPES.has(row.dealType)) return false;
+  if (row.dealType === "door") return true;
+  return SWITCH_BUCKETS_FOR_VS_PN.has(row.sizeBucket ?? "");
+}
 
 // Show-lifecycle states where the deal is effectively locked in — no point
 // proposing a Smart Switch or Smart Guaranteed Price anymore.
@@ -139,7 +156,7 @@ const LOCKED_SHOW_STATUSES = new Set(["settled", "closed"]);
 // Settlement-lifecycle states where the proposal is past the negotiation window:
 // signed = both sides agreed; finalized = settlement closed; paid = money moved.
 // Anything earlier (draft / submitted / in_review / revised / disputed) is still
-// fair game for a switch.
+// fair game for a switch or a guarantee redraft.
 const LOCKED_SETTLEMENT_STATUSES = new Set(["signed", "finalized", "paid"]);
 
 // "Actionable upcoming" = an upcoming show whose proposal is still open enough
@@ -147,16 +164,22 @@ const LOCKED_SETTLEMENT_STATUSES = new Set(["signed", "finalized", "paid"]);
 // agent signs, or (b) redraft the proposal using the Smart Guaranteed Price.
 // We exclude:
 //  - past shows (date already happened)
-//  - deal types Smart Switch doesn't model (flat, % of gross)
-//  - shows where the booker already accepted/declined the switch
+//  - flat deals (neither engine has anything to recommend)
 //  - shows whose status says the deal is locked (settled/closed)
 //  - shows whose settlement is past the negotiation window (signed/finalized/paid)
+//  - for Switch-eligible rows only: shows where the booker already accepted or
+//    declined the switch (the switch decision is irrelevant for SGP-only rows)
 function isActionableUpcoming(row: ShowRow): boolean {
   if (row.tense !== "upcoming") return false;
-  if (row.dealType === null || !ELIGIBLE_DEAL_TYPES.has(row.dealType)) return false;
-  if (row.switchStatus === "accepted" || row.switchStatus === "declined") return false;
+  if (row.dealType === null || !SGP_ELIGIBLE_DEAL_TYPES.has(row.dealType)) return false;
   if (LOCKED_SHOW_STATUSES.has(row.show.status)) return false;
   if (row.settlement && LOCKED_SETTLEMENT_STATUSES.has(row.settlement.status)) return false;
+  if (
+    isSwitchEligible(row) &&
+    (row.switchStatus === "accepted" || row.switchStatus === "declined")
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -368,7 +391,7 @@ export function ShowsList({ rows }: { rows: ShowRow[] }) {
             className="text-[11px] text-brand-700 bg-brand-50/50 hover:bg-brand-50 px-2 py-1 rounded ring-1 ring-brand-200/60 inline-flex items-center gap-1 transition-colors"
           >
             <Shield className="h-2.5 w-2.5" />
-            {upcomingActionableCount} actionable for Smart Switch — narrow to these →
+            {upcomingActionableCount} actionable now (Smart Switch or Smart Guaranteed Price) — narrow to these →
           </button>
         )}
         {isFilterActive(filters) && (
@@ -491,7 +514,8 @@ function DrillChip({ label, onClear }: { label: string; onClear: () => void }) {
 function ShowListRow({ row }: { row: ShowRow }) {
   const { show, artist, deal, settlement } = row;
   const accent = getAccentColor(row);
-  const isActionableSmartSwitch = isActionableUpcoming(row);
+  const isActionable = isActionableUpcoming(row);
+  const switchEligible = isSwitchEligible(row);
   return (
     <li className="relative group list-none">
       <div
@@ -541,14 +565,24 @@ function ShowListRow({ row }: { row: ShowRow }) {
         </div>
 
         <div className="flex justify-end">
-          {isActionableSmartSwitch ? (
-            <span
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-brand-700 text-white ring-1 ring-brand-700 group-hover:bg-brand-800 transition-colors shadow-[0_1px_2px_rgba(0,80,60,0.18)]"
-              title="Open deal page to run a Smart Switch suggestion"
-            >
-              <Shield className="h-3 w-3" />
-              Run Smart Switch
-            </span>
+          {isActionable ? (
+            switchEligible ? (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-brand-700 text-white ring-1 ring-brand-700 group-hover:bg-brand-800 transition-colors shadow-[0_1px_2px_rgba(0,80,60,0.18)]"
+                title="Open deal page to run a Smart Switch suggestion"
+              >
+                <Shield className="h-3 w-3" />
+                Run Smart Switch
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-sky-700 text-white ring-1 ring-sky-700 group-hover:bg-sky-800 transition-colors shadow-[0_1px_2px_rgba(8,80,120,0.18)]"
+                title="Open deal page to draft a guarantee with Smart Guaranteed Price"
+              >
+                <Shield className="h-3 w-3" />
+                Use Smart Guaranteed Price
+              </span>
+            )
           ) : settlement ? (
             <SettlementPill status={settlement.status} />
           ) : null}

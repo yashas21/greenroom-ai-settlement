@@ -547,7 +547,7 @@ function BeforeAfterCrossTabSection() {
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-brand-700" />
             <h2 className="text-[15px] font-semibold text-ink-900">
-              Performance — actual vs Smart Switch projection
+              Performance — actual vs Smart Switch + Smart Guaranteed Price projection
             </h2>
             <span className="eyebrow text-[10px] text-ink-400">
               · all {data.totalCandidates} deals
@@ -571,9 +571,12 @@ function BeforeAfterCrossTabSection() {
         <p className="text-[12px] text-ink-500 mb-5 leading-relaxed">
           The same Deal type × deal size grid as Deal Analysis, shown twice:{" "}
           <strong className="text-ink-700">Before</strong> = what actually settled.{" "}
-          <strong className="text-ink-700">After</strong> = the same nights, recomputed if Smart Switch
-          had been used. vs / % of net / door deals get a flat or door-hybrid counterfactual; flat /
-          % of gross deals are left untouched (no switch needed).
+          <strong className="text-ink-700">After</strong> = the same nights, recomputed under whichever
+          engine applies. Door (any size) and vs / % of net in $1–5K get a Smart Switch counterfactual
+          (flat or door-hybrid). vs / % of net outside $1–5K and % of gross are SGP-only — Smart
+          Guaranteed Price would redraft the guarantee at proposal time, but we don't backtest payouts
+          on already-signed deals, so the "after" cell mirrors actual. Flat deals have no engine and
+          are left untouched.
         </p>
 
         <BeforeAfterGrid
@@ -590,7 +593,7 @@ function BeforeAfterCrossTabSection() {
         <div className="my-4 flex items-center gap-3">
           <div className="h-px bg-ink-200/60 flex-1" />
           <span className="eyebrow text-[10px] text-brand-700 font-semibold">
-            ↓ recomputed under Smart Switch
+            ↓ recomputed under Smart Switch + SGP
           </span>
           <div className="h-px bg-ink-200/60 flex-1" />
         </div>
@@ -662,7 +665,7 @@ function BeforeAfterGrid({
             variant === "actual" ? "text-ink-600" : "text-brand-700"
           }`}
         >
-          {variant === "actual" ? "Before · actual settlements" : "After · under Smart Switch"}
+          {variant === "actual" ? "Before · actual settlements" : "After · under Smart Switch + SGP"}
         </span>
       </div>
       <table className="w-full text-[12px]">
@@ -723,7 +726,11 @@ function BeforeAfterGrid({
                 const muted = variant === "projected" && !cell.switchApplies;
 
                 const title = `${cell.count} deals · ${losingN} losing money · ${disputeN} disputed · ${attentionN} needs attention${
-                  variant === "projected" && !cell.switchApplies ? " (Smart Switch does not apply — projection = actual)" : ""
+                  variant === "projected" && !cell.switchApplies
+                    ? cell.dealType === "flat"
+                      ? " (flat deal — no engine applies, projection = actual)"
+                      : " (SGP-only — Smart Guaranteed Price would redraft at proposal time; not backtested on signed deals)"
+                    : ""
                 }`;
                 return (
                   <td
@@ -823,7 +830,7 @@ function SwitchProjectedGridSection() {
             </span>
           </div>
           <div className="text-[13px] text-ink-500">
-            No vs / % of net / door deals settled in this window — nothing to project.
+            No non-flat deals settled in this window — nothing to project.
           </div>
         </CardContent>
       </Card>
@@ -841,7 +848,7 @@ function SwitchProjectedGridSection() {
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-brand-700" />
             <h2 className="text-[15px] font-semibold text-ink-900">
-              If Smart Switch had been used
+              If Smart Switch + Smart Guaranteed Price had been used
             </h2>
             <span className="eyebrow text-[10px] text-ink-400">
               · last {data.windowMonths} months · projected grid
@@ -852,12 +859,14 @@ function SwitchProjectedGridSection() {
           </div>
         </div>
         <p className="text-[12px] text-ink-500 mb-3 leading-relaxed">
-          The Deal Analysis cross-tab, recomputed with each settled vs / % of net / door deal
-          replaced by its Smart Switch counterfactual. <span className="font-mono">losing</span>{" "}
-          re-derived from the projected payout; <span className="font-mono">disputed</span> and{" "}
-          <span className="font-mono">attention</span> assumed to drop to 0 (pre-agreed terms
-          eliminate recoup arithmetic, which is what every settlement-flow attention kind in
-          this app traces back to).
+          The Deal Analysis cross-tab, recomputed with each Smart-Switch-eligible settled deal
+          (door any size, or vs / % of net in $1–5K) replaced by its Switch counterfactual.{" "}
+          <span className="font-mono">losing</span> re-derived from the projected payout;{" "}
+          <span className="font-mono">disputed</span> and <span className="font-mono">attention</span>{" "}
+          assumed to drop to 0 (pre-agreed terms eliminate recoup arithmetic, which is what every
+          settlement-flow attention kind in this app traces back to). vs / % of net outside $1–5K
+          and % of gross are SGP-only and shown muted — Smart Guaranteed Price would redraft the
+          guarantee at proposal time, but isn't backtested on already-signed deals here.
         </p>
 
         <details className="mb-5 rounded-md ring-1 ring-ink-200/60 bg-ink-50/30 px-3 py-2 text-[11px] text-ink-600">
@@ -964,7 +973,16 @@ function ProjCellBox({ cell }: { cell: SwitchProjectedCell | null }) {
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] font-mono tabular text-ink-500">n={cell.count}</span>
         {muted ? (
-          <span className="text-[9px] eyebrow text-ink-400">no switch needed</span>
+          <span
+            className="text-[9px] eyebrow text-ink-400"
+            title={
+              cell.dealType === "flat"
+                ? "Flat deal — no engine applies"
+                : "SGP-only — Smart Guaranteed Price would redraft the guarantee at proposal time; not backtested on signed deals"
+            }
+          >
+            {cell.dealType === "flat" ? "no engine" : "SGP-only"}
+          </span>
         ) : (
           <span
             className={`text-[10px] font-mono tabular font-semibold ${
