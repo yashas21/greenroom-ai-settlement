@@ -61,4 +61,20 @@ export const api = {
     }
     return res.json() as Promise<GuaranteeSuggestion>;
   },
+  applyGuaranteeToDeal: async (
+    id: string,
+    guaranteeAmount: number,
+    setDealTypeFlat = false,
+  ): Promise<{ ok: true; dealId: string; guaranteeAmount: number; dealType: string }> => {
+    const res = await fetch(`${BASE}/shows/${encodeURIComponent(id)}/deal/apply-guarantee`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ guaranteeAmount, setDealTypeFlat }),
+    });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(j.error ?? `API error ${res.status}`);
+    }
+    return res.json() as Promise<{ ok: true; dealId: string; guaranteeAmount: number; dealType: string }>;
+  },
 };

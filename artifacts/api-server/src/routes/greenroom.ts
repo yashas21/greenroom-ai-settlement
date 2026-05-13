@@ -5,6 +5,9 @@ import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insig
 import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
 import { generateAndPersist, decideSuggestion } from "../lib/smartSwitch";
 import { generateAndPersistGuarantee, backfillUpcomingGuarantees } from "../lib/smartGuarantee";
+import { db } from "../db";
+import { deals, shows } from "../db/schema";
+import { eq } from "drizzle-orm";
 import { getSwitchSavings, getSwitchProjectedGrid } from "../lib/switchSavings";
 import { getGuaranteeBacktest } from "../lib/guaranteeBacktest";
 
@@ -132,6 +135,32 @@ router.post("/shows/:id/guarantee/generate", async (req, res): Promise<void> => 
     res.json(out.suggestion);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "generate_failed" });
+  }
+});
+
+router.post("/shows/:id/deal/apply-guarantee", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const body = (req.body ?? {}) as { guaranteeAmount?: unknown; setDealTypeFlat?: unknown };
+  const amt = typeof body.guaranteeAmount === "number" ? body.guaranteeAmount : Number(body.guaranteeAmount);
+  if (!Number.isFinite(amt) || amt < 0) {
+    res.status(400).json({ error: "invalid_guarantee" });
+    return;
+  }
+  try {
+    const [showRow] = await db.select().from(shows).where(eq(shows.id, raw));
+    if (!showRow) { res.status(404).json({ error: "show_not_found" }); return; }
+    const [dealRow] = await db.select().from(deals).where(eq(deals.showId, raw));
+    if (!dealRow) { res.status(404).json({ error: "no_deal" }); return; }
+    const update: Partial<typeof deals.$inferInsert> = { guaranteeAmount: amt };
+    if (body.setDealTypeFlat === true) {
+      update.dealType = "flat";
+      update.percentage = null;
+      update.percentageBasis = null;
+    }
+    await db.update(deals).set(update).where(eq(deals.id, dealRow.id));
+    res.json({ ok: true, dealId: dealRow.id, guaranteeAmount: amt, dealType: update.dealType ?? dealRow.dealType });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "apply_failed" });
   }
 });
 

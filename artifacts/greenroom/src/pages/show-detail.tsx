@@ -14,7 +14,7 @@ import { parseBonuses } from "@/lib/dealMath";
 import {
   formatMoney, formatMoneyCompact, formatShowDateFull, relativeShowDate,
 } from "@/lib/format";
-import type { Bonus, SwitchSuggestion, Deal, Settlement } from "@/lib/types";
+import type { Bonus, SwitchSuggestion, GuaranteeSuggestion, Deal, Settlement } from "@/lib/types";
 import { useApiData, LoadingState } from "@/hooks/useApiData";
 import NotFound from "./not-found";
 
@@ -70,7 +70,9 @@ function ExportJsonButton({ showId, artistName, date }: { showId: string; artist
 export default function ShowDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const state = useApiData(() => api.show(id), [id]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey((k) => k + 1);
+  const state = useApiData(() => api.show(id), [id, reloadKey]);
 
   if (state.status === "loading") return <LoadingState label="Loading show..." />;
   if (state.status === "error") {
@@ -178,12 +180,22 @@ export default function ShowDetailPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-2">
-          {deal && (deal.dealType === "vs" || deal.dealType === "percentage_of_net" || deal.dealType === "door") && (
+          {deal && deal.dealType !== "flat" && switchEligibleClient(deal) && (
             <SmartSwitchPanel
               showId={show.id}
               deal={deal}
               settlement={settlement}
               initial={data.switchSuggestion}
+              onApplied={reload}
+            />
+          )}
+          {deal && deal.dealType !== "flat" && !switchEligibleClient(deal) && (
+            <SmartGuaranteedPricePanel
+              showId={show.id}
+              deal={deal}
+              settlement={settlement}
+              initial={data.guaranteeSuggestion}
+              onApplied={reload}
             />
           )}
 
@@ -484,7 +496,6 @@ function switchEligibleClient(deal: Deal): boolean {
 }
 
 const SWITCH_ERROR_MESSAGES: Record<string, string> = {
-  not_eligible: "Smart Switch only applies to door deals and to vs / % of net deals in the $1–5K bucket. This deal isn't eligible.",
   no_deal: "This show doesn't have a deal attached, so there's nothing to recompute.",
   could_not_generate: "Couldn't compute a suggestion right now. Try again in a moment.",
 };
@@ -494,18 +505,18 @@ function friendlySwitchError(raw: string): string {
 }
 
 function SmartSwitchPanel({
-  showId, deal, settlement, initial,
+  showId, deal, settlement, initial, onApplied,
 }: {
   showId: string;
   deal: Deal;
   settlement: Settlement | null;
   initial: SwitchSuggestion | null;
+  onApplied: () => void;
 }) {
   const [sug, setSug] = useState<SwitchSuggestion | null>(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const eligible = switchEligibleClient(deal);
-  const bucket = classifyBucketClient(deal);
+  const [applied, setApplied] = useState(false);
 
   async function call(fn: () => Promise<SwitchSuggestion>) {
     setBusy(true); setErr(null);
@@ -518,6 +529,19 @@ function SmartSwitchPanel({
   const recompute = () => call(() => api.generateSwitch(showId, { force: true }));
   const accept = () => call(() => api.acceptSwitch(showId));
   const decline = () => call(() => api.declineSwitch(showId));
+
+  async function applyToDeal(amount: number) {
+    setBusy(true); setErr(null);
+    try {
+      await api.applyGuaranteeToDeal(showId, amount, true);
+      setApplied(true);
+      onApplied();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Card className="md:col-span-3 ring-1 ring-brand-200/60 bg-gradient-to-br from-brand-50/30 to-canvas">
@@ -541,7 +565,7 @@ function SmartSwitchPanel({
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {!sug && eligible && (
+        {!sug && (
           <div className="flex items-center justify-between gap-4">
             <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
               {settlement
@@ -553,16 +577,6 @@ function SmartSwitchPanel({
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               {busy ? "Computing…" : "Generate suggestion"}
             </Button>
-          </div>
-        )}
-
-        {!sug && !eligible && (
-          <div className="flex items-start gap-3 rounded-lg bg-ink-50/60 ring-1 ring-ink-200/50 p-3">
-            <AlertTriangle className="h-4 w-4 text-ink-500 mt-0.5 shrink-0" />
-            <div className="text-[12.5px] text-ink-700 leading-relaxed">
-              Smart Switch only applies to <strong>door</strong> deals and to <strong>vs / % of net</strong>{" "}
-              deals in the <strong>$1–5K</strong> bucket. This deal is <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> in the <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{bucket}</code> bucket — not eligible.
-            </div>
           </div>
         )}
 
@@ -681,7 +695,18 @@ function SmartSwitchPanel({
 
                 {sug.status === "suggested" && (
                   <div className="flex flex-col gap-2 pt-2 border-t border-ink-200/40">
-                    <Button variant="brand" onClick={accept} disabled={busy}>
+                    {!settlement && sug.shape === "flat" && sug.suggestedFlat != null && (
+                      <Button
+                        variant="brand"
+                        onClick={() => applyToDeal(sug.suggestedFlat as number)}
+                        disabled={busy || applied}
+                        title="Overwrite the deal's guarantee field with the Smart price and convert this to a clean flat deal"
+                      >
+                        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        {applied ? "Applied to deal" : `Apply to deal — set $${sug.suggestedFlat.toLocaleString()} flat`}
+                      </Button>
+                    )}
+                    <Button variant={!settlement && sug.shape === "flat" ? "ghost" : "brand"} onClick={accept} disabled={busy}>
                       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                       Accept suggestion
                     </Button>
@@ -702,8 +727,20 @@ function SmartSwitchPanel({
                   </div>
                 )}
                 {sug.status !== "suggested" && sug.decidedAt && (
-                  <div className="text-[11px] text-ink-500 pt-2 border-t border-ink-200/40">
-                    {sug.status === "accepted" ? "Accepted" : "Declined"} {new Date(sug.decidedAt).toLocaleDateString()}
+                  <div className="flex flex-col gap-2 pt-2 border-t border-ink-200/40">
+                    <div className="text-[11px] text-ink-500">
+                      {sug.status === "accepted" ? "Accepted" : "Declined"} {new Date(sug.decidedAt).toLocaleDateString()}
+                    </div>
+                    {!settlement && sug.status === "accepted" && sug.shape === "flat" && sug.suggestedFlat != null && (
+                      <Button
+                        variant="brand"
+                        onClick={() => applyToDeal(sug.suggestedFlat as number)}
+                        disabled={busy || applied}
+                      >
+                        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        {applied ? "Applied to deal" : `Apply to deal — set $${sug.suggestedFlat.toLocaleString()} flat`}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -717,6 +754,192 @@ function SmartSwitchPanel({
   );
 }
 
+
+function SmartGuaranteedPricePanel({
+  showId, deal, settlement, initial, onApplied,
+}: {
+  showId: string;
+  deal: Deal;
+  settlement: Settlement | null;
+  initial: GuaranteeSuggestion | null;
+  onApplied: () => void;
+}) {
+  const [sug, setSug] = useState<GuaranteeSuggestion | null>(initial);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [applied, setApplied] = useState(false);
+  const bucket = classifyBucketClient(deal);
+
+  async function generate() {
+    setBusy(true); setErr(null);
+    try { setSug(await api.generateGuarantee(showId)); }
+    catch (e) { setErr(e instanceof Error ? e.message : "failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function applyToDeal() {
+    if (!sug) return;
+    setBusy(true); setErr(null);
+    try {
+      await api.applyGuaranteeToDeal(showId, sug.suggestedPrice, false);
+      setApplied(true);
+      onApplied();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const agentG = deal.guaranteeAmount ?? 0;
+  const delta = sug ? sug.suggestedPrice - agentG : 0;
+  const gapDirection = delta > 0
+    ? "Smart price exceeds the agent's ask — counter up."
+    : delta < 0
+      ? "Agent's ask exceeds the Smart price — push back toward the lower number."
+      : "Agent's ask matches the Smart price — accept as-is.";
+  const gapTone = Math.abs(delta) > 150
+    ? (delta > 0 ? "amber" : "amber")
+    : "emerald";
+
+  return (
+    <Card className="md:col-span-3 ring-1 ring-sky-200/60 bg-gradient-to-br from-sky-50/40 to-canvas">
+      <CardHeader>
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-sky-700" />
+            Smart Guaranteed Price
+          </CardTitle>
+          <CardDescription>
+            {settlement
+              ? <>Hindsight check: what flat number our 7-step engine would have recommended for this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal in the <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{bucket}</code> bucket.</>
+              : <>Suggested guarantee for this <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded ring-1 ring-ink-200/40">{deal.dealType}</code> deal — keeps the deal shape the agent proposed and just tells you the right number to put on the table.</>
+            }
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!sug && (
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-[13px] text-ink-600 leading-relaxed max-w-xl">
+              Run the 7-step engine: expected gross → ticketing fees → capped expense estimate → percentage payout vs guarantee → rounded suggested price.
+            </div>
+            <Button variant="brand" onClick={generate} disabled={busy}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {busy ? "Computing…" : "Generate suggestion"}
+            </Button>
+          </div>
+        )}
+
+        {sug && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-3">
+                  <div className="eyebrow text-[10px] text-ink-500 mb-1">Agent's guarantee</div>
+                  <div className="text-[28px] font-mono tabular font-semibold text-ink-900 leading-none">
+                    {formatMoney(agentG)}
+                  </div>
+                  <div className="text-[11px] text-ink-500 mt-2">As written in the deal terms</div>
+                </div>
+                <div className={`rounded-lg p-3 ring-1 ${gapTone === "amber" ? "bg-amber-50/60 ring-amber-300/60" : "bg-emerald-50/40 ring-emerald-200/60"}`}>
+                  <div className="eyebrow text-[10px] text-ink-500 mb-1">Smart Guaranteed Price</div>
+                  <div className="text-[28px] font-mono tabular font-semibold text-emerald-800 leading-none">
+                    {formatMoney(sug.suggestedPrice)}
+                  </div>
+                  <div className="text-[11px] text-ink-500 mt-2">7-step calc · rounded to $50</div>
+                </div>
+              </div>
+
+              {!settlement && Math.abs(delta) > 0 && (
+                <div className={`rounded-lg ring-1 p-3 flex items-start gap-2 ${Math.abs(delta) > 150 ? "ring-amber-300/70 bg-amber-50/70" : "ring-emerald-200/60 bg-emerald-50/40"}`}>
+                  {Math.abs(delta) > 150
+                    ? <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                    : <Check className="h-4 w-4 text-emerald-700 mt-0.5 shrink-0" />
+                  }
+                  <div className={`text-[12.5px] leading-relaxed ${Math.abs(delta) > 150 ? "text-amber-900" : "text-emerald-900"}`}>
+                    <strong>Δ {delta > 0 ? "+" : "−"}{formatMoney(Math.abs(delta))}</strong> — {gapDirection}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+                <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-2.5">
+                  <div className="eyebrow text-[10px] text-ink-500 mb-1">Expected gross</div>
+                  <div className="font-mono tabular text-[14px] text-ink-900">{formatMoney(sug.expectedGross)}</div>
+                </div>
+                <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-2.5">
+                  <div className="eyebrow text-[10px] text-ink-500 mb-1">Capped expenses</div>
+                  <div className="font-mono tabular text-[14px] text-ink-900">{formatMoney(sug.expenseEstimate)}</div>
+                </div>
+                <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-2.5">
+                  <div className="eyebrow text-[10px] text-ink-500 mb-1">Breakeven gross</div>
+                  <div className="font-mono tabular text-[14px] text-ink-900">{formatMoney(sug.breakevenGross)}</div>
+                </div>
+              </div>
+
+              <div className="text-[13px] text-ink-700 leading-relaxed pt-3 border-t border-ink-200/40">
+                {sug.basis}
+              </div>
+
+              {settlement?.totalToArtist != null && (
+                <div className="rounded-lg bg-white/60 ring-1 ring-ink-200/50 p-3 mt-2">
+                  <div className="eyebrow text-[10px] text-ink-500 mb-1">Hindsight (this show actually settled)</div>
+                  <div className="text-[12.5px] text-ink-700 leading-relaxed">
+                    Suggested <span className="font-mono tabular font-medium">{formatMoney(sug.suggestedPrice)}</span> vs actual payout <span className="font-mono tabular font-medium">{formatMoney(settlement.totalToArtist)}</span>
+                    {" — "}
+                    {(() => {
+                      const d = sug.suggestedPrice - settlement.totalToArtist;
+                      const sign = d >= 0 ? "+" : "−";
+                      return (
+                        <span className={d >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                          {sign}{formatMoney(Math.abs(d))} {d >= 0 ? "venue would have paid more" : "venue would have saved"}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="eyebrow text-[10px] text-ink-500 mb-2">Confidence</div>
+                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ring-1 text-[12px] font-medium ${TIER_COLOR[sug.confidenceTier]}`}>
+                  <span className="font-mono tabular text-[14px] font-bold">{sug.confidenceTier}</span>
+                  <span>{TIER_LABEL[sug.confidenceTier]}</span>
+                </div>
+                <div className="text-[11px] text-ink-500 mt-2">
+                  {sug.artistShowCount} prior show{sug.artistShowCount === 1 ? "" : "s"} with this artist · {sug.agentShowCount} with this agent.
+                </div>
+              </div>
+
+              {!settlement && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-ink-200/40">
+                  <Button variant="brand" onClick={applyToDeal} disabled={busy || applied}>
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    {applied ? "Applied to deal" : `Apply to deal — set $${sug.suggestedPrice.toLocaleString()}`}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={generate}
+                    disabled={busy}
+                    className="text-[11px] text-ink-500 hover:text-sky-700 underline-offset-2 hover:underline inline-flex items-center gap-1 self-start mt-1 disabled:opacity-50"
+                    title="Recompute against the latest pricing engine"
+                  >
+                    {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    {busy ? "Recomputing…" : "Recompute"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {err && <div className="text-[12px] text-rose-600">{err}</div>}
+      </CardContent>
+    </Card>
+  );
+}
 
 function BonusBadge({ type }: { type: Bonus["type"] }) {
   const labels: Record<Bonus["type"], string> = {
