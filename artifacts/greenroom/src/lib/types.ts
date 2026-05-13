@@ -247,8 +247,9 @@ export interface InsightsCell {
 }
 
 export interface SwitchProjectedCell {
-  dealType: "vs" | "percentage_of_net" | "door";
+  dealType: "vs" | "percentage_of_net" | "door" | "flat" | "percentage_of_gross";
   bucket: string;
+  switchApplies: boolean;
   count: number;
   actualLosingMoney: number;
   actualDisputed: number;

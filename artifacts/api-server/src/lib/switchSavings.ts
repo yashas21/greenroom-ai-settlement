@@ -50,8 +50,9 @@ export type SavingsItem = {
 };
 
 export type ProjectedCell = {
-  dealType: "vs" | "percentage_of_net" | "door";
+  dealType: "vs" | "percentage_of_net" | "door" | "flat" | "percentage_of_gross";
   bucket: string;
+  switchApplies: boolean;
   count: number;
   // Actual past-period stats
   actualLosingMoney: number;
@@ -128,7 +129,8 @@ function monthsAgoString(months: number): string {
 }
 
 const SETTLED_STATUSES = new Set(["signed", "finalized", "paid", "disputed"]);
-const PROJECTED_DEAL_TYPES: ProjectedCell["dealType"][] = ["vs", "percentage_of_net", "door"];
+const PROJECTED_DEAL_TYPES: ProjectedCell["dealType"][] = ["vs", "percentage_of_net", "door", "flat", "percentage_of_gross"];
+const SWITCH_APPLIES_TO = new Set(["vs", "percentage_of_net", "door"]);
 const PROJECTED_BUCKETS = ["$0–1K", "$1–5K", "$5–15K", "$15K+", "Uncapped %"];
 
 async function buildPriorShowIndex(): Promise<Map<string, string[]>> {
@@ -316,9 +318,7 @@ export async function getSwitchProjectedGrid(
     if (!r.deal || !r.settlement) return false;
     if (r.settlement.totalToArtist == null || r.settlement.grossBoxOffice == null) return false;
     if (!SETTLED_STATUSES.has(r.settlement.status)) return false;
-    return PROJECTED_DEAL_TYPES.includes(
-      r.deal.dealType as ProjectedCell["dealType"],
-    );
+    return (PROJECTED_DEAL_TYPES as readonly string[]).includes(r.deal.dealType);
   });
 
   const [allExpenses, priorIndex, attention] = await Promise.all([
@@ -376,22 +376,23 @@ export async function getSwitchProjectedGrid(
     const hasAttention = attentionByShow.has(show.id);
     const actualNet = gross - actualPayout - totalExp;
 
-    const artistN = countPriorBefore(
-      priorIndex.get(`${show.artistId}::${show.venueId}`),
-      show.date,
-    );
-    const generated = await generateSuggestion(deal, artistN);
-    if (!generated) continue;
-
-    let projectedPayout: number;
-    if (generated.shape === "flat") {
-      projectedPayout = generated.suggestedFlat ?? 0;
-    } else {
-      const cap = generated.doorExpenseCap ?? 1500;
-      const pool = Math.max(0, gross * 0.9 - cap);
-      projectedPayout = Math.round(
-        (generated.doorFloor ?? 0) + (generated.doorSplitPct ?? 0) * pool,
+    let projectedPayout = actualPayout; // default for non-switch deal types
+    if (SWITCH_APPLIES_TO.has(deal.dealType)) {
+      const artistN = countPriorBefore(
+        priorIndex.get(`${show.artistId}::${show.venueId}`),
+        show.date,
       );
+      const generated = await generateSuggestion(deal, artistN);
+      if (!generated) continue;
+      if (generated.shape === "flat") {
+        projectedPayout = generated.suggestedFlat ?? 0;
+      } else {
+        const cap = generated.doorExpenseCap ?? 1500;
+        const pool = Math.max(0, gross * 0.9 - cap);
+        projectedPayout = Math.round(
+          (generated.doorFloor ?? 0) + (generated.doorSplitPct ?? 0) * pool,
+        );
+      }
     }
     const projectedNet = gross - projectedPayout - totalExp;
 
@@ -413,9 +414,11 @@ export async function getSwitchProjectedGrid(
     for (const bucket of PROJECTED_BUCKETS) {
       const acc = cellAcc.get(`${dealType}::${bucket}`);
       if (!acc || acc.count === 0) continue;
+      const switchApplies = SWITCH_APPLIES_TO.has(dealType);
       cells.push({
         dealType,
         bucket,
+        switchApplies,
         count: acc.count,
         actualLosingMoney: acc.actualLosingMoney,
         actualDisputed: acc.actualDisputed,
@@ -423,15 +426,19 @@ export async function getSwitchProjectedGrid(
         actualLosingRate: acc.actualLosingMoney / acc.count,
         actualDisputeRate: acc.actualDisputed / acc.count,
         actualAttentionRate: acc.actualAttention / acc.count,
-        projectedLosingMoney: acc.projectedLosingMoney,
-        projectedDisputed: 0,
-        projectedAttention: 0,
-        projectedLosingRate: acc.projectedLosingMoney / acc.count,
-        projectedDisputeRate: 0,
-        projectedAttentionRate: 0,
+        projectedLosingMoney: switchApplies ? acc.projectedLosingMoney : acc.actualLosingMoney,
+        projectedDisputed: switchApplies ? 0 : acc.actualDisputed,
+        projectedAttention: switchApplies ? 0 : acc.actualAttention,
+        projectedLosingRate: switchApplies
+          ? acc.projectedLosingMoney / acc.count
+          : acc.actualLosingMoney / acc.count,
+        projectedDisputeRate: switchApplies ? 0 : acc.actualDisputed / acc.count,
+        projectedAttentionRate: switchApplies ? 0 : acc.actualAttention / acc.count,
         actualPayoutSum: Math.round(acc.actualPayoutSum),
         projectedPayoutSum: Math.round(acc.projectedPayoutSum),
-        moneySavedToVenue: Math.round(acc.actualPayoutSum - acc.projectedPayoutSum),
+        moneySavedToVenue: switchApplies
+          ? Math.round(acc.actualPayoutSum - acc.projectedPayoutSum)
+          : 0,
       });
     }
   }

@@ -475,15 +475,16 @@ const PROJ_DEAL_LABEL: Record<string, string> = {
   vs: "Vs",
   percentage_of_net: "% of net",
   door: "Door",
+  flat: "Flat",
+  percentage_of_gross: "% of gross",
 };
 
 function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
 }
 
-function deltaTone(actual: number, projected: number): string {
-  if (actual === projected) return "text-ink-400";
-  return projected < actual ? "text-emerald-700" : "text-rose-700";
+function deltaPts(actual: number, projected: number): number {
+  return Math.round((actual - projected) * 100);
 }
 
 function SwitchProjectedGridSection() {
@@ -652,35 +653,50 @@ function ProjCellBox({ cell }: { cell: SwitchProjectedCell | null }) {
     );
   }
   const moneyPositive = cell.moneySavedToVenue > 0;
+  const moneyNegative = cell.moneySavedToVenue < 0;
+  const muted = !cell.switchApplies;
   return (
-    <div className="rounded-md ring-1 ring-ink-200/60 bg-white p-2">
+    <div
+      className={`rounded-md ring-1 p-2 ${muted ? "ring-ink-200/40 bg-ink-50/30" : "ring-ink-200/60 bg-white"}`}
+    >
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[10px] font-mono tabular text-ink-500">n={cell.count}</span>
-        <span className={`text-[10px] font-mono tabular font-semibold ${moneyPositive ? "text-emerald-700" : "text-ink-400"}`}>
-          {moneyPositive ? "+" : ""}
-          {fmtMoney(cell.moneySavedToVenue)}
-        </span>
+        {muted ? (
+          <span className="text-[9px] eyebrow text-ink-400">no switch needed</span>
+        ) : (
+          <span
+            className={`text-[10px] font-mono tabular font-semibold ${
+              moneyPositive ? "text-emerald-700" : moneyNegative ? "text-rose-700" : "text-ink-400"
+            }`}
+          >
+            {moneyPositive ? "+" : ""}
+            {fmtMoney(cell.moneySavedToVenue)}
+          </span>
+        )}
       </div>
       <ProjMetricRow
         label="losing"
-        actual={cell.actualLosingRate}
-        projected={cell.projectedLosingRate}
+        actualPct={cell.actualLosingRate}
+        projectedPct={cell.projectedLosingRate}
         actualN={cell.actualLosingMoney}
         projectedN={cell.projectedLosingMoney}
+        muted={muted}
       />
       <ProjMetricRow
         label="disputed"
-        actual={cell.actualDisputeRate}
-        projected={cell.projectedDisputeRate}
+        actualPct={cell.actualDisputeRate}
+        projectedPct={cell.projectedDisputeRate}
         actualN={cell.actualDisputed}
         projectedN={cell.projectedDisputed}
+        muted={muted}
       />
       <ProjMetricRow
         label="attention"
-        actual={cell.actualAttentionRate}
-        projected={cell.projectedAttentionRate}
+        actualPct={cell.actualAttentionRate}
+        projectedPct={cell.projectedAttentionRate}
         actualN={cell.actualAttention}
         projectedN={cell.projectedAttention}
+        muted={muted}
       />
     </div>
   );
@@ -688,28 +704,50 @@ function ProjCellBox({ cell }: { cell: SwitchProjectedCell | null }) {
 
 function ProjMetricRow({
   label,
-  actual,
-  projected,
+  actualPct,
+  projectedPct,
   actualN,
   projectedN,
+  muted,
 }: {
   label: string;
-  actual: number;
-  projected: number;
+  actualPct: number;
+  projectedPct: number;
   actualN: number;
   projectedN: number;
+  muted: boolean;
 }) {
-  const tone = deltaTone(actual, projected);
+  const dPts = deltaPts(actualPct, projectedPct);
+  const noChange = dPts === 0;
+  const better = dPts > 0;
+  const arrow = noChange ? "·" : better ? "▼" : "▲";
+  const deltaTone = muted || noChange
+    ? "text-ink-300"
+    : better
+      ? "text-emerald-700"
+      : "text-rose-700";
+  const afterTone = muted || noChange
+    ? "text-ink-500"
+    : better
+      ? "text-emerald-700"
+      : "text-rose-700";
+
   return (
-    <div className="flex items-center justify-between text-[10.5px] font-mono tabular leading-tight py-0.5">
-      <span className="text-ink-400">{label}</span>
-      <span className="flex items-center gap-1">
-        <span className="text-ink-600">
-          {pct(actual)}
-          <span className="text-ink-300"> ({actualN})</span>
-        </span>
-        <span className="text-ink-300">→</span>
-        <span className={`font-semibold ${tone}`}>{pct(projected)}</span>
+    <div className="grid grid-cols-[52px_1fr_1fr_44px] gap-1 items-baseline text-[10px] font-mono tabular leading-tight py-[3px] border-t border-ink-100/60 first:border-t-0">
+      <span className="text-ink-400 col-span-1">{label}</span>
+      <span className="text-ink-500" title="before">
+        <span className="text-ink-300 mr-0.5">b</span>
+        {pct(actualPct)}
+        <span className="text-ink-300"> ({actualN})</span>
+      </span>
+      <span className={afterTone} title="after">
+        <span className="text-ink-300 mr-0.5">a</span>
+        {pct(projectedPct)}
+        <span className="text-ink-300"> ({projectedN})</span>
+      </span>
+      <span className={`text-right font-semibold ${deltaTone}`}>
+        {arrow}
+        {!noChange && ` ${Math.abs(dPts)}pt`}
       </span>
     </div>
   );
