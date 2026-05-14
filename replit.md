@@ -340,6 +340,8 @@ in `exports/`:
 | `exports/greenroom-settlement-redesign-v2.html` | HTML source of the redesign report (re-export with `python3 -c "from weasyprint import HTML; HTML('exports/greenroom-settlement-redesign-v2.html').write_pdf('exports/greenroom-settlement-redesign-v2.pdf')"`). |
 | `exports/greenroom-supporting-document.pdf` | **Supporting Document · Features, APIs, and Tabs.** Engineering and analytical companion: every tab, every API endpoint, every backend lib module, with a direct mapping from each surface to the claim it supplies in the redesign report. |
 | `exports/greenroom-supporting-document.html` | HTML source of the supporting document. |
+| `exports/greenroom-insurance-pricing.pdf` | **Insurance Products 1 & 2 · Suggested Cost & Pricing** (May 2026). Pricing brief for the two Phase-3 insurance products. Per-show expected-cost derivation from live `/api/reports` (Product 1: 4.32% × $345 = $14.84/show) and the full 12-mo SGP backtest (Product 2: per-cap pricing table from n=156, median gap $870, p75 $1,569). Includes tier ladder, two-sided discount math, bundles, platform-level revenue model, sensitivity bands, and reserve recommendations. |
+| `exports/greenroom-insurance-pricing.html` | HTML source of the insurance pricing brief. |
 
 Older v1 PDFs were superseded by v2.1 and have been removed.
 

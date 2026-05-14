@@ -36,3 +36,9 @@ id = "aS1lcavXNSV_TG9S1jheQ"
 uri = "file://exports/greenroom-supporting-document.pdf"
 type = "pdf"
 title = "Greenroom · Supporting Document · Features, APIs, and Tabs"
+
+[[outputs]]
+id = "VjQBXDyDt8kV95ZEoZBTL"
+uri = "file://exports/greenroom-insurance-pricing.pdf"
+type = "pdf"
+title = "Insurance Products 1 & 2 · Suggested Cost & Pricing"
