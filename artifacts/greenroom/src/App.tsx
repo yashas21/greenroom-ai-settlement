@@ -5,6 +5,7 @@ import ShowsPage from "@/pages/shows";
 import ShowDetailPage from "@/pages/show-detail";
 import SettlePage from "@/pages/settle";
 import ArtistsPage from "@/pages/artists";
+import ArtistDetailPage from "@/pages/artist-detail";
 import ReportsPage from "@/pages/reports";
 import DealAnalysisPage from "@/pages/deal-analysis";
 import NeedsAttentionPage from "@/pages/needs-attention";
@@ -21,6 +22,7 @@ function AppRoutes() {
       <Route path="/shows/:id/settle" component={SettlePage} />
       <Route path="/shows/:id" component={ShowDetailPage} />
       <Route path="/artists" component={ArtistsPage} />
+      <Route path="/artists/:id" component={ArtistDetailPage} />
       <Route path="/reports" component={ReportsPage} />
       <Route path="/deal-analysis" component={DealAnalysisPage} />
       <Route path="/needs-attention" component={NeedsAttentionPage} />

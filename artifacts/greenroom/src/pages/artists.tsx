@@ -172,7 +172,7 @@ function ArtistCard({ row }: { row: ArtistRow }) {
 
   return (
     <Link
-      href={`/shows?q=${encodeURIComponent(artist.name)}`}
+      href={`/artists/${encodeURIComponent(artist.id)}`}
       className={`group relative block rounded-lg border bg-white p-5 transition-all duration-150 hover:shadow-[0_4px_16px_rgba(26,24,20,0.06)] hover:-translate-y-0.5 cursor-pointer ${tone.card}`}
       aria-label={`View shows for ${artist.name}`}
     >

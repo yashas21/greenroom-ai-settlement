@@ -511,6 +511,45 @@ export interface ArtistRow {
   attentionCount: number;
 }
 
+export interface ArtistProfileShow {
+  show: Show;
+  deal: Deal | null;
+  settlement: Settlement | null;
+  tense: "past" | "today" | "upcoming";
+  isUnsupportedDeal: boolean;
+  isDisputed: boolean;
+  recoupCategories: string[];
+  disputedRecoupCategories: string[];
+}
+
+export interface ArtistProfileSummary {
+  date: string;
+  showId: string;
+  positive: string | null;
+  negative: string | null;
+}
+
+export interface ArtistProfile {
+  artist: Artist;
+  agent: Agent | null;
+  agency: Agency | null;
+  shows: ArtistProfileShow[];
+  summaries: ArtistProfileSummary[];
+  attentionItems: AttentionItem[];
+  stats: {
+    totalShows: number;
+    pastCount: number;
+    upcomingCount: number;
+    settledCount: number;
+    disputedCount: number;
+    totalPaidToArtist: number;
+    totalGross: number;
+    firstShowDate: string | null;
+    lastShowDate: string | null;
+    dealTypes: { dealType: string; count: number }[];
+  };
+}
+
 export interface Reports {
   dealTypeCounts: Record<string, number>;
   totalDeals: number;

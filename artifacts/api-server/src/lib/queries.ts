@@ -250,6 +250,103 @@ export async function getAllArtists() {
   });
 }
 
+export async function getArtistProfile(artistId: string) {
+  const artistRows = await db
+    .select({ artist: artists, agent: agents, agency: agencies })
+    .from(artists)
+    .leftJoin(agents, eq(artists.agentId, agents.id))
+    .leftJoin(agencies, eq(agents.agencyId, agencies.id))
+    .where(eq(artists.id, artistId));
+
+  if (artistRows.length === 0) return null;
+  const { artist, agent, agency } = artistRows[0];
+
+  const today = todayDateString();
+  const showRows = await db
+    .select({ show: shows, deal: deals, settlement: settlements })
+    .from(shows)
+    .leftJoin(deals, eq(deals.showId, shows.id))
+    .leftJoin(settlements, eq(settlements.showId, shows.id))
+    .where(eq(shows.artistId, artistId))
+    .orderBy(desc(shows.date));
+
+  const attentionAll = await getNeedsAttention();
+  const showIdSet = new Set(showRows.map((r) => r.show.id));
+  const attentionItems = attentionAll.filter((a) => showIdSet.has(a.showId));
+
+  const summaries: { date: string; showId: string; positive: string | null; negative: string | null }[] = [];
+  const dealTypeCounts = new Map<string, number>();
+  let totalPaidToArtist = 0;
+  let totalGross = 0;
+  let settledCount = 0;
+  let disputedCount = 0;
+  let upcomingCount = 0;
+  let pastCount = 0;
+
+  const items = showRows.map((r) => {
+    const recoups = parseRecoups(r.settlement?.recoupsJson ?? null);
+    const tense: "past" | "today" | "upcoming" =
+      r.show.date > today ? "upcoming" : r.show.date === today ? "today" : "past";
+    if (tense === "upcoming") upcomingCount++;
+    else pastCount++;
+    if (r.deal) {
+      dealTypeCounts.set(r.deal.dealType, (dealTypeCounts.get(r.deal.dealType) ?? 0) + 1);
+    }
+    if (r.settlement) {
+      settledCount++;
+      if (r.settlement.totalToArtist != null) totalPaidToArtist += r.settlement.totalToArtist;
+      if (r.settlement.grossBoxOffice != null) totalGross += r.settlement.grossBoxOffice;
+      if (isDisputedSettlement(r.settlement)) disputedCount++;
+      if ((r.settlement.positiveSummary && r.settlement.positiveSummary.trim()) ||
+          (r.settlement.negativeSummary && r.settlement.negativeSummary.trim())) {
+        summaries.push({
+          date: r.show.date,
+          showId: r.show.id,
+          positive: r.settlement.positiveSummary,
+          negative: r.settlement.negativeSummary,
+        });
+      }
+    }
+    return {
+      show: r.show,
+      deal: r.deal,
+      settlement: r.settlement,
+      tense,
+      isUnsupportedDeal: isUnsupportedDeal(r.deal),
+      isDisputed: isDisputedSettlement(r.settlement),
+      recoupCategories: Array.from(new Set(recoups.map((x) => x.category))),
+      disputedRecoupCategories: Array.from(
+        new Set(recoups.filter((x) => x.status === "disputed").map((x) => x.category)),
+      ),
+    };
+  });
+
+  const dealTypes = Array.from(dealTypeCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([dealType, count]) => ({ dealType, count }));
+
+  return {
+    artist,
+    agent,
+    agency,
+    shows: items,
+    summaries,
+    attentionItems,
+    stats: {
+      totalShows: showRows.length,
+      pastCount,
+      upcomingCount,
+      settledCount,
+      disputedCount,
+      totalPaidToArtist,
+      totalGross,
+      firstShowDate: showRows.length > 0 ? showRows[showRows.length - 1].show.date : null,
+      lastShowDate: showRows.length > 0 ? showRows[0].show.date : null,
+      dealTypes,
+    },
+  };
+}
+
 type ComplexityBucket = "simple" | "medium" | "complex";
 
 export function classifyComplexity(d: typeof deals.$inferSelect): ComplexityBucket {

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { getAllShows, getShowById, getAllArtists, getReports, getDealAnalysis, getNeedsAttention } from "../lib/queries";
+import { getAllShows, getShowById, getAllArtists, getArtistProfile, getReports, getDealAnalysis, getNeedsAttention } from "../lib/queries";
 import { buildShowExport } from "../lib/showExport";
 import { getInsights, enrichSettlements, clearInsightsCache } from "../lib/insights";
 import { getLlmStatus, saveLlmSettings, type SaveLlmSettingsInput } from "../lib/llm";
@@ -46,6 +46,16 @@ router.get("/shows/:id", async (req, res): Promise<void> => {
 router.get("/artists", async (_req, res): Promise<void> => {
   const rows = await getAllArtists();
   res.json(rows);
+});
+
+router.get("/artists/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const data = await getArtistProfile(raw);
+  if (!data) {
+    res.status(404).json({ error: "Artist not found" });
+    return;
+  }
+  res.json(data);
 });
 
 router.get("/reports", async (_req, res): Promise<void> => {
