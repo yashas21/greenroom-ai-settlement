@@ -7,6 +7,7 @@ import {
   type Deal,
 } from "../db/schema";
 import { eq, lte } from "drizzle-orm";
+import { classifyAnalyticsSizeBucket } from "./queries";
 
 // P75-flat defaults derived from the 497-show audit (Apr 2026). Expenses at
 // this venue cluster around $1,500–$1,850 regardless of gross — they don't
@@ -59,16 +60,14 @@ export interface DealImprovementsPayload {
   context: ImprovementsContextStats;
 }
 
-function classifyBucket(deal: Deal): string {
-  if (deal.percentage != null && (deal.guaranteeAmount == null || deal.guaranteeAmount === 0)) {
-    return "Uncapped %";
-  }
-  const g = deal.guaranteeAmount ?? 0;
-  if (g < 1000) return "$0–1K";
-  if (g < 5000) return "$1–5K";
-  if (g < 15000) return "$5–15K";
-  return "$15K+";
-}
+// Re-use the analytics-canonical bucket function so this module stays in
+// lock-step with the Deal Analysis grid and Smart Switch cell stats. A
+// previous local copy of this function diverged on the zero-guarantee
+// case (routing every percentage deal to "Uncapped %" regardless of deal
+// type), which caused zero-guarantee vs/pn/door deals to be assigned to
+// different cells in the improvements pipeline than they were in the
+// analytics grid. Always use the canonical implementation in queries.ts.
+const classifyBucket = classifyAnalyticsSizeBucket;
 
 function median(xs: number[]): number | null {
   if (xs.length === 0) return null;

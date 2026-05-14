@@ -295,12 +295,17 @@ export async function getSwitchSavings(opts: { months?: number; topN?: number } 
     });
   }
 
-  // Sort by money saved desc, then by time saved desc, keep top N
+  // Sort by money saved desc, then by time saved desc, keep top N for the
+  // displayed list. The headline totals below intentionally sum across the
+  // FULL `items` set (every candidate Smart Switch would apply to), not
+  // `trimmed`, so totalCandidates / totalMoneySavedToVenue /
+  // totalMinutesSaved stay on the same scope. The UI shows "X of N" next
+  // to the list so the user can tell the list is truncated.
   items.sort((a, b) => b.moneySavedToVenue - a.moneySavedToVenue || b.minutesSaved - a.minutesSaved);
   const trimmed = items.slice(0, topN);
 
-  const totalMoney = trimmed.reduce((a, b) => a + b.moneySavedToVenue, 0);
-  const totalMinutes = trimmed.reduce((a, b) => a + b.minutesSaved, 0);
+  const totalMoney = items.reduce((a, b) => a + b.moneySavedToVenue, 0);
+  const totalMinutes = items.reduce((a, b) => a + b.minutesSaved, 0);
 
   // Vs-percentage-clause coverage: across every settled `vs` deal in the
   // window (not just the top-N or even the candidate set above), how many
