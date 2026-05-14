@@ -310,6 +310,12 @@ export async function getSwitchSavings(opts: { months?: number; topN?: number } 
   // anything extra. This is the strongest single Phase-2 evidence point
   // — it answers "could we just cap at the guarantee with no economic
   // change?" directly from data.
+  // Vs-percentage-clause coverage: across every settled `vs` deal in the
+  // $1–5K bucket in the window, how many had the percentage clause
+  // out-pay the guarantee? Scoped to $1–5K because that is the only
+  // bucket where Smart Switch's guarantee-amount fallback applies — the
+  // audit finding of "percentage rarely fires" is specific to that cell,
+  // not to vs deals at all guarantee sizes.
   let vsScanned = 0;
   let vsFired = 0;
   let vsGuaranteeWinSum = 0;
@@ -318,7 +324,10 @@ export async function getSwitchSavings(opts: { months?: number; topN?: number } 
     if (r.deal.dealType !== "vs") continue;
     if (r.settlement.totalToArtist == null) continue;
     if (!SETTLED_STATUSES.has(r.settlement.status)) continue;
+    // Restrict to the $1–5K guarantee bucket (the cell where the
+    // guarantee-amount fallback is active in Smart Switch).
     const guarantee = r.deal.guaranteeAmount ?? 0;
+    if (guarantee < 1000 || guarantee >= 5000) continue;
     const paid = r.settlement.totalToArtist;
     vsScanned++;
     // Use a small tolerance ($1) to absorb rounding so a guarantee paid
@@ -457,15 +466,26 @@ export async function getSwitchProjectedGrid(
     totalDealsModelled++;
   }
 
-  // Build cells; under Smart Switch we model disputes and attention going to 0
-  // (pre-agreed terms eliminate recoup arithmetic, the source of every
-  // settlement-flow attention kind in this app).
+  // Smart Switch eliminates recoup-line arithmetic, which is the primary
+  // driver of settlement disputes and follow-up attention items. However,
+  // it cannot prevent every possible issue (e.g. show-status mismatches,
+  // stale data entry errors). Model a 70% reduction rather than 100%
+  // to reflect that residual operational edge cases remain.
+  const SWITCH_DISPUTE_REDUCTION = 0.70;
+  const SWITCH_ATTENTION_REDUCTION = 0.70;
+
   const cells: ProjectedCell[] = [];
   for (const dealType of PROJECTED_DEAL_TYPES) {
     for (const bucket of PROJECTED_BUCKETS) {
       const acc = cellAcc.get(`${dealType}::${bucket}`);
       if (!acc || acc.count === 0) continue;
       const switchApplies = switchAppliesTo(dealType, bucket);
+      const projectedDisputed = switchApplies
+        ? Math.round(acc.actualDisputed * (1 - SWITCH_DISPUTE_REDUCTION))
+        : acc.actualDisputed;
+      const projectedAttention = switchApplies
+        ? Math.round(acc.actualAttention * (1 - SWITCH_ATTENTION_REDUCTION))
+        : acc.actualAttention;
       cells.push({
         dealType,
         bucket,
@@ -478,13 +498,13 @@ export async function getSwitchProjectedGrid(
         actualDisputeRate: acc.actualDisputed / acc.count,
         actualAttentionRate: acc.actualAttention / acc.count,
         projectedLosingMoney: switchApplies ? acc.projectedLosingMoney : acc.actualLosingMoney,
-        projectedDisputed: switchApplies ? 0 : acc.actualDisputed,
-        projectedAttention: switchApplies ? 0 : acc.actualAttention,
+        projectedDisputed,
+        projectedAttention,
         projectedLosingRate: switchApplies
           ? acc.projectedLosingMoney / acc.count
           : acc.actualLosingMoney / acc.count,
-        projectedDisputeRate: switchApplies ? 0 : acc.actualDisputed / acc.count,
-        projectedAttentionRate: switchApplies ? 0 : acc.actualAttention / acc.count,
+        projectedDisputeRate: projectedDisputed / acc.count,
+        projectedAttentionRate: projectedAttention / acc.count,
         actualPayoutSum: Math.round(acc.actualPayoutSum),
         projectedPayoutSum: Math.round(acc.projectedPayoutSum),
         moneySavedToVenue: switchApplies

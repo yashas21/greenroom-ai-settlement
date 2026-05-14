@@ -1,0 +1,801 @@
+Here's a copy-paste–ready prompt for the Replit agent:
+
+---
+
+```
+Apply the following five bug fixes to the Greenroom api-server codebase
+(artifacts/api-server/src/lib/). All changes are in existing files; do not
+touch anything else. Run `pnpm --filter @workspace/api-server test` after
+each file to confirm nothing regresses. All 70 tests must pass at the end.
+
+────────────────────────────────────────────────────────────────────────────
+FIX 1 — smartGuarantee.ts  (buildCtx: exclude venue-absorbed expenses)
+────────────────────────────────────────────────────────────────────────────
+In `buildCtx()`, find the expense accumulation loop that looks like:
+
+  const expByShow = new Map<string, number>();
+  for (const e of allExpenses) {
+    expByShow.set(e.showId, (expByShow.get(e.showId) ?? 0) + e.amount);
+  }
+
+Replace it with:
+
+  const expByShow = new Map<string, number>();
+  for (const e of allExpenses) {
+    if (e.absorbedByVenue) continue; // only count expenses billed to the artist
+    expByShow.set(e.showId, (expByShow.get(e.showId) ?? 0) + e.amount);
+  }
+
+────────────────────────────────────────────────────────────────────────────
+FIX 2 — smartSwitch.ts  (computeCellStats: exclude venue-absorbed expenses)
+────────────────────────────────────────────────────────────────────────────
+In `computeCellStats()`, find:
+
+  const expensesByShow = new Map<string, number>();
+  for (const e of allExpenses) {
+    expensesByShow.set(e.showId, (expensesByShow.get(e.showId) ?? 0) + e.amount);
+  }
+
+Replace with:
+
+  const expensesByShow = new Map<string, number>();
+  for (const e of allExpenses) {
+    if (e.absorbedByVenue) continue; // only count expenses billed to the artist
+    expensesByShow.set(e.showId, (expensesByShow.get(e.showId) ?? 0) + e.amount);
+  }
+
+────────────────────────────────────────────────────────────────────────────
+FIX 3 — queries.ts  (two changes in the same file)
+────────────────────────────────────────────────────────────────────────────
+
+3a. settledCount bug in getReports()
+Find:
+  const showCount = pastShowIds.size;
+  const settledCount = pastShowIds.size;
+
+Replace with:
+  const showCount = pastShowIds.size;
+  const settledCount = allShowsRows.filter(
+    (s) => s.date <= today && (s.status === "settled" || s.status === "closed"),
+  ).length;
+
+3b. "today" tense missing in getAllShows()
+Find:
+  tense: (r.show.date > today ? "upcoming" : "past") as "past" | "upcoming",
+
+Replace with:
+  tense: (r.show.date > today ? "upcoming" : r.show.date === today ? "today" : "past") as "past" | "today" | "upcoming",
+
+────────────────────────────────────────────────────────────────────────────
+FIX 4 — switchSavings.ts  (vsPercentageFiredStats: scope to $1–5K bucket)
+────────────────────────────────────────────────────────────────────────────
+In `getSwitchSavings()`, find the vs-percentage-clause coverage block.
+It starts with a comment about "Vs-percentage-clause coverage" and contains:
+
+  let vsScanned = 0;
+  let vsFired = 0;
+  let vsGuaranteeWinSum = 0;
+  for (const r of rows) {
+    if (!r.deal || !r.settlement) continue;
+    if (r.deal.dealType !== "vs") continue;
+    if (r.settlement.totalToArtist == null) continue;
+    if (!SETTLED_STATUSES.has(r.settlement.status)) continue;
+    const guarantee = r.deal.guaranteeAmount ?? 0;
+    const paid = r.settlement.totalToArtist;
+    vsScanned++;
+    // Use a small tolerance ($1) ...
+    if (paid > guarantee + 1) {
+      vsFired++;
+    } else {
+      vsGuaranteeWinSum += guarantee - paid;
+    }
+  }
+
+Replace the entire block (including its leading comment) with:
+
+  // Vs-percentage-clause coverage: across every settled `vs` deal in the
+  // $1–5K bucket in the window, how many had the percentage clause
+  // out-pay the guarantee? Scoped to $1–5K because that is the only
+  // bucket where Smart Switch's guarantee-amount fallback applies — the
+  // audit finding of "percentage rarely fires" is specific to that cell,
+  // not to vs deals at all guarantee sizes.
+  let vsScanned = 0;
+  let vsFired = 0;
+  let vsGuaranteeWinSum = 0;
+  for (const r of rows) {
+    if (!r.deal || !r.settlement) continue;
+    if (r.deal.dealType !== "vs") continue;
+    if (r.settlement.totalToArtist == null) continue;
+    if (!SETTLED_STATUSES.has(r.settlement.status)) continue;
+    // Restrict to the $1–5K guarantee bucket (the cell where the
+    // guarantee-amount fallback is active in Smart Switch).
+    const guarantee = r.deal.guaranteeAmount ?? 0;
+    if (guarantee < 1000 || guarantee >= 5000) continue;
+    const paid = r.settlement.totalToArtist;
+    vsScanned++;
+    // Use a small tolerance ($1) to absorb rounding so a guarantee paid
+    // exactly at the floor isn't mistakenly flagged as the percentage
+    // "firing" by a sub-dollar amount.
+    if (paid > guarantee + 1) {
+      vsFired++;
+    } else {
+      vsGuaranteeWinSum += guarantee - paid;
+    }
+  }
+
+────────────────────────────────────────────────────────────────────────────
+FIX 5 — switchSavings.ts  (getSwitchProjectedGrid: 70% dispute reduction)
+────────────────────────────────────────────────────────────────────────────
+In `getSwitchProjectedGrid()`, find the cell-building block that starts with:
+
+  // Build cells; under Smart Switch we model disputes and attention going to 0
+  // (pre-agreed terms eliminate recoup arithmetic, the source of every
+  // settlement-flow attention kind in this app).
+  const cells: ProjectedCell[] = [];
+  for (const dealType of PROJECTED_DEAL_TYPES) {
+    for (const bucket of PROJECTED_BUCKETS) {
+      const acc = cellAcc.get(`${dealType}::${bucket}`);
+      if (!acc || acc.count === 0) continue;
+      const switchApplies = switchAppliesTo(dealType, bucket);
+      cells.push({
+        ...
+        projectedDisputed: switchApplies ? 0 : acc.actualDisputed,
+        projectedAttention: switchApplies ? 0 : acc.actualAttention,
+        ...
+        projectedDisputeRate: switchApplies ? 0 : acc.actualDisputed / acc.count,
+        projectedAttentionRate: switchApplies ? 0 : acc.actualAttention / acc.count,
+        ...
+      });
+    }
+  }
+
+Replace the entire block with:
+
+  // Smart Switch eliminates recoup-line arithmetic, which is the primary
+  // driver of settlement disputes and follow-up attention items. However,
+  // it cannot prevent every possible issue (e.g. show-status mismatches,
+  // stale data entry errors). Model a 70% reduction rather than 100%
+  // to reflect that residual operational edge cases remain.
+  const SWITCH_DISPUTE_REDUCTION = 0.70;
+  const SWITCH_ATTENTION_REDUCTION = 0.70;
+
+  const cells: ProjectedCell[] = [];
+  for (const dealType of PROJECTED_DEAL_TYPES) {
+    for (const bucket of PROJECTED_BUCKETS) {
+      const acc = cellAcc.get(`${dealType}::${bucket}`);
+      if (!acc || acc.count === 0) continue;
+      const switchApplies = switchAppliesTo(dealType, bucket);
+      const projectedDisputed = switchApplies
+        ? Math.round(acc.actualDisputed * (1 - SWITCH_DISPUTE_REDUCTION))
+        : acc.actualDisputed;
+      const projectedAttention = switchApplies
+        ? Math.round(acc.actualAttention * (1 - SWITCH_ATTENTION_REDUCTION))
+        : acc.actualAttention;
+      cells.push({
+        dealType,
+        bucket,
+        switchApplies,
+        count: acc.count,
+        actualLosingMoney: acc.actualLosingMoney,
+        actualDisputed: acc.actualDisputed,
+        actualAttention: acc.actualAttention,
+        actualLosingRate: acc.actualLosingMoney / acc.count,
+        actualDisputeRate: acc.actualDisputed / acc.count,
+        actualAttentionRate: acc.actualAttention / acc.count,
+        projectedLosingMoney: switchApplies ? acc.projectedLosingMoney : acc.actualLosingMoney,
+        projectedDisputed,
+        projectedAttention,
+        projectedLosingRate: switchApplies
+          ? acc.projectedLosingMoney / acc.count
+          : acc.actualLosingMoney / acc.count,
+        projectedDisputeRate: projectedDisputed / acc.count,
+        projectedAttentionRate: projectedAttention / acc.count,
+        actualPayoutSum: Math.round(acc.actualPayoutSum),
+        projectedPayoutSum: Math.round(acc.projectedPayoutSum),
+        moneySavedToVenue: switchApplies
+          ? Math.round(acc.actualPayoutSum - acc.projectedPayoutSum)
+          : 0,
+      });
+    }
+  }
+
+────────────────────────────────────────────────────────────────────────────
+NEW TEST FILES  (create these three files verbatim)
+────────────────────────────────────────────────────────────────────────────
+
+Create artifacts/api-server/src/lib/queries.extra.test.ts with this content:
+
+---START FILE---
+import { describe, expect, it, beforeEach } from "vitest";
+
+process.env.DATABASE_URL = "file::memory:";
+
+const { client, db } = await import("../db");
+const schema = await import("../db/schema");
+const { getReports, getAllShows } = await import("./queries");
+
+const CREATE = `
+CREATE TABLE venues (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, capacity INTEGER NOT NULL,
+  city TEXT NOT NULL, state TEXT NOT NULL
+);
+CREATE TABLE agencies (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
+CREATE TABLE agents (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, agency_id TEXT,
+  email TEXT NOT NULL, phone TEXT, preferences_notes TEXT
+);
+CREATE TABLE artists (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, agent_id TEXT,
+  manager_email TEXT, genre TEXT, prior_show_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE shows (
+  id TEXT PRIMARY KEY NOT NULL, venue_id TEXT NOT NULL, artist_id TEXT NOT NULL,
+  date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'booked',
+  doors_time TEXT, set_time TEXT, opener_artist_id TEXT,
+  room_config TEXT NOT NULL DEFAULT 'standing', internal_notes TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE deals (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL UNIQUE,
+  deal_type TEXT NOT NULL, guarantee_amount REAL, percentage REAL,
+  percentage_basis TEXT, expense_cap REAL, hospitality_cap REAL,
+  bonuses_json TEXT, deal_notes_freetext TEXT, created_at INTEGER NOT NULL
+);
+CREATE TABLE settlements (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'draft',
+  drafted_at INTEGER, submitted_at INTEGER, review_started_at INTEGER,
+  signed_at INTEGER, disputed_at INTEGER, revised_at INTEGER,
+  finalized_at INTEGER, paid_at INTEGER, completed_at INTEGER,
+  completed_by_user_id TEXT,
+  gross_box_office REAL, net_box_office REAL, total_expenses REAL,
+  total_to_artist REAL, calculation_json TEXT, recoups_json TEXT,
+  signoff_text TEXT, notes TEXT, positive_summary TEXT, negative_summary TEXT
+);
+CREATE TABLE expenses (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL, category TEXT NOT NULL,
+  amount REAL NOT NULL, description TEXT,
+  approved INTEGER NOT NULL DEFAULT 1, absorbed_by_venue INTEGER NOT NULL DEFAULT 0,
+  entered_by_user_id TEXT, entered_at INTEGER NOT NULL
+);
+CREATE TABLE ticket_sales (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL, qty INTEGER NOT NULL,
+  gross REAL NOT NULL, fees REAL NOT NULL, captured_at INTEGER NOT NULL
+);
+CREATE TABLE comps (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL, category TEXT NOT NULL,
+  count INTEGER NOT NULL, face_value REAL NOT NULL,
+  counts_toward_gross INTEGER NOT NULL DEFAULT 0, notes TEXT
+);
+CREATE TABLE switch_suggestions (
+  id TEXT PRIMARY KEY, show_id TEXT NOT NULL UNIQUE, deal_id TEXT NOT NULL,
+  suggested_at INTEGER NOT NULL, deal_type_from TEXT NOT NULL, shape TEXT NOT NULL,
+  suggested_flat REAL, door_floor REAL, door_split_pct REAL, door_expense_cap REAL,
+  confidence_tier TEXT NOT NULL, band_low REAL, band_high REAL, band_width REAL,
+  source TEXT, sample_size INTEGER NOT NULL, basis TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'suggested', decided_at INTEGER
+);
+CREATE TABLE guarantee_suggestions (
+  id TEXT PRIMARY KEY, show_id TEXT NOT NULL UNIQUE, deal_id TEXT NOT NULL,
+  generated_at INTEGER NOT NULL,
+  agent_guarantee REAL, suggested_price REAL NOT NULL, delta REAL NOT NULL,
+  expected_gross REAL NOT NULL, expected_gross_source TEXT NOT NULL,
+  ticketing_fees REAL NOT NULL, net_after_fees REAL NOT NULL,
+  expense_estimate REAL NOT NULL, expense_source TEXT NOT NULL, expense_cap REAL,
+  net_base REAL NOT NULL, percentage_payout REAL NOT NULL,
+  winner TEXT NOT NULL, winner_margin REAL NOT NULL, breakeven_gross REAL NOT NULL,
+  artist_show_count INTEGER NOT NULL, agent_show_count INTEGER NOT NULL,
+  confidence_tier TEXT NOT NULL, insurance_tier INTEGER NOT NULL,
+  basis TEXT NOT NULL, audit_json TEXT NOT NULL
+);
+`;
+
+const TABLES = [
+  "guarantee_suggestions", "switch_suggestions", "comps", "ticket_sales",
+  "expenses", "settlements", "deals", "shows", "artists", "agents",
+  "agencies", "venues",
+];
+
+function todayISO(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+function daysAhead(n: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+let counter = 0;
+
+beforeEach(async () => {
+  for (const t of TABLES) {
+    try { await client.execute(`DROP TABLE IF EXISTS ${t}`); } catch { /* */ }
+  }
+  for (const stmt of CREATE.split(";").map((s) => s.trim()).filter(Boolean)) {
+    await client.execute(stmt);
+  }
+  counter = 0;
+  await db.insert(schema.venues).values({
+    id: "v1", name: "Greenroom", capacity: 500, city: "Austin", state: "TX",
+  });
+  await db.insert(schema.artists).values({
+    id: "a1", name: "Test Artist", priorShowCount: 0,
+  });
+});
+
+async function seedShow(opts: {
+  date: string;
+  status: typeof schema.shows.$inferInsert["status"];
+  dealType?: "flat" | "vs";
+  settlementStatus?: string;
+}) {
+  counter++;
+  const sid = `s${counter}`;
+  await db.insert(schema.shows).values({
+    id: sid, venueId: "v1", artistId: "a1",
+    date: opts.date, status: opts.status,
+    roomConfig: "standing", createdAt: new Date(),
+  });
+  await db.insert(schema.deals).values({
+    id: `d${counter}`, showId: sid,
+    dealType: opts.dealType ?? "flat", guaranteeAmount: 1000,
+    createdAt: new Date(),
+  });
+  if (opts.settlementStatus) {
+    await db.insert(schema.settlements).values({
+      id: `set${counter}`, showId: sid,
+      status: opts.settlementStatus as typeof schema.settlements.$inferInsert["status"],
+      grossBoxOffice: 5000, totalToArtist: 1000,
+    });
+  }
+  return sid;
+}
+
+describe("getReports — settledCount", () => {
+  it("counts only past shows with status settled or closed, not all past shows", async () => {
+    await seedShow({ date: daysAgo(10), status: "settled", settlementStatus: "paid" });
+    await seedShow({ date: daysAgo(20), status: "settled", settlementStatus: "paid" });
+    await seedShow({ date: daysAgo(5), status: "booked" });
+    await seedShow({ date: daysAhead(10), status: "booked" });
+    const r = await getReports();
+    expect(r.showCount).toBe(3);
+    expect(r.settledCount).toBe(2);
+    expect(r.settledCount).not.toBe(r.showCount);
+  });
+
+  it("includes closed shows in settledCount alongside settled shows", async () => {
+    await seedShow({ date: daysAgo(5), status: "settled", settlementStatus: "paid" });
+    await seedShow({ date: daysAgo(10), status: "closed", settlementStatus: "finalized" });
+    await seedShow({ date: daysAgo(15), status: "advanced" });
+    const r = await getReports();
+    expect(r.settledCount).toBe(2);
+  });
+
+  it("returns 0 for settledCount when no shows have settled or closed status", async () => {
+    await seedShow({ date: daysAgo(5), status: "booked" });
+    await seedShow({ date: daysAgo(10), status: "advanced" });
+    const r = await getReports();
+    expect(r.showCount).toBe(2);
+    expect(r.settledCount).toBe(0);
+  });
+});
+
+describe("getAllShows — tense classification", () => {
+  it("classifies a show on today's date as 'today', not 'past'", async () => {
+    await seedShow({ date: todayISO(), status: "day_of" });
+    const shows = await getAllShows();
+    const todayShow = shows.find((s) => s.show.date === todayISO());
+    expect(todayShow).toBeDefined();
+    expect(todayShow!.tense).toBe("today");
+  });
+
+  it("classifies past shows correctly as 'past'", async () => {
+    await seedShow({ date: daysAgo(1), status: "settled", settlementStatus: "paid" });
+    const shows = await getAllShows();
+    expect(shows[0].tense).toBe("past");
+  });
+
+  it("classifies future shows correctly as 'upcoming'", async () => {
+    await seedShow({ date: daysAhead(7), status: "booked" });
+    const shows = await getAllShows();
+    expect(shows[0].tense).toBe("upcoming");
+  });
+
+  it("all three tenses can coexist in a single result set", async () => {
+    await seedShow({ date: daysAgo(5), status: "settled", settlementStatus: "paid" });
+    await seedShow({ date: todayISO(), status: "day_of" });
+    await seedShow({ date: daysAhead(7), status: "booked" });
+    const shows = await getAllShows();
+    const tenses = new Set(shows.map((s) => s.tense));
+    expect(tenses).toContain("past");
+    expect(tenses).toContain("today");
+    expect(tenses).toContain("upcoming");
+  });
+});
+---END FILE---
+
+
+Create artifacts/api-server/src/lib/smartGuarantee.absorbedByVenue.test.ts:
+
+---START FILE---
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+process.env.DATABASE_URL = "file::memory:";
+
+const { client, db } = await import("../db");
+const schema = await import("../db/schema");
+const { generateGuarantee, clearGuaranteeCache } = await import("./smartGuarantee");
+
+const CREATE_TABLES_SQL = `
+CREATE TABLE agencies (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
+CREATE TABLE agents (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, agency_id TEXT,
+  email TEXT NOT NULL, phone TEXT, preferences_notes TEXT
+);
+CREATE TABLE artists (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, agent_id TEXT,
+  manager_email TEXT, genre TEXT, prior_show_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE venues (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, capacity INTEGER NOT NULL,
+  city TEXT NOT NULL, state TEXT NOT NULL
+);
+CREATE TABLE shows (
+  id TEXT PRIMARY KEY NOT NULL, venue_id TEXT NOT NULL, artist_id TEXT NOT NULL,
+  date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'booked',
+  doors_time TEXT, set_time TEXT, opener_artist_id TEXT,
+  room_config TEXT NOT NULL DEFAULT 'standing', internal_notes TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE deals (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL UNIQUE,
+  deal_type TEXT NOT NULL, guarantee_amount REAL, percentage REAL,
+  percentage_basis TEXT, expense_cap REAL, hospitality_cap REAL,
+  bonuses_json TEXT, deal_notes_freetext TEXT, created_at INTEGER NOT NULL
+);
+CREATE TABLE settlements (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'draft',
+  drafted_at INTEGER, submitted_at INTEGER, review_started_at INTEGER,
+  signed_at INTEGER, disputed_at INTEGER, revised_at INTEGER,
+  finalized_at INTEGER, paid_at INTEGER, completed_at INTEGER,
+  completed_by_user_id TEXT,
+  gross_box_office REAL, net_box_office REAL, total_expenses REAL,
+  total_to_artist REAL, calculation_json TEXT, recoups_json TEXT,
+  signoff_text TEXT, notes TEXT, positive_summary TEXT, negative_summary TEXT
+);
+CREATE TABLE expenses (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL, category TEXT NOT NULL,
+  amount REAL NOT NULL, description TEXT,
+  approved INTEGER NOT NULL DEFAULT 1, absorbed_by_venue INTEGER NOT NULL DEFAULT 0,
+  entered_by_user_id TEXT, entered_at INTEGER NOT NULL
+);
+CREATE TABLE guarantee_suggestions (
+  id TEXT PRIMARY KEY, show_id TEXT NOT NULL UNIQUE, deal_id TEXT NOT NULL,
+  generated_at INTEGER NOT NULL,
+  agent_guarantee REAL, suggested_price REAL NOT NULL, delta REAL NOT NULL,
+  expected_gross REAL NOT NULL, expected_gross_source TEXT NOT NULL,
+  ticketing_fees REAL NOT NULL, net_after_fees REAL NOT NULL,
+  expense_estimate REAL NOT NULL, expense_source TEXT NOT NULL, expense_cap REAL,
+  net_base REAL NOT NULL, percentage_payout REAL NOT NULL,
+  winner TEXT NOT NULL, winner_margin REAL NOT NULL, breakeven_gross REAL NOT NULL,
+  artist_show_count INTEGER NOT NULL, agent_show_count INTEGER NOT NULL,
+  confidence_tier TEXT NOT NULL, insurance_tier INTEGER NOT NULL,
+  basis TEXT NOT NULL, audit_json TEXT NOT NULL
+);
+`;
+
+const TABLES = [
+  "guarantee_suggestions", "expenses", "settlements", "deals",
+  "shows", "artists", "agents", "agencies", "venues",
+];
+
+const VENUE_ID = "v1";
+const ARTIST_ID = "art1";
+
+function isoDate(d: Date): string { return d.toISOString().slice(0, 10); }
+function daysFromNow(n: number): Date {
+  const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + n); return d;
+}
+
+let counter = 0;
+
+beforeAll(async () => {
+  for (const t of TABLES) await client.execute(`DROP TABLE IF EXISTS ${t}`);
+  for (const stmt of CREATE_TABLES_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
+    await client.execute(stmt);
+  }
+});
+
+beforeEach(async () => {
+  for (const t of TABLES) await client.execute(`DELETE FROM ${t}`);
+  counter = 0;
+  clearGuaranteeCache();
+  await db.insert(schema.venues).values({
+    id: VENUE_ID, name: "Crescent", capacity: 650, city: "Nashville", state: "TN",
+  });
+  await db.insert(schema.artists).values({
+    id: ARTIST_ID, name: "Headliner", agentId: null, priorShowCount: 0,
+  });
+});
+
+describe("SGP expense waterfall — absorbedByVenue filter", () => {
+  it("excludes venue-absorbed expenses from the expense estimate", async () => {
+    counter++;
+    const pastId = `past-${counter}`;
+    const pastDate = daysFromNow(-30);
+    await db.insert(schema.shows).values({
+      id: pastId, venueId: VENUE_ID, artistId: ARTIST_ID,
+      date: isoDate(pastDate), status: "settled", roomConfig: "standing", createdAt: pastDate,
+    });
+    await db.insert(schema.deals).values({
+      id: `d-${pastId}`, showId: pastId, dealType: "flat", createdAt: pastDate,
+    });
+    await db.insert(schema.settlements).values({
+      id: `st-${pastId}`, showId: pastId, status: "signed",
+      grossBoxOffice: 10000, totalToArtist: 5000,
+    });
+    // billed expense
+    await db.insert(schema.expenses).values({
+      id: `e1-${pastId}`, showId: pastId, category: "production",
+      amount: 800, absorbedByVenue: false, enteredAt: pastDate,
+    });
+    // venue-absorbed — must NOT inflate the estimate
+    await db.insert(schema.expenses).values({
+      id: `e2-${pastId}`, showId: pastId, category: "sound",
+      amount: 2000, absorbedByVenue: true, enteredAt: pastDate,
+    });
+
+    counter++;
+    const upId = `up-${counter}`;
+    const upDate = daysFromNow(14);
+    await db.insert(schema.shows).values({
+      id: upId, venueId: VENUE_ID, artistId: ARTIST_ID,
+      date: isoDate(upDate), status: "booked", roomConfig: "standing", createdAt: upDate,
+    });
+    await db.insert(schema.deals).values({
+      id: `d-${upId}`, showId: upId, dealType: "vs",
+      guaranteeAmount: 1000, percentage: 0.85, createdAt: upDate,
+    });
+
+    const r = await generateGuarantee(upId);
+    expect(r.suggestion).not.toBeNull();
+    expect(r.suggestion!.expenseSource).toBe("artist_history_1");
+    // must be $800 (billed only), NOT $2800 (all expenses)
+    expect(r.suggestion!.expenseEstimate).toBe(800);
+  });
+
+  it("includes billed expenses normally when none are venue-absorbed", async () => {
+    counter++;
+    const pastId = `past-${counter}`;
+    const pastDate = daysFromNow(-30);
+    await db.insert(schema.shows).values({
+      id: pastId, venueId: VENUE_ID, artistId: ARTIST_ID,
+      date: isoDate(pastDate), status: "settled", roomConfig: "standing", createdAt: pastDate,
+    });
+    await db.insert(schema.deals).values({
+      id: `d-${pastId}`, showId: pastId, dealType: "flat", createdAt: pastDate,
+    });
+    await db.insert(schema.settlements).values({
+      id: `st-${pastId}`, showId: pastId, status: "signed",
+      grossBoxOffice: 10000, totalToArtist: 5000,
+    });
+    await db.insert(schema.expenses).values({
+      id: `e1-${pastId}`, showId: pastId, category: "production",
+      amount: 1200, absorbedByVenue: false, enteredAt: pastDate,
+    });
+
+    counter++;
+    const upId = `up-${counter}`;
+    const upDate = daysFromNow(14);
+    await db.insert(schema.shows).values({
+      id: upId, venueId: VENUE_ID, artistId: ARTIST_ID,
+      date: isoDate(upDate), status: "booked", roomConfig: "standing", createdAt: upDate,
+    });
+    await db.insert(schema.deals).values({
+      id: `d-${upId}`, showId: upId, dealType: "vs",
+      guaranteeAmount: 1000, percentage: 0.85, createdAt: upDate,
+    });
+
+    const r = await generateGuarantee(upId);
+    expect(r.suggestion!.expenseEstimate).toBe(1200);
+  });
+});
+---END FILE---
+
+
+Create artifacts/api-server/src/lib/switchSavings.vsStats.test.ts:
+
+---START FILE---
+import { beforeEach, describe, expect, it } from "vitest";
+
+process.env.DATABASE_URL = "file::memory:";
+
+const { client, db } = await import("../db");
+const schema = await import("../db/schema");
+const { getSwitchSavings } = await import("./switchSavings");
+const { clearSmartSwitchCache } = await import("./smartSwitch");
+const { clearGuaranteeCache } = await import("./smartGuarantee");
+
+const CREATE_TABLES_SQL = `
+CREATE TABLE agencies (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
+CREATE TABLE agents (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, agency_id TEXT,
+  email TEXT NOT NULL, phone TEXT, preferences_notes TEXT
+);
+CREATE TABLE artists (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, agent_id TEXT,
+  manager_email TEXT, genre TEXT, prior_show_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE venues (
+  id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, capacity INTEGER NOT NULL,
+  city TEXT NOT NULL, state TEXT NOT NULL
+);
+CREATE TABLE shows (
+  id TEXT PRIMARY KEY NOT NULL, venue_id TEXT NOT NULL, artist_id TEXT NOT NULL,
+  date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'booked',
+  doors_time TEXT, set_time TEXT, opener_artist_id TEXT,
+  room_config TEXT NOT NULL DEFAULT 'standing', internal_notes TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE deals (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL UNIQUE,
+  deal_type TEXT NOT NULL, guarantee_amount REAL, percentage REAL,
+  percentage_basis TEXT, expense_cap REAL, hospitality_cap REAL,
+  bonuses_json TEXT, deal_notes_freetext TEXT, created_at INTEGER NOT NULL
+);
+CREATE TABLE settlements (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'draft',
+  drafted_at INTEGER, submitted_at INTEGER, review_started_at INTEGER,
+  signed_at INTEGER, disputed_at INTEGER, revised_at INTEGER,
+  finalized_at INTEGER, paid_at INTEGER, completed_at INTEGER,
+  completed_by_user_id TEXT,
+  gross_box_office REAL, net_box_office REAL, total_expenses REAL,
+  total_to_artist REAL, calculation_json TEXT, recoups_json TEXT,
+  signoff_text TEXT, notes TEXT, positive_summary TEXT, negative_summary TEXT
+);
+CREATE TABLE expenses (
+  id TEXT PRIMARY KEY NOT NULL, show_id TEXT NOT NULL, category TEXT NOT NULL,
+  amount REAL NOT NULL, description TEXT,
+  approved INTEGER NOT NULL DEFAULT 1, absorbed_by_venue INTEGER NOT NULL DEFAULT 0,
+  entered_by_user_id TEXT, entered_at INTEGER NOT NULL
+);
+CREATE TABLE switch_suggestions (
+  id TEXT PRIMARY KEY, show_id TEXT NOT NULL UNIQUE, deal_id TEXT NOT NULL,
+  suggested_at INTEGER NOT NULL, deal_type_from TEXT NOT NULL, shape TEXT NOT NULL,
+  suggested_flat REAL, door_floor REAL, door_split_pct REAL, door_expense_cap REAL,
+  confidence_tier TEXT NOT NULL, band_low REAL, band_high REAL, band_width REAL,
+  source TEXT, sample_size INTEGER NOT NULL, basis TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'suggested', decided_at INTEGER
+);
+CREATE TABLE guarantee_suggestions (
+  id TEXT PRIMARY KEY, show_id TEXT NOT NULL UNIQUE, deal_id TEXT NOT NULL,
+  generated_at INTEGER NOT NULL,
+  agent_guarantee REAL, suggested_price REAL NOT NULL, delta REAL NOT NULL,
+  expected_gross REAL NOT NULL, expected_gross_source TEXT NOT NULL,
+  ticketing_fees REAL NOT NULL, net_after_fees REAL NOT NULL,
+  expense_estimate REAL NOT NULL, expense_source TEXT NOT NULL, expense_cap REAL,
+  net_base REAL NOT NULL, percentage_payout REAL NOT NULL,
+  winner TEXT NOT NULL, winner_margin REAL NOT NULL, breakeven_gross REAL NOT NULL,
+  artist_show_count INTEGER NOT NULL, agent_show_count INTEGER NOT NULL,
+  confidence_tier TEXT NOT NULL, insurance_tier INTEGER NOT NULL,
+  basis TEXT NOT NULL, audit_json TEXT NOT NULL
+);
+`;
+
+const TABLES = [
+  "switch_suggestions", "guarantee_suggestions", "expenses", "settlements",
+  "deals", "shows", "artists", "agents", "agencies", "venues",
+];
+
+const VENUE_ID = "v1";
+
+function isoDate(d: Date): string { return d.toISOString().slice(0, 10); }
+function daysFromNow(n: number): Date {
+  const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + n); return d;
+}
+
+let counter = 0;
+
+async function seedArtist(id: string) {
+  await db.insert(schema.artists).values({ id, name: id });
+}
+
+async function seedVsShow(opts: {
+  artistId: string; daysBack: number;
+  guarantee: number; payout: number; gross: number;
+}) {
+  counter++;
+  const showId = `s${counter}`;
+  await db.insert(schema.shows).values({
+    id: showId, venueId: VENUE_ID, artistId: opts.artistId,
+    date: isoDate(daysFromNow(-opts.daysBack)),
+    status: "settled", roomConfig: "standing", createdAt: new Date(),
+  });
+  await db.insert(schema.deals).values({
+    id: `d${counter}`, showId, dealType: "vs",
+    guaranteeAmount: opts.guarantee, percentage: 0.80, createdAt: new Date(),
+  });
+  await db.insert(schema.settlements).values({
+    id: `set${counter}`, showId, status: "signed",
+    grossBoxOffice: opts.gross, totalToArtist: opts.payout,
+  });
+  return showId;
+}
+
+beforeEach(async () => {
+  for (const t of TABLES) await client.execute(`DROP TABLE IF EXISTS ${t}`);
+  for (const stmt of CREATE_TABLES_SQL.split(";").map((s) => s.trim()).filter(Boolean)) {
+    await client.execute(stmt);
+  }
+  clearSmartSwitchCache();
+  clearGuaranteeCache();
+  counter = 0;
+  await db.insert(schema.venues).values({
+    id: VENUE_ID, name: "The Greenroom", capacity: 500, city: "Austin", state: "TX",
+  });
+});
+
+describe("getSwitchSavings — vsPercentageFiredStats scoped to $1–5K bucket", () => {
+  it("excludes vs deals outside the $1–5K bucket from the fire-rate scan", async () => {
+    // $5–15K (guarantee $8000): should be excluded from scan
+    await seedArtist("a1");
+    await seedVsShow({ artistId: "a1", daysBack: 30, guarantee: 8000, payout: 9000, gross: 15000 });
+    // $1–5K (guarantee $2000): guarantee wins — should appear in scan
+    await seedArtist("a2");
+    await seedVsShow({ artistId: "a2", daysBack: 25, guarantee: 2000, payout: 1800, gross: 5000 });
+
+    const out = await getSwitchSavings({ months: 6, topN: 10 });
+    const stats = out.vsPercentageFiredStats;
+    expect(stats.vsDealsScanned).toBe(1);
+    expect(stats.vsPercentageFired).toBe(0);
+    expect(stats.vsPercentageNeverFired).toBe(1);
+    expect(stats.vsPercentageNeverFiredRate).toBe(1);
+  });
+
+  it("counts a $1–5K vs deal as fired when payout exceeds guarantee by more than $1", async () => {
+    await seedArtist("a3");
+    await seedVsShow({ artistId: "a3", daysBack: 20, guarantee: 2000, payout: 3500, gross: 8000 });
+
+    const out = await getSwitchSavings({ months: 6, topN: 10 });
+    const stats = out.vsPercentageFiredStats;
+    expect(stats.vsDealsScanned).toBe(1);
+    expect(stats.vsPercentageFired).toBe(1);
+    expect(stats.vsPercentageNeverFired).toBe(0);
+    expect(stats.vsPercentageNeverFiredRate).toBe(0);
+  });
+
+  it("does not scan vs deals whose guarantee is exactly at a bucket boundary ($1000 or $5000)", async () => {
+    await seedArtist("a4");
+    await seedArtist("a5");
+    await seedVsShow({ artistId: "a4", daysBack: 15, guarantee: 999, payout: 800, gross: 3000 });
+    await seedVsShow({ artistId: "a5", daysBack: 15, guarantee: 5000, payout: 4000, gross: 10000 });
+
+    const out = await getSwitchSavings({ months: 6, topN: 10 });
+    expect(out.vsPercentageFiredStats.vsDealsScanned).toBe(0);
+  });
+});
+---END FILE---
+
+────────────────────────────────────────────────────────────────────────────
+VERIFICATION
+────────────────────────────────────────────────────────────────────────────
+Run:
+  pnpm --filter @workspace/api-server test
+
+Expected result:
+  Test Files  8 passed (8)
+  Tests  70 passed (70)
+
+If any test fails, do not proceed — diagnose and fix before finishing.
+```
