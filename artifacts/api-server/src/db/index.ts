@@ -93,4 +93,5 @@ export const migrationsReady = (async () => {
   // ensureColumn can detect the table.
   await ensureColumn("switch_suggestions", "source", "TEXT");
   await ensureColumn("switch_suggestions", "band_width", "REAL");
+  await ensureColumn("switch_suggestions", "artist_shows_at_venue", "INTEGER");
 })();

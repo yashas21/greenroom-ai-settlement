@@ -118,11 +118,17 @@ describe("smartSwitch — audit fixes", () => {
     expect(sug!.suggestedFlat).toBe(2237);
   });
 
-  it("guarantee_amount source pins tier to A regardless of sample size or familiarity", async () => {
-    // Audit acceptance: the guarantee IS the answer — there's no statistical
-    // uncertainty to discount, so a first-time artist with thin cell history
-    // should still get tier A on the guarantee_amount path.
-    // (No history seeded → cell.n = 0 → would normally produce tier D.)
+  it("guarantee_amount source computes confidenceTier honestly from cell + familiarity", async () => {
+    // The guarantee_amount fallback used to hard-code tier="A" on the
+    // grounds that "the flat equals the contract number" is a structurally
+    // certain claim. That conflated two different uncertainties: the
+    // contract-equals-contract claim (always certain) vs. the data backing
+    // for this artist + cell (often thin). The UI now renders those as two
+    // separate chips — Confidence (data backing) and Familiarity (prior
+    // shows at venue) — so the backend tier must reflect ONLY the data
+    // dimension, computed by the same computeTier formula every other
+    // branch uses. For a first-time artist with no seeded history,
+    // cell.n=0 + artistShowsAtVenue=0 → tier D.
     clearSmartSwitchCache();
     const sug = await generateSuggestion(
       {
@@ -134,7 +140,10 @@ describe("smartSwitch — audit fixes", () => {
       0, // first-time artist
     );
     expect(sug!.source).toBe("guarantee_amount");
-    expect(sug!.confidenceTier).toBe("A");
+    expect(sug!.confidenceTier).toBe("D");
+    expect(sug!.artistShowsAtVenue).toBe(0);
+    // Basis copy no longer bundles familiarity into the tier sentence.
+    expect(sug!.basis).not.toMatch(/Confidence tier .* \(first-time/);
   });
 
   it("door at $15K+ returns source=suppressed (not enough history)", async () => {

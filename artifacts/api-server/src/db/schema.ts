@@ -161,6 +161,14 @@ export const switchSuggestions = sqliteTable("switch_suggestions", {
   bandLow: real("band_low"),
   bandHigh: real("band_high"),
   sampleSize: integer("sample_size").notNull(),
+  // Artist familiarity — count of prior shows by THIS artist at THIS venue
+  // before the suggested show's date. Tracked separately from
+  // confidenceTier so the UI can render the two as distinct chips:
+  // confidenceTier answers "how well does cell data back this number?" and
+  // artistShowsAtVenue answers "how well do we know this artist's
+  // settlement behavior?". Nullable for rows persisted before the column
+  // was added.
+  artistShowsAtVenue: integer("artist_shows_at_venue"),
   basis: text("basis").notNull(),
   status: text("status", { enum: ["suggested", "accepted", "declined"] })
     .notNull().default("suggested"),

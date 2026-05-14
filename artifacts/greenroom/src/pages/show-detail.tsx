@@ -476,10 +476,23 @@ function MiniStat({
 }
 
 const TIER_LABEL: Record<"A" | "B" | "C" | "D", string> = {
-  A: "High confidence",
-  B: "Solid",
+  A: "Strong data backing",
+  B: "Solid data backing",
   C: "Directional",
   D: "Thin sample",
+};
+
+function familiarityLabel(n: number | null): { label: string; tone: "neutral" | "warn" | "good" } {
+  if (n == null) return { label: "Familiarity unknown", tone: "neutral" };
+  if (n === 0) return { label: "First-time artist at venue", tone: "warn" };
+  if (n === 1) return { label: "1 prior show at venue", tone: "neutral" };
+  return { label: `${n} prior shows at venue`, tone: "good" };
+}
+
+const FAMILIARITY_COLOR: Record<"neutral" | "warn" | "good", string> = {
+  neutral: "bg-ink-100 text-ink-700 ring-ink-200",
+  warn: "bg-amber-50 text-amber-800 ring-amber-200",
+  good: "bg-emerald-50 text-emerald-800 ring-emerald-200",
 };
 
 const TIER_COLOR: Record<"A" | "B" | "C" | "D", string> = {
@@ -751,7 +764,21 @@ function SmartSwitchPanel({
                     <span>{TIER_LABEL[sug.confidenceTier]}</span>
                   </div>
                   <div className="text-[11px] text-ink-500 mt-2">
-                    Based on <span className="font-mono tabular">{sug.sampleSize}</span> comparable past deal{sug.sampleSize === 1 ? "" : "s"}.
+                    Based on <span className="font-mono tabular">{sug.sampleSize}</span> comparable past deal{sug.sampleSize === 1 ? "" : "s"} in this cell.
+                  </div>
+                </div>
+                <div>
+                  <div className="eyebrow text-[10px] text-ink-500 mb-2">Artist familiarity</div>
+                  {(() => {
+                    const f = familiarityLabel(sug.artistShowsAtVenue);
+                    return (
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ring-1 text-[12px] font-medium ${FAMILIARITY_COLOR[f.tone]}`}>
+                        <span>{f.label}</span>
+                      </div>
+                    );
+                  })()}
+                  <div className="text-[11px] text-ink-500 mt-2">
+                    Tracked separately — Confidence reflects cell-level data backing; Familiarity reflects how well we know <em>this</em> artist's settlement behavior at the venue.
                   </div>
                 </div>
 
@@ -935,7 +962,23 @@ function SmartGuaranteedPricePanel({
                   <span>{TIER_LABEL[sug.confidenceTier]}</span>
                 </div>
                 <div className="text-[11px] text-ink-500 mt-2">
-                  {sug.artistShowCount} prior show{sug.artistShowCount === 1 ? "" : "s"} with this artist · {sug.agentShowCount} with this agent.
+                  Reflects historical-data backing — winner margin and cell sample size.
+                </div>
+              </div>
+              <div>
+                <div className="eyebrow text-[10px] text-ink-500 mb-2">Artist familiarity</div>
+                {(() => {
+                  const f = familiarityLabel(sug.artistShowCount);
+                  return (
+                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ring-1 text-[12px] font-medium ${FAMILIARITY_COLOR[f.tone]}`}>
+                      <span>{f.label}</span>
+                    </div>
+                  );
+                })()}
+                <div className="text-[11px] text-ink-500 mt-2">
+                  {sug.agentShowCount > 0
+                    ? <>Agent has <span className="font-mono tabular">{sug.agentShowCount}</span> other show{sug.agentShowCount === 1 ? "" : "s"} here.</>
+                    : <>No prior agent history at this venue.</>}
                 </div>
               </div>
               <button

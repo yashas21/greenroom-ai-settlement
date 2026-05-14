@@ -157,6 +157,11 @@ export type GeneratedSuggestion = {
   // didn't even cover the floor. Derived from source === "door_dead_pool"
   // so callers don't have to know the source enum vocabulary.
   isDeadPool: boolean;
+  // Familiarity dimension — kept separate from confidenceTier so the UI can
+  // render the two as distinct chips. confidenceTier reflects ONLY how well
+  // the cell statistics back the projection; this field reflects whether
+  // we've seen THIS artist at THIS venue before.
+  artistShowsAtVenue: number;
 };
 
 /** Source-of-truth for the dead-pool boolean. Anywhere that reads a
@@ -233,6 +238,7 @@ export async function generateSuggestion(
             sampleSize: cell?.n ?? g.artistShowCount + g.agentShowCount,
             basis: g.basis,
             isDeadPool: false,
+            artistShowsAtVenue,
           };
         }
         // SGP returned tier C/D — fall through to guarantee_amount fallback.
@@ -267,13 +273,17 @@ export async function generateSuggestion(
       // suggestion is anchored to the real number on the contract, not a
       // synthesized average.
       const flat = deal.guaranteeAmount;
-      // Tier is pinned to A for the single narrow claim being made: "the
-      // flat equals the contract number." That number is certain. The
-      // broader question "will the artist actually walk with just the
-      // guarantee?" has a different answer (no, 87.6% of the time); the
-      // basis string below makes that distinction explicit so the
-      // confidence label is not mistaken for a payout prediction.
-      const tier: ConfidenceTier = "A";
+      // Confidence tier is computed honestly from the cell sample size and
+      // artist familiarity — same formula as every other Smart Switch
+      // branch. The "flat equals the contract number" claim is a
+      // structural fact that's documented in the basis copy and made
+      // visible in the source enum (`guarantee_amount`); it is NOT a
+      // reason to override the data-backed confidence tier. Previously
+      // this branch hard-coded tier="A", which conflated structural
+      // certainty with statistical certainty and produced the
+      // contradictory "Tier A (first-time)" label the team flagged.
+      const sampleSize = cell?.n ?? 0;
+      const tier = computeTier(sampleSize, artistShowsAtVenue);
       const dealName = deal.dealType === "vs" ? "vs" : "percentage-of-net";
       return {
         shape: "flat",
@@ -287,7 +297,7 @@ export async function generateSuggestion(
         bandHigh: cell ? roundTo50(cell.p90Payout) : null,
         bandWidth: cellBandWidth,
         source: "guarantee_amount",
-        sampleSize: cell?.n ?? 0,
+        sampleSize,
         basis:
           `Smart Guaranteed Price didn't have enough comparable deals to ` +
           `project a confident number for this artist + agent, so Smart ` +
@@ -298,9 +308,9 @@ export async function generateSuggestion(
           `deals in the ${bucket} bucket had the percentage clause out-pay ` +
           `the guarantee on most nights, so the agent may push back on ` +
           `freezing the upside. Treat this as a conservative floor for the ` +
-          `negotiation, not a payout prediction. Confidence tier ${tier} ` +
-          `(${familiarity}).`,
+          `negotiation, not a payout prediction.`,
         isDeadPool: false,
+        artistShowsAtVenue,
       };
     }
 
@@ -341,6 +351,7 @@ export async function generateSuggestion(
           `at this venue — not enough history to project a hybrid floor/split with ` +
           `confidence. Discuss the structure directly with the agent before signing; ` +
           `the standard $${DOOR_FLOOR} floor is still recommended as a baseline.`,
+        artistShowsAtVenue,
       };
     }
 
@@ -371,7 +382,8 @@ export async function generateSuggestion(
           `available pool after the $${cap} expense cap is ${formatMoney(Math.max(0, projectedAvail))}, ` +
           `at or below the $${DOOR_FLOOR} floor. Artist effectively walks with the floor; ` +
           `the ${Math.round(DOOR_SPLIT_PCT * 100)}% split rarely fires. Treat this as a ` +
-          `flat $${DOOR_FLOOR} guarantee. Confidence tier ${tier} (${familiarity}).`,
+          `flat $${DOOR_FLOOR} guarantee.`,
+        artistShowsAtVenue,
       };
     }
 
@@ -400,7 +412,8 @@ export async function generateSuggestion(
         `of walk-up, then ${Math.round(DOOR_SPLIT_PCT * 100)}% of the pool above an ` +
         `$${cap} expense cap. Projected artist payout ~${formatMoney(projectedArtist)} ` +
         `at the cell-average gross of ${formatMoney(avgGross)}; venue stops eating ` +
-        `expense overruns on slow nights. Confidence tier ${tier} (${familiarity}).`,
+        `expense overruns on slow nights.`,
+      artistShowsAtVenue,
     };
   }
 
@@ -489,6 +502,7 @@ export async function generateAndPersist(showId: string, opts: { force?: boolean
     status: "suggested",
     source: generated.source,
     bandWidth: generated.bandWidth,
+    artistShowsAtVenue: generated.artistShowsAtVenue,
   });
 
   const fresh = await getSuggestionForShow(showId);

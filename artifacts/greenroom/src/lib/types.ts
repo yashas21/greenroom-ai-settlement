@@ -187,6 +187,11 @@ export interface SwitchSuggestion {
   // collapsed to a pure floor deal because projected available pool ≤ floor.
   // Derived server-side from `source === "door_dead_pool"`.
   isDeadPool: boolean;
+  // Artist familiarity — count of prior shows by this artist at this venue
+  // before the show date. Rendered as its own chip in the UI, separate
+  // from confidenceTier. Nullable for legacy rows persisted before the
+  // column existed.
+  artistShowsAtVenue: number | null;
 }
 
 export interface GuaranteeSuggestion {
