@@ -2417,44 +2417,6 @@
   },
   {
     "artist": {
-      "id": "artist_demo_north_frontier",
-      "name": "North Frontier",
-      "agentId": "agent_sarah_kim",
-      "managerEmail": "manager+artist_demo_north_frontier@example.com",
-      "genre": "indie",
-      "priorShowCount": 4
-    },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agencyId": "agcy_wme",
-      "email": "skim@wme.com",
-      "phone": null,
-      "preferencesNotes": "One of the easier WME agents. Reads settlements carefully but fairly. Pet peeve: 'Miscellaneous' line items in expenses without itemization."
-    },
-    "agency": {
-      "id": "agcy_wme",
-      "name": "WME"
-    },
-    "showCount": 5,
-    "lastShowDate": "2026-05-21",
-    "topDealType": "flat",
-    "dealTypes": [
-      {
-        "dealType": "flat",
-        "count": 4
-      },
-      {
-        "dealType": "vs",
-        "count": 1
-      }
-    ],
-    "topPositive": null,
-    "topNegative": null,
-    "attentionCount": 1
-  },
-  {
-    "artist": {
       "id": "art_the_quiet_houses",
       "name": "The Quiet Houses",
       "agentId": "agent_daniel_hwang",
@@ -2569,27 +2531,45 @@
   },
   {
     "artist": {
+      "id": "artist_demo_north_frontier",
+      "name": "North Frontier",
+      "agentId": null,
+      "managerEmail": null,
+      "genre": "indie",
+      "priorShowCount": 0
+    },
+    "agent": null,
+    "agency": null,
+    "showCount": 4,
+    "lastShowDate": "2026-05-22",
+    "topDealType": "flat",
+    "dealTypes": [
+      {
+        "dealType": "flat",
+        "count": 3
+      },
+      {
+        "dealType": "vs",
+        "count": 1
+      }
+    ],
+    "topPositive": null,
+    "topNegative": null,
+    "attentionCount": 0
+  },
+  {
+    "artist": {
       "id": "artist_demo_quartz_lantern",
       "name": "Quartz Lantern",
-      "agentId": "agent_sarah_kim",
-      "managerEmail": "manager+artist_demo_quartz_lantern@example.com",
+      "agentId": null,
+      "managerEmail": null,
       "genre": "indie",
-      "priorShowCount": 3
+      "priorShowCount": 0
     },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agencyId": "agcy_wme",
-      "email": "skim@wme.com",
-      "phone": null,
-      "preferencesNotes": "One of the easier WME agents. Reads settlements carefully but fairly. Pet peeve: 'Miscellaneous' line items in expenses without itemization."
-    },
-    "agency": {
-      "id": "agcy_wme",
-      "name": "WME"
-    },
+    "agent": null,
+    "agency": null,
     "showCount": 4,
-    "lastShowDate": "2026-05-30",
+    "lastShowDate": "2026-05-31",
     "topDealType": "flat",
     "dealTypes": [
       {
@@ -2609,25 +2589,15 @@
     "artist": {
       "id": "artist_demo_drowsy_beacon",
       "name": "Drowsy Beacon",
-      "agentId": "agent_sarah_kim",
-      "managerEmail": "manager+artist_demo_drowsy_beacon@example.com",
+      "agentId": null,
+      "managerEmail": null,
       "genre": "indie",
       "priorShowCount": 0
     },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agencyId": "agcy_wme",
-      "email": "skim@wme.com",
-      "phone": null,
-      "preferencesNotes": "One of the easier WME agents. Reads settlements carefully but fairly. Pet peeve: 'Miscellaneous' line items in expenses without itemization."
-    },
-    "agency": {
-      "id": "agcy_wme",
-      "name": "WME"
-    },
+    "agent": null,
+    "agency": null,
     "showCount": 1,
-    "lastShowDate": "2026-06-05",
+    "lastShowDate": "2026-06-06",
     "topDealType": "door",
     "dealTypes": [
       {
@@ -2643,25 +2613,15 @@
     "artist": {
       "id": "artist_demo_marble_index",
       "name": "Marble Index",
-      "agentId": "agent_sarah_kim",
-      "managerEmail": "manager+artist_demo_marble_index@example.com",
+      "agentId": null,
+      "managerEmail": null,
       "genre": "indie",
       "priorShowCount": 0
     },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agencyId": "agcy_wme",
-      "email": "skim@wme.com",
-      "phone": null,
-      "preferencesNotes": "One of the easier WME agents. Reads settlements carefully but fairly. Pet peeve: 'Miscellaneous' line items in expenses without itemization."
-    },
-    "agency": {
-      "id": "agcy_wme",
-      "name": "WME"
-    },
+    "agent": null,
+    "agency": null,
     "showCount": 1,
-    "lastShowDate": "2026-05-18",
+    "lastShowDate": "2026-05-19",
     "topDealType": "vs",
     "dealTypes": [
       {
@@ -2677,25 +2637,15 @@
     "artist": {
       "id": "artist_demo_vespertine_choir",
       "name": "Vespertine Choir",
-      "agentId": "agent_sarah_kim",
-      "managerEmail": "manager+artist_demo_vespertine_choir@example.com",
+      "agentId": null,
+      "managerEmail": null,
       "genre": "indie",
       "priorShowCount": 0
     },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agencyId": "agcy_wme",
-      "email": "skim@wme.com",
-      "phone": null,
-      "preferencesNotes": "One of the easier WME agents. Reads settlements carefully but fairly. Pet peeve: 'Miscellaneous' line items in expenses without itemization."
-    },
-    "agency": {
-      "id": "agcy_wme",
-      "name": "WME"
-    },
+    "agent": null,
+    "agency": null,
     "showCount": 1,
-    "lastShowDate": "2026-05-26",
+    "lastShowDate": "2026-05-27",
     "topDealType": "percentage_of_net",
     "dealTypes": [
       {

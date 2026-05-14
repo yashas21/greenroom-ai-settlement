@@ -1,5 +1,45 @@
 [
   {
+    "id": "artist_demo_drowsy_beacon",
+    "name": "Drowsy Beacon",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "indie",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_demo_marble_index",
+    "name": "Marble Index",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "indie",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_demo_north_frontier",
+    "name": "North Frontier",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "indie",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_demo_quartz_lantern",
+    "name": "Quartz Lantern",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "indie",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_demo_vespertine_choir",
+    "name": "Vespertine Choir",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "indie",
+    "prior_show_count": 0
+  },
+  {
     "id": "artist_newdemo_atlas_court",
     "name": "[NEW DEMO] Atlas Court",
     "agent_id": null,
