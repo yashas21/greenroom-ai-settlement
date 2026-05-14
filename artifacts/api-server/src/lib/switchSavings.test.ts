@@ -267,7 +267,7 @@ describe("getSwitchSavings", () => {
     expect(it0.moneySavedToVenue).toBe(-1500);
   });
 
-  it("sorts by money saved desc and trims to topN; totals reflect the trimmed slice", async () => {
+  it("sorts by money saved desc and trims items to topN; totals roll up the full candidate set", async () => {
     // Three vs deals, descending savings of 1500, 1000, 500.
     await seedArtist("a5");
     await seedArtist("a6");
@@ -293,8 +293,11 @@ describe("getSwitchSavings", () => {
     expect(out.totalCandidates).toBe(3);
     expect(out.items).toHaveLength(2);
     expect(out.items.map((i) => i.moneySavedToVenue)).toEqual([1500, 1000]);
-    // Totals reflect ONLY the trimmed top-N slice (2500), not all 3000.
-    expect(out.totalMoneySavedToVenue).toBe(2500);
+    // Totals roll up the FULL candidate set (1500 + 1000 + 500 = 3000), not
+    // just the displayed top-N slice. Keeping totals and totalCandidates on
+    // the same scope prevents callers from mixing top-N numerators with
+    // full-set denominators.
+    expect(out.totalMoneySavedToVenue).toBe(3000);
   });
 
   it("excludes deal types Smart Switch does not cover (flat) and unsettled rows", async () => {
