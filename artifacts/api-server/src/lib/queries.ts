@@ -254,13 +254,11 @@ type ComplexityBucket = "simple" | "medium" | "complex";
 
 function classifyComplexity(d: typeof deals.$inferSelect): ComplexityBucket {
   const hasBonuses = !!d.bonusesJson && d.bonusesJson !== "[]" && d.bonusesJson !== "null";
-  const hasNotes = !!d.dealNotesFreetext && d.dealNotesFreetext.trim().length > 0;
   if (
     d.dealType === "vs" ||
     d.dealType === "door" ||
     d.dealType === "percentage_of_net" ||
-    hasBonuses ||
-    hasNotes
+    hasBonuses
   ) {
     return "complex";
   }
