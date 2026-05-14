@@ -93,7 +93,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         dealType: deal.dealType,
       };
     }
-    const bonusResult = applyBonuses(parseBonuses(deal), {
+    const bonusResult = applyDealBonuses(parseBonuses(deal), {
       gross: grossBoxOffice,
       tickets,
       capacity: venueCapacity,
@@ -135,7 +135,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
       };
     }
     const payout = grossBoxOffice * deal.percentage;
-    const bonusResult = applyBonuses(parseBonuses(deal), {
+    const bonusResult = applyDealBonuses(parseBonuses(deal), {
       gross: grossBoxOffice,
       tickets,
       capacity: venueCapacity,
@@ -186,8 +186,8 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
   };
 }
 
-/** Evaluate a list of bonuses against the show's actual numbers. */
-function applyBonuses(
+/** Evaluate structured bonuses against the show's actual numbers (exported for settlement estimate). */
+export function applyDealBonuses(
   bonuses: Bonus[],
   ctx: { gross: number; tickets: number; capacity?: number },
 ) {

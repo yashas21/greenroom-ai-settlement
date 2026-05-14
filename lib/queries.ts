@@ -24,6 +24,16 @@ function todayDateString(): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Venues for booking forms (e.g. add show). */
+export async function getVenues() {
+  return db.select().from(venues).orderBy(asc(venues.name));
+}
+
+/** Artists for show booking — includes roster; new shows can reference any. */
+export async function getArtistsAlphabetical() {
+  return db.select().from(artists).orderBy(asc(artists.name));
+}
+
 export async function getAllShows() {
   return db
     .select({

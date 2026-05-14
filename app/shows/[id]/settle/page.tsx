@@ -11,7 +11,6 @@ import {
   XCircle,
   Wallet,
   TrendingUp,
-  Sparkles,
 } from "lucide-react";
 import { getShowById } from "@/lib/queries";
 import {
@@ -24,6 +23,8 @@ import {
 } from "@/components/ui/card";
 import { StatusBadge, DealTypeBadge, PlainBadge } from "@/components/ui/badge";
 import { calculateSettlement } from "@/lib/dealMath";
+import { buildSettlementEstimate } from "@/lib/settlementEstimate";
+import { SettlementEstimatePanel } from "@/components/settlement/settlement-estimate-panel";
 import {
   formatMoney,
   formatShowDateFull,
@@ -38,29 +39,6 @@ const RECOUP_LABELS: Record<Recoup["category"], string> = {
   prior_advance: "Prior advance",
   damages: "Damages",
   other: "Other",
-};
-
-/** Mock-only — prototype Settlement Estimate; replace with real model later. */
-const SETTLEMENT_ESTIMATE_MOCK = {
-  estimatedPayout: 8_420,
-  confidence: { label: "Medium confidence", variant: "amber" as const },
-  flags: [
-    {
-      title: "Deal notes vs structured fields",
-      detail:
-        "Guarantee in prose doesn’t match the structured guarantee — confirm with the agent before show night.",
-    },
-    {
-      title: "Sellout bonus unclear",
-      detail:
-        "Bonus language references “capacity” but room config may change — align on which cap counts.",
-    },
-    {
-      title: "Expense pass-through timing",
-      detail:
-        "Marketing line items are still being approved; final pass-through could shift the vs math.",
-    },
-  ],
 };
 
 export default async function SettlePage({
@@ -87,6 +65,12 @@ export default async function SettlePage({
   }
 
   const calc = calculateSettlement({
+    deal,
+    ticketSales,
+    expenses,
+    venueCapacity: data.venue?.capacity ?? undefined,
+  });
+  const estimate = buildSettlementEstimate({
     deal,
     ticketSales,
     expenses,
@@ -151,7 +135,11 @@ export default async function SettlePage({
       )}
 
       <div className="space-y-6 mt-6">
-        <SettlementEstimateCard />
+        <SettlementEstimatePanel
+          showId={show.id}
+          estimate={estimate}
+          variant="internal"
+        />
 
         {!calc.supported ? (
           <UnsupportedDeal
@@ -210,63 +198,6 @@ function BackLink({ showId }: { showId: string }) {
     >
       <ArrowLeft className="h-3.5 w-3.5" /> Back to show
     </Link>
-  );
-}
-
-function SettlementEstimateCard() {
-  const m = SETTLEMENT_ESTIMATE_MOCK;
-  return (
-    <Card accent="sky">
-      <CardHeader>
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Sparkles className="h-3.5 w-3.5 text-sky-700 shrink-0" />
-            <CardTitle>Settlement estimate</CardTitle>
-          </div>
-          <CardDescription>
-            Pre-show payout preview — non-binding. Mock data for prototype.
-          </CardDescription>
-        </div>
-        <PlainBadge variant={m.confidence.variant}>{m.confidence.label}</PlainBadge>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <div className="eyebrow text-[10px] text-ink-400 mb-2">
-            Estimated payout to artist
-          </div>
-          <div
-            className="text-[40px] font-mono tabular font-semibold text-ink-900 leading-none"
-            style={{ letterSpacing: "-0.03em" }}
-          >
-            {formatMoney(m.estimatedPayout)}
-          </div>
-        </div>
-
-        <div>
-          <div className="eyebrow text-[10px] text-ink-500 mb-2.5">
-            Ambiguity & risk (preview)
-          </div>
-          <ul className="space-y-2.5">
-            {m.flags.map((f) => (
-              <li
-                key={f.title}
-                className="rounded-lg border border-amber-200/70 bg-amber-50/35 px-3.5 py-3 flex gap-2.5"
-              >
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-700 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-[12.5px] font-medium text-ink-900 leading-snug">
-                    {f.title}
-                  </div>
-                  <p className="text-[11.5px] text-ink-600 mt-1 leading-relaxed">
-                    {f.detail}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

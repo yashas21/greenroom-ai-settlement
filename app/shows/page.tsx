@@ -1,4 +1,5 @@
 import { getAllShows } from "@/lib/queries";
+import Link from "next/link";
 import {
   formatMoneyCompact,
   formatShowDate,
@@ -76,6 +77,14 @@ export default async function ShowsPage() {
           )}
           .
         </p>
+        <div className="mt-5">
+          <Link
+            href="/shows/new"
+            className="inline-flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-medium bg-brand-700 text-white hover:bg-brand-800 shadow-sm shadow-brand-700/15 ring-1 ring-inset ring-brand-800/20 transition-all duration-150"
+          >
+            Add show
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-px bg-ink-200/40 rounded-xl overflow-hidden mb-14">
