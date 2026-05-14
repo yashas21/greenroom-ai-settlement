@@ -16,8 +16,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = join(HERE, "..", "data", "greenroom.db");
 const OUT_DIR = join(HERE, "..", "data", "seeds");
 
-const ART_PREFIX = "artist_demo_";
-const SHOW_PREFIX = "show_demo_";
+// Demo additions added on top of the upstream starter dataset come from two
+// seed scripts that use different ID prefixes: `seedSmartSwitchDemo.ts`
+// (`artist_demo_` / `show_demo_`) and `seedNewDemoProposals.ts`
+// (`artist_newdemo_` / `show_newdemo_`). Both are exported.
+const ART_PREFIXES = ["artist_demo_", "artist_newdemo_"] as const;
+const SHOW_PREFIXES = ["show_demo_", "show_newdemo_"] as const;
+
+const orLike = (col: string, prefixes: readonly string[]): string =>
+  prefixes.map((p) => `${col} LIKE '${p}%'`).join(" OR ");
 
 async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
@@ -38,10 +45,10 @@ async function main(): Promise<void> {
     });
   };
 
-  const demoArtists = await pick("artists", `id LIKE '${ART_PREFIX}%'`);
+  const demoArtists = await pick("artists", orLike("id", ART_PREFIXES));
   const demoShows = await pick(
     "shows",
-    `id LIKE '${SHOW_PREFIX}%' OR (artist_id LIKE '${ART_PREFIX}%')`,
+    `(${orLike("id", SHOW_PREFIXES)}) OR (${orLike("artist_id", ART_PREFIXES)})`,
   );
   const showIds = demoShows.map((s) => `'${s.id}'`).join(",");
   const demoDeals = showIds ? await pick("deals", `show_id IN (${showIds})`) : [];

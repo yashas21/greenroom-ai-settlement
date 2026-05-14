@@ -38,5 +38,125 @@
     "manager_email": "manager+artist_demo_vespertine_choir@example.com",
     "genre": "indie",
     "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_atlas_court",
+    "name": "[NEW DEMO] Atlas Court",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Indie Rock",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_bramble_hollow",
+    "name": "[NEW DEMO] Bramble Hollow",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Folk",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_cinder_path",
+    "name": "[NEW DEMO] Cinder Path",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Garage Rock",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_driftline",
+    "name": "[NEW DEMO] Driftline",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Indie Rock",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_echo_bramble",
+    "name": "[NEW DEMO] Echo Bramble",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Americana",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_foxglove_society",
+    "name": "[NEW DEMO] Foxglove Society",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Indie Rock",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_gilded_fern",
+    "name": "[NEW DEMO] Gilded Fern",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Folk",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_hollow_bay",
+    "name": "[NEW DEMO] Hollow Bay",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Indie Pop",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_iron_lattice",
+    "name": "[NEW DEMO] Iron Lattice",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Indie Rock",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_juniper_cove",
+    "name": "[NEW DEMO] Juniper Cove",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Americana",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_kestrel_lane",
+    "name": "[NEW DEMO] Kestrel Lane",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Garage Rock",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_lantern_mile",
+    "name": "[NEW DEMO] Lantern Mile",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Punk",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_mast_marrow",
+    "name": "[NEW DEMO] Mast & Marrow",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Indie Rock",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_nightingale_press",
+    "name": "[NEW DEMO] Nightingale Press",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Indie Pop",
+    "prior_show_count": 0
+  },
+  {
+    "id": "artist_newdemo_oakshade_theory",
+    "name": "[NEW DEMO] Oakshade Theory",
+    "agent_id": null,
+    "manager_email": null,
+    "genre": "Folk",
+    "prior_show_count": 0
   }
 ]

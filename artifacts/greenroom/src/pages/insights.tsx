@@ -393,11 +393,11 @@ function SwitchSavingsSection() {
           </div>
           <div
             className="rounded-md ring-1 ring-amber-200/60 bg-amber-50/40 p-3"
-            title="Across every settled vs deal in the window: how often the percentage clause out-paid the guarantee. ‘Never fired’ = artist was paid the guarantee floor and the % upside produced nothing extra."
+            title="Scoped to settled vs deals with a guarantee in $1–5K (the bucket Smart Switch covers): how often the percentage clause out-paid the guarantee. ‘Never fired’ = artist was paid the guarantee floor and the % upside produced nothing extra."
           >
             <div className="flex items-center gap-1.5 eyebrow text-[10px] text-amber-700 mb-1">
               <Shield className="h-3 w-3" />
-              Vs % clause never fired
+              Vs % clause never fired ($1–5K)
             </div>
             <div className="text-[22px] font-serif text-ink-900 tabular">
               {data.vsPercentageFiredStats && data.vsPercentageFiredStats.vsDealsScanned > 0
@@ -406,7 +406,7 @@ function SwitchSavingsSection() {
             </div>
             <div className="text-[10px] text-ink-400">
               {data.vsPercentageFiredStats
-                ? `${data.vsPercentageFiredStats.vsPercentageNeverFired} of ${data.vsPercentageFiredStats.vsDealsScanned} settled vs deals · avg guarantee-win $${data.vsPercentageFiredStats.avgGuaranteeWin.toLocaleString()}`
+                ? `${data.vsPercentageFiredStats.vsPercentageNeverFired} of ${data.vsPercentageFiredStats.vsDealsScanned} settled vs $1–5K deals · avg guarantee-win $${data.vsPercentageFiredStats.avgGuaranteeWin.toLocaleString()}`
                 : "data unavailable"}
             </div>
           </div>
