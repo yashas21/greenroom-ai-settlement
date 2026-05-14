@@ -25319,264 +25319,6 @@
     }
   },
   {
-    "settlementId": "set_show_demohist_north_frontier_0",
-    "showId": "show_demohist_north_frontier_0",
-    "showDate": "2026-03-13",
-    "showStatus": "closed",
-    "settlementStatus": "paid",
-    "artist": {
-      "id": "artist_demo_north_frontier",
-      "name": "North Frontier",
-      "genre": "indie"
-    },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agency": "WME"
-    },
-    "deal": {
-      "id": "show_demohist_north_frontier_0_d",
-      "dealType": "flat",
-      "guaranteeAmount": 800,
-      "percentage": null,
-      "percentageBasis": null,
-      "expenseCap": null,
-      "hospitalityCap": null,
-      "bonuses": null,
-      "notes": null
-    },
-    "settlementFinancials": {
-      "grossBoxOffice": 4000,
-      "totalToArtist": 800,
-      "totalExpenses": 0,
-      "recoups": []
-    },
-    "rawText": {
-      "notes": null,
-      "signoffText": null
-    },
-    "extractedInsight": {
-      "positiveSummary": null,
-      "negativeSummary": null,
-      "hasSummary": false
-    }
-  },
-  {
-    "settlementId": "set_show_demohist_north_frontier_1",
-    "showId": "show_demohist_north_frontier_1",
-    "showDate": "2026-01-27",
-    "showStatus": "closed",
-    "settlementStatus": "paid",
-    "artist": {
-      "id": "artist_demo_north_frontier",
-      "name": "North Frontier",
-      "genre": "indie"
-    },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agency": "WME"
-    },
-    "deal": {
-      "id": "show_demohist_north_frontier_1_d",
-      "dealType": "flat",
-      "guaranteeAmount": 800,
-      "percentage": null,
-      "percentageBasis": null,
-      "expenseCap": null,
-      "hospitalityCap": null,
-      "bonuses": null,
-      "notes": null
-    },
-    "settlementFinancials": {
-      "grossBoxOffice": 4000,
-      "totalToArtist": 800,
-      "totalExpenses": 0,
-      "recoups": []
-    },
-    "rawText": {
-      "notes": null,
-      "signoffText": null
-    },
-    "extractedInsight": {
-      "positiveSummary": null,
-      "negativeSummary": null,
-      "hasSummary": false
-    }
-  },
-  {
-    "settlementId": "set_show_demohist_north_frontier_2",
-    "showId": "show_demohist_north_frontier_2",
-    "showDate": "2025-12-13",
-    "showStatus": "closed",
-    "settlementStatus": "paid",
-    "artist": {
-      "id": "artist_demo_north_frontier",
-      "name": "North Frontier",
-      "genre": "indie"
-    },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agency": "WME"
-    },
-    "deal": {
-      "id": "show_demohist_north_frontier_2_d",
-      "dealType": "flat",
-      "guaranteeAmount": 800,
-      "percentage": null,
-      "percentageBasis": null,
-      "expenseCap": null,
-      "hospitalityCap": null,
-      "bonuses": null,
-      "notes": null
-    },
-    "settlementFinancials": {
-      "grossBoxOffice": 4000,
-      "totalToArtist": 800,
-      "totalExpenses": 0,
-      "recoups": []
-    },
-    "rawText": {
-      "notes": null,
-      "signoffText": null
-    },
-    "extractedInsight": {
-      "positiveSummary": null,
-      "negativeSummary": null,
-      "hasSummary": false
-    }
-  },
-  {
-    "settlementId": "set_show_demohist_quartz_lantern_0",
-    "showId": "show_demohist_quartz_lantern_0",
-    "showDate": "2026-03-13",
-    "showStatus": "closed",
-    "settlementStatus": "paid",
-    "artist": {
-      "id": "artist_demo_quartz_lantern",
-      "name": "Quartz Lantern",
-      "genre": "indie"
-    },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agency": "WME"
-    },
-    "deal": {
-      "id": "show_demohist_quartz_lantern_0_d",
-      "dealType": "flat",
-      "guaranteeAmount": 800,
-      "percentage": null,
-      "percentageBasis": null,
-      "expenseCap": null,
-      "hospitalityCap": null,
-      "bonuses": null,
-      "notes": null
-    },
-    "settlementFinancials": {
-      "grossBoxOffice": 4000,
-      "totalToArtist": 800,
-      "totalExpenses": 0,
-      "recoups": []
-    },
-    "rawText": {
-      "notes": null,
-      "signoffText": null
-    },
-    "extractedInsight": {
-      "positiveSummary": null,
-      "negativeSummary": null,
-      "hasSummary": false
-    }
-  },
-  {
-    "settlementId": "set_show_demohist_quartz_lantern_1",
-    "showId": "show_demohist_quartz_lantern_1",
-    "showDate": "2026-01-27",
-    "showStatus": "closed",
-    "settlementStatus": "paid",
-    "artist": {
-      "id": "artist_demo_quartz_lantern",
-      "name": "Quartz Lantern",
-      "genre": "indie"
-    },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agency": "WME"
-    },
-    "deal": {
-      "id": "show_demohist_quartz_lantern_1_d",
-      "dealType": "flat",
-      "guaranteeAmount": 800,
-      "percentage": null,
-      "percentageBasis": null,
-      "expenseCap": null,
-      "hospitalityCap": null,
-      "bonuses": null,
-      "notes": null
-    },
-    "settlementFinancials": {
-      "grossBoxOffice": 4000,
-      "totalToArtist": 800,
-      "totalExpenses": 0,
-      "recoups": []
-    },
-    "rawText": {
-      "notes": null,
-      "signoffText": null
-    },
-    "extractedInsight": {
-      "positiveSummary": null,
-      "negativeSummary": null,
-      "hasSummary": false
-    }
-  },
-  {
-    "settlementId": "set_show_demohist_quartz_lantern_2",
-    "showId": "show_demohist_quartz_lantern_2",
-    "showDate": "2025-12-13",
-    "showStatus": "closed",
-    "settlementStatus": "paid",
-    "artist": {
-      "id": "artist_demo_quartz_lantern",
-      "name": "Quartz Lantern",
-      "genre": "indie"
-    },
-    "agent": {
-      "id": "agent_sarah_kim",
-      "name": "Sarah Kim",
-      "agency": "WME"
-    },
-    "deal": {
-      "id": "show_demohist_quartz_lantern_2_d",
-      "dealType": "flat",
-      "guaranteeAmount": 800,
-      "percentage": null,
-      "percentageBasis": null,
-      "expenseCap": null,
-      "hospitalityCap": null,
-      "bonuses": null,
-      "notes": null
-    },
-    "settlementFinancials": {
-      "grossBoxOffice": 4000,
-      "totalToArtist": 800,
-      "totalExpenses": 0,
-      "recoups": []
-    },
-    "rawText": {
-      "notes": null,
-      "signoffText": null
-    },
-    "extractedInsight": {
-      "positiveSummary": null,
-      "negativeSummary": null,
-      "hasSummary": false
-    }
-  },
-  {
     "settlementId": "settlement_newdemo_atlas_court",
     "showId": "show_newdemo_atlas_court",
     "showDate": "2026-06-04",
@@ -26153,6 +25895,240 @@
     },
     "rawText": {
       "notes": "[NEW DEMO] Pre-show settlement placeholder for the proposal stage.",
+      "signoffText": null
+    },
+    "extractedInsight": {
+      "positiveSummary": null,
+      "negativeSummary": null,
+      "hasSummary": false
+    }
+  },
+  {
+    "settlementId": "set_show_demohist_north_frontier_0",
+    "showId": "show_demohist_north_frontier_0",
+    "showDate": "2026-02-03",
+    "showStatus": "settled",
+    "settlementStatus": "paid",
+    "artist": {
+      "id": "artist_demo_north_frontier",
+      "name": "North Frontier",
+      "genre": "indie"
+    },
+    "agent": null,
+    "deal": {
+      "id": "deal_show_demohist_north_frontier_0",
+      "dealType": "flat",
+      "guaranteeAmount": 800,
+      "percentage": null,
+      "percentageBasis": null,
+      "expenseCap": null,
+      "hospitalityCap": null,
+      "bonuses": null,
+      "notes": null
+    },
+    "settlementFinancials": {
+      "grossBoxOffice": 4000,
+      "totalToArtist": 800,
+      "totalExpenses": 0,
+      "recoups": []
+    },
+    "rawText": {
+      "notes": null,
+      "signoffText": null
+    },
+    "extractedInsight": {
+      "positiveSummary": null,
+      "negativeSummary": null,
+      "hasSummary": false
+    }
+  },
+  {
+    "settlementId": "set_show_demohist_north_frontier_1",
+    "showId": "show_demohist_north_frontier_1",
+    "showDate": "2025-12-15",
+    "showStatus": "settled",
+    "settlementStatus": "paid",
+    "artist": {
+      "id": "artist_demo_north_frontier",
+      "name": "North Frontier",
+      "genre": "indie"
+    },
+    "agent": null,
+    "deal": {
+      "id": "deal_show_demohist_north_frontier_1",
+      "dealType": "flat",
+      "guaranteeAmount": 800,
+      "percentage": null,
+      "percentageBasis": null,
+      "expenseCap": null,
+      "hospitalityCap": null,
+      "bonuses": null,
+      "notes": null
+    },
+    "settlementFinancials": {
+      "grossBoxOffice": 4000,
+      "totalToArtist": 800,
+      "totalExpenses": 0,
+      "recoups": []
+    },
+    "rawText": {
+      "notes": null,
+      "signoffText": null
+    },
+    "extractedInsight": {
+      "positiveSummary": null,
+      "negativeSummary": null,
+      "hasSummary": false
+    }
+  },
+  {
+    "settlementId": "set_show_demohist_north_frontier_2",
+    "showId": "show_demohist_north_frontier_2",
+    "showDate": "2025-10-26",
+    "showStatus": "settled",
+    "settlementStatus": "paid",
+    "artist": {
+      "id": "artist_demo_north_frontier",
+      "name": "North Frontier",
+      "genre": "indie"
+    },
+    "agent": null,
+    "deal": {
+      "id": "deal_show_demohist_north_frontier_2",
+      "dealType": "flat",
+      "guaranteeAmount": 800,
+      "percentage": null,
+      "percentageBasis": null,
+      "expenseCap": null,
+      "hospitalityCap": null,
+      "bonuses": null,
+      "notes": null
+    },
+    "settlementFinancials": {
+      "grossBoxOffice": 4000,
+      "totalToArtist": 800,
+      "totalExpenses": 0,
+      "recoups": []
+    },
+    "rawText": {
+      "notes": null,
+      "signoffText": null
+    },
+    "extractedInsight": {
+      "positiveSummary": null,
+      "negativeSummary": null,
+      "hasSummary": false
+    }
+  },
+  {
+    "settlementId": "set_show_demohist_quartz_lantern_0",
+    "showId": "show_demohist_quartz_lantern_0",
+    "showDate": "2026-02-03",
+    "showStatus": "settled",
+    "settlementStatus": "paid",
+    "artist": {
+      "id": "artist_demo_quartz_lantern",
+      "name": "Quartz Lantern",
+      "genre": "indie"
+    },
+    "agent": null,
+    "deal": {
+      "id": "deal_show_demohist_quartz_lantern_0",
+      "dealType": "flat",
+      "guaranteeAmount": 800,
+      "percentage": null,
+      "percentageBasis": null,
+      "expenseCap": null,
+      "hospitalityCap": null,
+      "bonuses": null,
+      "notes": null
+    },
+    "settlementFinancials": {
+      "grossBoxOffice": 4000,
+      "totalToArtist": 800,
+      "totalExpenses": 0,
+      "recoups": []
+    },
+    "rawText": {
+      "notes": null,
+      "signoffText": null
+    },
+    "extractedInsight": {
+      "positiveSummary": null,
+      "negativeSummary": null,
+      "hasSummary": false
+    }
+  },
+  {
+    "settlementId": "set_show_demohist_quartz_lantern_1",
+    "showId": "show_demohist_quartz_lantern_1",
+    "showDate": "2025-12-15",
+    "showStatus": "settled",
+    "settlementStatus": "paid",
+    "artist": {
+      "id": "artist_demo_quartz_lantern",
+      "name": "Quartz Lantern",
+      "genre": "indie"
+    },
+    "agent": null,
+    "deal": {
+      "id": "deal_show_demohist_quartz_lantern_1",
+      "dealType": "flat",
+      "guaranteeAmount": 800,
+      "percentage": null,
+      "percentageBasis": null,
+      "expenseCap": null,
+      "hospitalityCap": null,
+      "bonuses": null,
+      "notes": null
+    },
+    "settlementFinancials": {
+      "grossBoxOffice": 4000,
+      "totalToArtist": 800,
+      "totalExpenses": 0,
+      "recoups": []
+    },
+    "rawText": {
+      "notes": null,
+      "signoffText": null
+    },
+    "extractedInsight": {
+      "positiveSummary": null,
+      "negativeSummary": null,
+      "hasSummary": false
+    }
+  },
+  {
+    "settlementId": "set_show_demohist_quartz_lantern_2",
+    "showId": "show_demohist_quartz_lantern_2",
+    "showDate": "2025-10-26",
+    "showStatus": "settled",
+    "settlementStatus": "paid",
+    "artist": {
+      "id": "artist_demo_quartz_lantern",
+      "name": "Quartz Lantern",
+      "genre": "indie"
+    },
+    "agent": null,
+    "deal": {
+      "id": "deal_show_demohist_quartz_lantern_2",
+      "dealType": "flat",
+      "guaranteeAmount": 800,
+      "percentage": null,
+      "percentageBasis": null,
+      "expenseCap": null,
+      "hospitalityCap": null,
+      "bonuses": null,
+      "notes": null
+    },
+    "settlementFinancials": {
+      "grossBoxOffice": 4000,
+      "totalToArtist": 800,
+      "totalExpenses": 0,
+      "recoups": []
+    },
+    "rawText": {
+      "notes": null,
       "signoffText": null
     },
     "extractedInsight": {
