@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "wouter";
 import { AlertTriangle, ThumbsUp, ThumbsDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatShowDate } from "@/lib/format";
@@ -170,8 +171,10 @@ function ArtistCard({ row }: { row: ArtistRow }) {
   const tone = attentionTone(attentionCount);
 
   return (
-    <div
-      className={`group relative rounded-lg border bg-white p-5 transition-all duration-150 hover:shadow-[0_4px_16px_rgba(26,24,20,0.06)] hover:-translate-y-0.5 ${tone.card}`}
+    <Link
+      href={`/shows?q=${encodeURIComponent(artist.name)}`}
+      className={`group relative block rounded-lg border bg-white p-5 transition-all duration-150 hover:shadow-[0_4px_16px_rgba(26,24,20,0.06)] hover:-translate-y-0.5 cursor-pointer ${tone.card}`}
+      aria-label={`View shows for ${artist.name}`}
     >
       <div className={`absolute top-4 right-4 w-2 h-2 rounded-full ${genreColor(artist.genre)} opacity-60`} />
       <div className="text-[15px] font-medium text-ink-900 group-hover:text-brand-800 transition-colors leading-tight pr-5">
@@ -246,6 +249,6 @@ function ArtistCard({ row }: { row: ArtistRow }) {
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
