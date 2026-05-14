@@ -370,25 +370,25 @@ function SwitchSavingsSection() {
           <div className="rounded-md ring-1 ring-emerald-200/60 bg-emerald-50/40 p-3">
             <div className="flex items-center gap-1.5 eyebrow text-[10px] text-emerald-700 mb-1">
               <DollarSign className="h-3 w-3" />
-              Money saved (top {data.items.length})
+              Money saved
             </div>
             <div className="text-[22px] font-serif text-ink-900 tabular">
               {fmtMoney(totalDollars)}
             </div>
             <div className="text-[10px] text-ink-400">
-              cumulative venue-side payout reduction vs. actual
+              cumulative venue-side payout reduction across all {data.totalCandidates} candidate deals
             </div>
           </div>
           <div className="rounded-md ring-1 ring-sky-200/60 bg-sky-50/40 p-3">
             <div className="flex items-center gap-1.5 eyebrow text-[10px] text-sky-700 mb-1">
               <Clock className="h-3 w-3" />
-              Time saved (top {data.items.length})
+              Time saved
             </div>
             <div className="text-[22px] font-serif text-ink-900 tabular">
               {fmtMinutes(totalMins)}
             </div>
             <div className="text-[10px] text-ink-400">
-              fewer minutes spent on settlement-night arithmetic + back-and-forth
+              fewer minutes on settlement-night arithmetic across all {data.totalCandidates} deals
             </div>
           </div>
           <div
@@ -567,10 +567,12 @@ function SavingsExplainer({
           )}
 
           <div className="text-[11px] text-ink-500 border-t border-ink-200/60 pt-2.5">
-            Headline tiles roll up the top {itemCount} rows shown below: cumulative money saved is{" "}
+            Headline tiles roll up <span className="font-semibold">every</span> candidate deal in
+            the window — not just the top {itemCount} rows shown below: cumulative money saved is{" "}
             <span className="font-mono tabular text-ink-700">{fmtMoney(totalMoney)}</span>, time
             saved is{" "}
             <span className="font-mono tabular text-ink-700">{fmtMinutes(totalMinutes)}</span>.
+            The list below is sorted by money saved desc and truncated to Top-N for readability.
             Adjust the time-window and Top-N controls above to expand the window. Only past-dated,
             settled rows are eligible — future-dated proposals (NEW DEMO upcoming shows) never enter
             the calc.
