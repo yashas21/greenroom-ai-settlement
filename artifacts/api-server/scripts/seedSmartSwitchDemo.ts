@@ -106,6 +106,7 @@ async function ensureSwitchSuggestion(args: {
   flat?: number;
   doorFloor?: number; doorSplit?: number; doorCap?: number;
   basis: string;
+  artistShowsAtVenue: number;
 }): Promise<void> {
   const [existing] = await db.select().from(switchSuggestions).where(eq(switchSuggestions.showId, args.showId));
   if (existing) return;
@@ -127,6 +128,7 @@ async function ensureSwitchSuggestion(args: {
     basis: args.basis,
     status: args.status,
     decidedAt: args.status === "accepted" ? new Date() : null,
+    artistShowsAtVenue: args.artistShowsAtVenue,
   });
 }
 
@@ -159,20 +161,24 @@ async function main(): Promise<void> {
   await ensureSwitchSuggestion({
     showId: "show_demo_marble_index", shape: "flat", tier: "B", status: "accepted", flat: 4950,
     basis: "First-timer at the venue (tier capped at B). Comparable vs deals in the $1–5K bucket settled at $4,950 on average across 12 prior shows.",
+    artistShowsAtVenue: 0,
   });
   await ensureSwitchSuggestion({
     showId: "show_demo_north_frontier", shape: "flat", tier: "A", status: "suggested", flat: 4950,
     basis: "3 prior shows at the venue keep the tier ceiling at A. Comparable vs deals in the $1–5K bucket averaged $4,950 to artist.",
+    artistShowsAtVenue: 3,
   });
   await ensureSwitchSuggestion({
     showId: "show_demo_quartz_lantern", shape: "door_hybrid", tier: "A", status: "accepted",
     doorFloor: 500, doorSplit: 0.6, doorCap: 800,
     basis: "Pure door deals lose money for the venue 93% of the time. Hybrid: $500 floor + 60% above an $800 expense cap. 3 prior shows → tier A.",
+    artistShowsAtVenue: 3,
   });
   await ensureSwitchSuggestion({
     showId: "show_demo_drowsy_beacon", shape: "door_hybrid", tier: "B", status: "suggested",
     doorFloor: 500, doorSplit: 0.6, doorCap: 800,
     basis: "First-time at the venue (tier capped at B). Hybrid replaces pure door with a $500 floor + 60% above an $800 expense cap.",
+    artistShowsAtVenue: 0,
   });
 
   console.log("seedSmartSwitchDemo: complete (idempotent).");
