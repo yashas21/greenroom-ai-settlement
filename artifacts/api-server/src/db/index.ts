@@ -1,9 +1,14 @@
+import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
-const dbPath = path.resolve(process.cwd(), "data", "greenroom.db");
+const dbCandidates = [
+  path.resolve(process.cwd(), "data", "greenroom.db"),
+  path.resolve(process.cwd(), "artifacts", "api-server", "data", "greenroom.db"),
+];
+const dbPath = dbCandidates.find((p) => fs.existsSync(p)) ?? dbCandidates[0];
 const envUrl = process.env.DATABASE_URL;
 const dbUrl = envUrl && envUrl.startsWith("file:") ? envUrl : `file:${dbPath}`;
 
