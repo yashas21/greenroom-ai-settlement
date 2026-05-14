@@ -1,0 +1,25 @@
+Remaining Open Issues — None New Fixed
+
+These six issues from the original review are still open:
+
+1. Incorrect comment/basis string in smartSwitch.ts:244–246 and :287–289 (HIGH — user-visible)
+
+The comment and the emitted basis string both state the guarantee-anchor was chosen because "the percentage never fired" (and cite "43/43" deals). The current seeded data has 87.1% fire rate in that bucket. This comment is factually wrong and the basis string is surfaced directly in the UI tooltip. The policy decision (anchor to contract guarantee) is still the right call — but the stated reason is the opposite of reality. A future maintainer reading this will be confused why the audit recommends anchoring to a number that "never fires" when the data shows it fires most of the time.
+
+Suggested fix: Change the comment and basis text to: "We anchor to the contract guarantee — the number both sides already signed — rather than a cell-mean projection. Locking in the known number eliminates settlement-night arithmetic regardless of how often the percentage clause fires."
+
+2. Duplicate classifyBucket in dealImprovements.ts:62–71 (MEDIUM — maintenance risk)
+
+The local copy routes any percentage != null && guaranteeAmount == null deal to "Uncapped %" regardless of deal type. classifyAnalyticsSizeBucket (the canonical post-audit version) restricts "Uncapped %" to percentage_of_gross only. A zero-guarantee vs deal lands in "$0–1K" in the deal grid but in "Uncapped %" for expense-cap improvement suggestions — the two features use different bucket keys for the same deal.
+
+3. totalCandidates / totalMoneySavedToVenue scope mismatch in getSwitchSavings (MEDIUM — misleading API)
+
+switchSavings.ts:342 returns totalCandidates: items.length (full candidate list before topN trim) while totalMoneySavedToVenue and totalMinutesSaved are summed from trimmed = items.slice(0, topN). These three fields cannot be meaningfully combined by a caller — dividing totalMoneySavedToVenue / totalCandidates gives a per-show average using a denominator that includes shows whose money is not counted in the numerator.
+
+4. computeInsuranceTier never emits tier 1 (LOW — undocumented gap)
+
+smartGuarantee.ts:311–325 can only return 2, 3, or 4. If tier 1 is intentional (e.g. reserved for future high-confidence scenarios), it should be documented in a comment. If it was accidentally dropped, the condition is missing.
+
+5. N+1 DB queries inside getSwitchSavings and getSwitchProjectedGrid loops (LOW — performance)
+
+generateSuggestion(deal, artistN, show.id) → generateGuarantee(showId) fires three individual db.select() calls per candidate (show, deal, artist). Both functions pre-fetch expenses and the prior-show index in bulk, but the per-show lookups inside generateGuarantee were not batched. At ~50 candidates this is ~150 extra queries per /switch-savings request.
