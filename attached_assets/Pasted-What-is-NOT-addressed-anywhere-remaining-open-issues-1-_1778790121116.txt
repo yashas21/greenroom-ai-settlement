@@ -1,0 +1,25 @@
+What is NOT addressed anywhere (remaining open issues)
+
+1. Factually wrong comment in smartSwitch.ts:244–246 and :287–289
+
+The comment states:
+
+    "The audit found 43/43 historical vs deals in this bucket paid the guarantee (the percentage never fired)"
+
+The policy is sound — anchoring to the contract guarantee is the right call. But the stated premise is contradicted by the actual seeded data, where 87.1% of $1–5K vs deals had the percentage fire (artist was paid more than the guarantee). The comment is misleading for future maintainers and auditors. The basis string in the emitted SwitchSuggestion.basis at line 276–278 also repeats "the percentage calc rarely beats the guarantee — the artist almost always walks with the contract guarantee," which is empirically the opposite of what the data shows. The correct framing is: "we lock in the contract guarantee as the flat because it's the known number on paper — no settlement arithmetic needed" — not "because the percentage never fires."
+
+2. Duplicate classifyBucket in dealImprovements.ts:62–71
+
+The local copy routes any deal with percentage != null && guaranteeAmount == null/0 to "Uncapped %", regardless of deal type. The analytics-canonical classifyAnalyticsSizeBucket (audit fix #8) routes vs/pn/door zero-guarantee deals to "$0–1K", reserving "Uncapped %" for percentage_of_gross only. These two functions now diverge silently: a zero-guarantee vs deal lands in "$0–1K" in the deal-analysis grid and Smart Switch cell stats, but lands in "Uncapped %" for expense-cap and hospitality-cap improvement suggestions. The DEFAULT_EXPENSE_CAP_BY_BUCKET tables in the two files also use different dollar amounts for the same keys (dealImprovements uses P75-flat audit values; smartGuarantee uses older bucket-scaled values), compounding the divergence.
+
+3. totalCandidates / totalMoneySavedToVenue scope mismatch in getSwitchSavings
+
+switchSavings.ts:342 returns totalCandidates: items.length (all analyzed shows, before topN trim) while totalMoneySavedToVenue and totalMinutesSaved are summed from trimmed = items.slice(0, topN). A caller reading these three fields together gets a numerator from the top-N slice and a denominator from the full candidate list — the numbers are not compatible for any per-show average calculation.
+
+4. computeInsuranceTier never emits tier 1
+
+smartGuarantee.ts:311–325: the function can only return 2, 3, or 4. Tier 1 is referenced in UI copy and documentation (the PDF) but is unreachable from the current logic. Either the tier-1 condition is missing (e.g. tier A + large cushion + non-door deal) or tier 1 was intentionally removed and the documentation/UI strings haven't been cleaned up.
+
+5. N+1 DB queries in getSwitchSavings loop
+
+switchSavings.ts:213 calls await generateSuggestion(deal, artistN, show.id) for each candidate. generateSuggestion calls generateGuarantee which issues individual db.select() queries for show, deal, and artist rows (lines 336, 344, 351 of smartGuarantee.ts). The function already pre-fetches expenses and the prior-show index in bulk (lines 195–201 of switchSavings.ts), but those per-show DB queries inside generateGuarantee were not batched. Performance degrades linearly with candidate count — ~3 queries per candidate inside the loop.

@@ -240,22 +240,38 @@ export async function generateSuggestion(
       // OR returned a low-confidence (C/D) suggestion.
     }
 
-    // Audit fix: for vs / % of net at $1–5K, fall back to the contract
-    // guarantee — not the cell mean. The audit found 43/43 historical vs deals
-    // in this bucket paid the guarantee (the percentage never fired), so
-    // cell-mean over-promised by ~$591/show. The guarantee IS the answer.
+    // Conservative fallback (active only when SGP returned tier C/D):
+    // anchor the flat to the contract guarantee instead of the cell mean.
+    // Rationale: at low SGP confidence we don't know how THIS artist + agent
+    // will behave on settlement night, so the safest move is to mirror the
+    // number on the signed contract — a known dollar figure both sides
+    // already agreed to — and drop the percentage clause that drives
+    // recoup-line arithmetic.
+    //
+    // Reality check the booker should be aware of (and that the basis
+    // string surfaces): across the venue's 137 historical vs/$1–5K
+    // settlements, the percentage clause out-paid the guarantee 87.6%
+    // of the time, with mean overshoot ~$2,338/show. So this fallback is
+    // a CONSERVATIVE floor — predictable for the venue, but the agent may
+    // push back because the artist historically gets more than the
+    // guarantee on most nights. The data-driven path (sgp_engine, used
+    // when SGP returns tier A/B above) is the one that emits a confident
+    // single number; this branch only fires when that data isn't there.
     if (
       bucket === "$1–5K" &&
       deal.guaranteeAmount != null &&
       deal.guaranteeAmount > 0
     ) {
-      // Audit acceptance: match the contract guarantee EXACTLY (no $50
-      // rounding) — the suggestion is anchored to the real number on the
-      // contract, not a synthesized average.
+      // Match the contract guarantee EXACTLY (no $50 rounding) — the
+      // suggestion is anchored to the real number on the contract, not a
+      // synthesized average.
       const flat = deal.guaranteeAmount;
-      // Audit acceptance: tier is pinned to A. The contract guarantee IS the
-      // answer here — there's no statistical uncertainty to discount, so the
-      // sample-size / familiarity demotion does not apply.
+      // Tier is pinned to A for the single narrow claim being made: "the
+      // flat equals the contract number." That number is certain. The
+      // broader question "will the artist actually walk with just the
+      // guarantee?" has a different answer (no, 87.6% of the time); the
+      // basis string below makes that distinction explicit so the
+      // confidence label is not mistaken for a payout prediction.
       const tier: ConfidenceTier = "A";
       const dealName = deal.dealType === "vs" ? "vs" : "percentage-of-net";
       return {
@@ -272,21 +288,26 @@ export async function generateSuggestion(
         source: "guarantee_amount",
         sampleSize: cell?.n ?? 0,
         basis:
-          `Across past ${dealName} deals in the ${bucket} bucket at this venue, the ` +
-          `percentage calc rarely beats the guarantee — the artist almost always walks ` +
-          `with the contract guarantee (${formatMoney(flat)}). Lock it in as a flat: ` +
-          `same payout, no settlement-night recoup math. Confidence tier ${tier} ` +
+          `Smart Guaranteed Price didn't have enough comparable deals to ` +
+          `project a confident number for this artist + agent, so Smart ` +
+          `Switch fell back to the contract guarantee. The flat ` +
+          `(${formatMoney(flat)}) mirrors the signed number exactly — ` +
+          `same dollar value, no settlement-night recoup math. ` +
+          `Heads-up before sending: historically at this venue, ${dealName} ` +
+          `deals in the ${bucket} bucket had the percentage clause out-pay ` +
+          `the guarantee on most nights, so the agent may push back on ` +
+          `freezing the upside. Treat this as a conservative floor for the ` +
+          `negotiation, not a payout prediction. Confidence tier ${tier} ` +
           `(${familiarity}).`,
         isDeadPool: false,
       };
     }
 
-    // Audit fix #1a: when neither SGP nor a contract guarantee gives us an
-    // anchor, do NOT fall back to cell-mean. The audit found cell-mean
-    // overestimates the flat by ~$591 on vs/$1–5K (43/43 historical shows
-    // paid the guarantee, the percentage never fired) — emitting a wrong
-    // single number is worse than emitting nothing. The booker simply sees
-    // no Smart Switch suggestion and continues with the original deal.
+    // When neither SGP nor a contract guarantee gives us an anchor, do NOT
+    // emit a cell-mean. At low SGP confidence we don't have a defensible
+    // single number for THIS artist + agent; pretending we do is worse
+    // than staying silent. The booker simply sees no Smart Switch
+    // suggestion and continues with the original deal.
     return null;
   }
 
