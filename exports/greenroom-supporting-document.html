@@ -240,7 +240,7 @@
     </div>
     <div class="card">
       <h3><code>lib/switchSavings.ts</code></h3>
-      <p>"If Smart Switch had been used, what would have changed?" Computes per-show counterfactual payout, money delta, and a notes-/recoup-derived time-saved estimate. <code>getSwitchProjectedGrid()</code> rolls the same logic up to the cell-grid for the redesign report. Now also reports <code>vsPercentageFiredStats</code>: 24/180 (13.3%) of settled vs deals had the percentage clause never out-pay the guarantee.</p>
+      <p>"If Smart Switch had been used, what would have changed?" Computes per-show counterfactual payout, money delta, and a notes-/recoup-derived time-saved estimate. <code>getSwitchProjectedGrid()</code> rolls the same logic up to the cell-grid for the redesign report. Now also reports <code>vsPercentageFiredStats</code>, scoped to the $1–5K bucket where Smart Switch's flat fallback applies: 11/64 (17.2%) of settled vs / $1–5K deals had the percentage clause never out-pay the guarantee.</p>
     </div>
     <div class="card">
       <h3><code>lib/guaranteeBacktest.ts</code></h3>
@@ -300,8 +300,8 @@
     <tr><td>vs · $1–5K past deals</td><td class="mono">137</td><td><code>GET /api/deal-analysis</code> · cross-tab cell</td></tr>
     <tr><td>vs · $1–5K dispute rate</td><td class="mono">12.4%</td><td>same cell · <code>disputeRate</code></td></tr>
     <tr><td>flat · $1–5K dispute rate</td><td class="mono">3.8%</td><td>same cell · <code>disputeRate</code></td></tr>
-    <tr><td>Smart Switch projected savings · vs/$1–5K</td><td class="mono">$23,024</td><td><code>GET /api/insights/switch-projected-grid</code></td></tr>
-    <tr><td>vs deals scanned · % clause never fired</td><td class="mono">24 / 180 (13.3%)</td><td><code>GET /api/insights/switch-savings</code> · <code>vsPercentageFiredStats</code></td></tr>
+    <tr><td>Smart Switch projected savings · vs/$1–5K</td><td class="mono">$22,774</td><td><code>GET /api/insights/switch-projected-grid</code></td></tr>
+    <tr><td>vs deals scanned · % clause never fired (scoped to $1–5K)</td><td class="mono">11 / 64 (17.2%)</td><td><code>GET /api/insights/switch-savings</code> · <code>vsPercentageFiredStats</code></td></tr>
     <tr><td>SGP backtest scored deals</td><td class="mono">321</td><td><code>GET /api/insights/guarantee-backtest</code></td></tr>
     <tr><td>SGP gap distribution (median · p75 · p90)</td><td class="mono">$1,119 · $1,939 · $3,344</td><td>same · <code>gapCoverage</code></td></tr>
     <tr><td>SGP gap fully covered at $400</td><td class="mono">25.2%</td><td>same · <code>gapCoverage.buckets</code></td></tr>
