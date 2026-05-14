@@ -48,3 +48,9 @@ id = "U_rCEYNcmL0CHWa7v-yUX"
 uri = "file://exports/greenroom-supporting-document-changes.md"
 type = "text"
 title = "Supporting Document — Drift Report"
+
+[[outputs]]
+id = "UfZRT50rw6h9be383YQG1"
+uri = "file://exports/greenroom-supporting-document-changes.pdf"
+type = "pdf"
+title = "Supporting Document — Drift Report (PDF)"
