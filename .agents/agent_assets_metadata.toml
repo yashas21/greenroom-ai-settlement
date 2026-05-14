@@ -42,3 +42,9 @@ id = "VjQBXDyDt8kV95ZEoZBTL"
 uri = "file://exports/greenroom-insurance-pricing.pdf"
 type = "pdf"
 title = "Insurance Products 1 & 2 · Suggested Cost & Pricing"
+
+[[outputs]]
+id = "U_rCEYNcmL0CHWa7v-yUX"
+uri = "file://exports/greenroom-supporting-document-changes.md"
+type = "text"
+title = "Supporting Document — Drift Report"
