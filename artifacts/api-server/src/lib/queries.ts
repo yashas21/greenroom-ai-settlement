@@ -252,7 +252,7 @@ export async function getAllArtists() {
 
 type ComplexityBucket = "simple" | "medium" | "complex";
 
-function classifyComplexity(d: typeof deals.$inferSelect): ComplexityBucket {
+export function classifyComplexity(d: typeof deals.$inferSelect): ComplexityBucket {
   const hasBonuses = !!d.bonusesJson && d.bonusesJson !== "[]" && d.bonusesJson !== "null";
   if (
     d.dealType === "vs" ||

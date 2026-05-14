@@ -29,7 +29,7 @@ const COMPLEXITY_META: Record<
   },
   complex: {
     label: "Complex",
-    blurb: "Vs / door / % of net, or has bonuses or freetext notes.",
+    blurb: "Vs / door / % of net, or has bonuses.",
     bar: "bg-amber-500/90",
     ring: "ring-amber-200/60",
     bg: "bg-amber-50/30",
@@ -366,7 +366,7 @@ function ComplexitySection({ data }: { data: DealAnalysis }) {
     <section className="mb-16">
       <SectionHeader
         title="By complexity"
-        subtitle="A derived score Mariana can use to spot which deals are quietly burning hours. Complex deals are also the ones the in-app tool can't settle."
+        subtitle="A structural read of the deal shape — simple flats settle in one click, % deals need cap math, and vs / door / % of net deals fall to the spreadsheet. The in-tool / spreadsheet split per bucket shows where the wizard already covers vs. where bookers still leave the tool."
       />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {data.byComplexity.map((c) => {
