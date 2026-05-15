@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Slice C: deal-clarification resolutions are demo state. Reviewers start fresh.
+data/clarifications.json
+
+# Local-only deliverables (memo PDF, etc.) — submitted out-of-band, not in repo.
+*.pdf

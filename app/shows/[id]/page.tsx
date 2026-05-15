@@ -6,8 +6,13 @@ import {
   AlertCircle,
   Clock,
   TrendingUp,
+  ScrollText,
+  AlertTriangle,
+  ShieldCheck,
 } from "lucide-react";
 import { getShowById } from "@/lib/queries";
+import { parseDeal } from "@/lib/dealParser";
+import { getClarifications } from "@/lib/clarifications";
 import {
   Card,
   CardContent,
@@ -75,6 +80,16 @@ export default async function ShowDetailPage({
 
   const bonuses = deal ? parseBonuses(deal) : [];
 
+  // Deal Sheet integration: parse the prose, count open ambiguities.
+  const dealSheet = deal ? parseDeal(deal) : null;
+  const dealResolutions = dealSheet
+    ? await getClarifications(dealSheet.flags.map((f) => f.id))
+    : {};
+  const openFlags = dealSheet
+    ? dealSheet.flags.filter((f) => !dealResolutions[f.id])
+    : [];
+  const openHigh = openFlags.filter((f) => f.severity === "high").length;
+
   const isDisputed = settlement?.status === "disputed";
 
   return (
@@ -119,12 +134,48 @@ export default async function ShowDetailPage({
               </span>
             </div>
           </div>
-          <Link href={`/shows/${show.id}/settle`} className="mt-6 shrink-0">
-            <Button variant="brand" size="lg">
-              <FileSpreadsheet className="h-4 w-4" />
-              {settlement ? "View settlement" : "Settle show"}
-            </Button>
-          </Link>
+          <div className="mt-6 shrink-0 flex items-center gap-2">
+            {dealSheet && (
+              <Link href={`/shows/${show.id}/deal-sheet`}>
+                <Button
+                  variant={
+                    openHigh > 0
+                      ? "danger"
+                      : openFlags.length > 0
+                        ? "secondary"
+                        : "secondary"
+                  }
+                  size="lg"
+                >
+                  {openFlags.length === 0 ? (
+                    <ShieldCheck className="h-4 w-4" />
+                  ) : openHigh > 0 ? (
+                    <AlertTriangle className="h-4 w-4" />
+                  ) : (
+                    <ScrollText className="h-4 w-4" />
+                  )}
+                  Deal sheet
+                  {openFlags.length > 0 && (
+                    <span
+                      className={`ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10.5px] font-semibold ${
+                        openHigh > 0
+                          ? "bg-white/20 text-white"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {openFlags.length}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+            )}
+            <Link href={`/shows/${show.id}/settle`}>
+              <Button variant="brand" size="lg">
+                <FileSpreadsheet className="h-4 w-4" />
+                {settlement ? "View settlement" : "Settle show"}
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Key numbers strip */}

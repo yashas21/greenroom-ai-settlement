@@ -10,6 +10,32 @@ This is the starter codebase for the Greenroom Applied AI PM case study.
 
 ---
 
+## 🛠 Case-study submission — Sheharyar
+
+> **Slice:** Deal Sheet + Wednesday Risk View. *Settlement starts on Wednesday, not at 2am.*
+>
+> **Read first:** [`MEMO.md`](./MEMO.md) (1.5-page PRD)
+>
+> **Try the demo:**
+> 1. `npm install && npm run dev` — open http://localhost:3000
+> 2. Click **Wednesday** in the sidebar — the new top-level surface.
+> 3. Look at the **"Status ↔ sign-off mismatch"** card (the brief's exact breadcrumb, surfaced explicitly).
+> 4. Click into `show_coastal_spell_dispute` → see the 🔴 *"Marketing recoup — inside or outside the expense cap?"* flag, the evidence quoted from the prose, and the pre-drafted clarification email.
+> 5. Compare with `show_0000` (Low Rooms) — same product, clean deal, 🟢 settle-ready.
+>
+> **What's new:**
+> - `app/wednesday/page.tsx` — risk view
+> - `app/shows/[id]/deal-sheet/` — per-show deal sheet
+> - `lib/dealParser.ts` — deterministic parser + ambiguity catalog (LLM-swappable)
+> - `lib/clarifications.ts` — JSON-file persistence for resolved/acknowledged/dismissed flags
+> - `lib/riskQueries.ts` — aggregate parse for the Wednesday view
+> - `components/deal-sheet/flag-card.tsx` — the interactive flag UI
+> - "Deal sheet" entry-point button on the existing show detail page
+>
+> **To reset the demo state:** `rm -f data/clarifications.json` (re-opens any flags you marked).
+
+---
+
 You're looking at a working but mediocre product. It's enough to feel real, but every workflow has gaps. **Your job isn't to fix everything — it's to pick a slice and design it well.** See your case study brief for full instructions.
 
 ## Before you start
