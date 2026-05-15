@@ -1,0 +1,523 @@
+# Greenroom — Smart Flat Rate Calculation Engine
+### Replit Agent Prompt · `lib/switchMath.ts`
+
+---
+
+## What you are building
+
+A standalone calculation module: `lib/switchMath.ts`.
+
+This is **not** a modification to `lib/dealMath.ts`. That file handles settlement calculations for shows that are already in progress — it runs on the night of the show using real expenses. This new module runs **at deal entry**, weeks before the show, using historical expense data to predict what the settlement will produce. The outputs are different, the timing is different, the data sources are different.
+
+`dealMath.ts` answers: *"Given the actual expenses from tonight, what does the artist receive?"*
+`switchMath.ts` answers: *"Given this deal structure, what flat guarantee would produce the same outcome based on historical patterns?"*
+
+Do not merge these two files. Do not import `calculateSettlement` into `switchMath.ts`.
+
+---
+
+## The core distinction: historical vs actual
+
+The Greenroom flat guarantee (stored as `deal.guaranteeAmount`) is the number the venue and agent agreed to when they booked the show. The Smart Flat suggestion is the number Greenroom calculates independently from the deal structure, using the platform's historical expense data — it may or may not equal the guarantee.
+
+For vs deals under $5,000 expected gross, these two numbers are almost always the same ($11 average difference across 43 historical shows). But the calculation must still run the full historical path and arrive at the guarantee through evidence, not by reading the field directly. This matters because:
+
+1. It proves the guarantee is reasonable — Mariana can show agents "our data confirms this number"
+2. It catches cases where the guarantee is set wrong relative to historical patterns
+3. It produces a confidence band that tells Mariana how reliable the suggestion is
+4. It builds an audit trail: every flat suggestion records exactly which historical data was used
+
+---
+
+## Historical data constants — derived from 497 settled shows
+
+These are pre-computed from the database and should be seeded as constants in the module. They must be re-computed and updated each time Greenroom re-seeds its statistics (add a `lib/updateSwitchConstants.ts` script that can be run on a schedule).
+
+```typescript
+// lib/switchConstants.ts  ← create this as a sibling file
+
+export const SWITCH_CONSTANTS = {
+
+  // ── Expense caps by deal type + gross range (P75 of historical expenses) ──
+  // Cap = the expense level that 75% of shows fall at or below.
+  // Used to protect both parties: 75% of nights need no insurance.
+  // The 25% above-cap overage is where insurance applies.
+  expenseCap: {
+    vs_under5k:      1836,   // P75 of 49 vs deals under $5K gross
+    pn_under5k:      1729,   // P75 of 49 % of net deals under $5K gross
+    flat_under5k:    1770,   // P75 of 128 flat deals under $5K gross
+    door_any:        1774,   // P75 of 23 door deals across all gross
+    venue_all:       1758,   // P75 of all 497 settled shows (last-resort fallback)
+  },
+
+  // ── Venue-wide expense averages (used when no artist/genre history) ──
+  expenseMean: {
+    vs_under5k:      1607,
+    pn_under5k:      1526,
+    flat_under5k:    1538,
+    door_any:        1578,
+    venue_all:       1543,
+  },
+
+  // ── Genre-level expense P75 (fallback when artist has <2 shows) ──
+  // Source: all settled shows grouped by artist genre, min 5 shows per genre.
+  genreExpenseP75: {
+    "indie rock":    1707,
+    "indie pop":     1675,
+    "americana":     1807,
+    "garage rock":   1707,
+    "alt country":   1703,
+    "indie folk":    1770,
+    "punk":          1813,
+    "post rock":     1869,
+    "songwriter":    1760,
+    "ambient":       1839,
+    "rock":          1803,
+    "shoegaze":      1760,
+    "blues rock":    1776,
+    "psych rock":    1585,
+    "soul":          1846,
+    "art rock":      1717,
+    "folk rock":     1593,
+    "_unknown":      1758,   // fallback for genres with < 5 shows
+  },
+
+  // ── Accuracy benchmarks (used to set confidence tier and insurance default) ──
+  accuracy: {
+    vs_under5k_within50:  "43/43",   // 100%: guarantee always equals flat answer
+    pn_under5k_mean_delta: 725,      // % of net needs artist history to be accurate
+    pn_under5k_p90_delta:  1101,     // high variance without artist-specific data
+  },
+
+  // ── Fee rate ──
+  ticketingFeeRate: 0.10,            // 10% of gross
+
+} as const;
+```
+
+---
+
+## Data sources for the expense estimate — resolution order
+
+The expense estimate is the single most important input. The module must resolve it from the richest available source, in this order:
+
+```
+Priority 1: Artist-specific expense history (≥ 2 prior shows at this venue)
+  → Use: mean of artist's actual expenses across all prior shows at this venue
+  → Confidence: A (highest)
+  → Source table: expenses JOIN shows WHERE artist_id = ? AND show_id IN (settled shows)
+
+Priority 2: Artist has exactly 1 prior show
+  → Use: that show's actual expenses
+  → Confidence: B
+  → Source: same query, n=1
+
+Priority 3: No artist history, but agent has ≥ 5 shows at this venue
+  → Use: mean expenses across all shows booked by this agent
+  → Confidence: C
+  → Note: agents at this venue avg $1,450–$1,655 expense range
+
+Priority 4: No artist or agent history, but genre is known
+  → Use: genreExpenseP75[artist.genre] from SWITCH_CONSTANTS
+  → Confidence: C–
+  → Note: punk/ambient/americana run $1,750–$1,870 P75; folk/pop run $1,600–$1,680
+
+Priority 5: Truly cold — no artist, agent, or genre data
+  → Use: expenseMean[deal_type + gross_range] from SWITCH_CONSTANTS
+  → Confidence: D
+  → Always show as a range, never a single number
+```
+
+The expense estimate and its source must be stored in the `switch_suggestions` table alongside the suggestion, so Mariana can see exactly what the system used.
+
+---
+
+## The 7-step calculation — runs for every eligible deal
+
+```typescript
+export interface FlatCalculationResult {
+  // Inputs used
+  expectedGross:     number;
+  ticketingFees:     number;      // gross × 0.10
+  expenseEstimate:   number;      // from historical resolution
+  expenseCap:        number;      // from SWITCH_CONSTANTS by deal type
+  cappedExpense:     number;      // min(expenseEstimate, expenseCap)
+  expenseSource:     ExpenseSource;
+
+  // Calculation path
+  netAfterFees:      number;      // gross - ticketingFees
+  netBase:           number;      // max(0, netAfterFees - cappedExpense)
+  percentagePayout:  number | null;  // netBase × pct (null if not a vs/pn deal)
+  guaranteeAmount:   number | null;  // from deal (null if no guarantee)
+
+  // Decision
+  winner:            "guarantee" | "percentage" | "flat_is_flat";
+  winnerMargin:      number;      // how far the winner is above the loser
+
+  // Suggestion output
+  flatSuggestion:    number;      // the recommended flat amount
+  flatSuggestionRounded: number;  // rounded to nearest $50
+  confidenceTier:    "A" | "B" | "C" | "D";
+  bandLow:           number;      // flatSuggestion - bandWidth
+  bandHigh:          number;      // flatSuggestion + bandWidth
+  bandWidth:         number;      // derived from confidence tier
+
+  // Breakeven
+  breakevenGross:    number;      // gross at which pct would equal guarantee
+
+  // Insurance recommendation
+  recommendedInsuranceTier: 1 | 2 | 3 | 4 | 5;
+  insuranceReason:   string;
+}
+```
+
+**Step-by-step:**
+
+```
+Step 1:  ticketingFees     = expectedGross × SWITCH_CONSTANTS.ticketingFeeRate
+Step 2:  netAfterFees      = expectedGross − ticketingFees
+Step 3:  expenseCap        = SWITCH_CONSTANTS.expenseCap[dealType_grossRange]
+Step 4:  cappedExpense     = min(expenseEstimate, expenseCap)
+Step 5:  netBase           = max(0, netAfterFees − cappedExpense)
+Step 6:  percentagePayout  = netBase × deal.percentage   [null if no pct]
+Step 7:  winner            = percentagePayout >= guaranteeAmount ? "percentage" : "guarantee"
+         flatSuggestion    = max(guaranteeAmount ?? 0, percentagePayout ?? 0)
+         flatSuggestionRounded = Math.round(flatSuggestion / 50) * 50
+```
+
+**Breakeven calculation:**
+```
+// At what gross does pct payout = guarantee?
+// pct × (G × 0.90 − cappedExpense) = guarantee
+// G = (guarantee / pct + cappedExpense) / 0.90
+breakevenGross = Math.round(
+  (deal.guaranteeAmount / deal.percentage + cappedExpense) / 0.90
+)
+```
+
+---
+
+## Confidence tier assignment
+
+```typescript
+function assignConfidenceTier(
+  expenseSource: ExpenseSource,
+  artistShowCount: number,
+  agentShowCount: number,
+  dealType: DealType,
+  winnerMargin: number
+): { tier: "A"|"B"|"C"|"D"; bandWidth: number } {
+
+  // Tier A: rich artist history + guarantee clearly wins
+  if (artistShowCount >= 2 && Math.abs(winnerMargin) > 200)
+    return { tier: "A", bandWidth: 25 };
+
+  // Tier A: vs deal where guarantee always wins (empirical certainty)
+  if (dealType === "vs" && expenseSource === "artist_history" && artistShowCount >= 2)
+    return { tier: "A", bandWidth: 25 };
+
+  // Tier B: 1 prior show or agent history available
+  if (artistShowCount === 1 || agentShowCount >= 5)
+    return { tier: "B", bandWidth: 75 };
+
+  // Tier C: genre-level proxy only
+  if (expenseSource === "genre_p75")
+    return { tier: "C", bandWidth: 150 };
+
+  // Tier D: venue average only — cold booking
+  return { tier: "D", bandWidth: 300 };
+}
+```
+
+**Band display rules:**
+- Tier A: show as `$X` (single number, no range)
+- Tier B: show as `$X ± $75` in the UI
+- Tier C: show as `$X – $Y` range
+- Tier D: show as range + "Low confidence — no artist or agent data" flag. Do not auto-send to agent. Surface to Mariana for review.
+
+---
+
+## Recommended insurance tier
+
+```typescript
+function recommendInsuranceTier(
+  confidenceTier: "A"|"B"|"C"|"D",
+  dealType: DealType,
+  breakevenGross: number,
+  expectedGross: number
+): { tier: 1|2|3|4|5; reason: string } {
+
+  // Door deals always need higher tier — expense variability is larger
+  if (dealType === "door")
+    return { tier: 4, reason: "Door deals have P90 gap of $397 — Tier 4 minimum required" };
+
+  // Breakeven is very close to expected gross — pct could flip
+  if (Math.abs(breakevenGross - expectedGross) < 500)
+    return { tier: 3, reason: "Breakeven gross is close to expected — moderate risk of pct firing" };
+
+  // Cold bookings
+  if (confidenceTier === "D")
+    return { tier: 4, reason: "No artist or agent history — high suggestion uncertainty" };
+
+  // New artist, known agent
+  if (confidenceTier === "C")
+    return { tier: 3, reason: "New artist — genre-level expense estimate, not artist-specific" };
+
+  // Standard: Tier 2 covers 99%+ of dispute costs at 54% margin
+  return { tier: 2, reason: "Artist history available — Tier 2 covers expected gaps at this confidence level" };
+}
+```
+
+---
+
+## Database queries the module must run
+
+Create a helper `lib/switchQueries.ts` with these Drizzle queries:
+
+```typescript
+// 1. Get artist's expense history at this venue
+export async function getArtistExpenseHistory(artistId: string, venueId: string) {
+  return db.select({
+    showDate:     shows.date,
+    totalExpenses: settlements.totalExpenses,
+    gross:        ticketSales.gross,
+    dealType:     deals.dealType,
+  })
+  .from(shows)
+  .innerJoin(settlements,  eq(settlements.showId,  shows.id))
+  .innerJoin(ticketSales,  eq(ticketSales.showId,  shows.id))
+  .innerJoin(deals,        eq(deals.showId,        shows.id))
+  .where(and(
+    eq(shows.artistId, artistId),
+    eq(shows.venueId,  venueId),
+    inArray(settlements.status, ['finalized','paid','signed'])
+  ))
+  .orderBy(desc(shows.date));
+}
+
+// 2. Get agent's expense history at this venue
+export async function getAgentExpenseHistory(agentId: string, venueId: string) {
+  return db.select({ totalExpenses: settlements.totalExpenses })
+  .from(shows)
+  .innerJoin(artists,      eq(artists.id,          shows.artistId))
+  .innerJoin(settlements,  eq(settlements.showId,  shows.id))
+  .where(and(
+    eq(artists.agentId,  agentId),
+    eq(shows.venueId,    venueId),
+    inArray(settlements.status, ['finalized','paid','signed'])
+  ));
+}
+
+// 3. Save a switch suggestion
+export async function saveSwitchSuggestion(input: {
+  showId:              string;
+  dealTypeFrom:        string;
+  flatSuggestion:      number;
+  flatSuggestionRounded: number;
+  confidenceTier:      string;
+  bandLow:             number;
+  bandHigh:            number;
+  expenseEstimate:     number;
+  expenseSource:       string;
+  expenseCap:          number;
+  breakevenGross:      number;
+  winnerMargin:        number;
+  recommendedInsuranceTier: number;
+  // door hybrid fields (null for non-door)
+  doorFloor?:          number;
+  doorSplit?:          number;
+}) { /* Drizzle insert into switch_suggestions */ }
+```
+
+---
+
+## The main exported function
+
+```typescript
+// lib/switchMath.ts
+
+export async function generateSwitchSuggestion(
+  deal: Deal,
+  show: Show,
+  artist: Artist,
+  venue: Venue,
+  expectedGross: number          // from deal booking estimate or prior show avg
+): Promise<SwitchSuggestion | null>
+```
+
+**Returns null** when the deal is not eligible:
+- Deal type is `percentage_of_gross` (already simple to settle, no switch needed)
+- Expected gross ≥ $5,000 AND deal type is `vs` or `percentage_of_net` (% calc fires reliably above this; do not suggest flat)
+- Show status is `day_of` or later (too late to switch)
+
+**Returns a `SwitchSuggestion`** for all eligible deals:
+
+```typescript
+export type SwitchSuggestion =
+  | {
+      type: "flat";
+      calculation: FlatCalculationResult;
+      autoSendToAgent: boolean;  // false for Tier D; true for A/B/C
+      displayText: string;       // human-readable: "Suggest flat at $1,500 — based on 7 prior shows"
+      warningText: string | null; // shown if autoSendToAgent = false
+    }
+  | {
+      type: "door_hybrid";
+      floor:             number;   // always 500
+      split:             number;   // always 0.60
+      expenseCap:        number;   // 1774 (door P75)
+      estimatedArtist:   number;   // at expected gross
+      estimatedVenue:    number;
+      confidenceTier:    "A"|"B"|"C"|"D";
+      bandLow:           number;
+      bandHigh:          number;
+      expenseSource:     ExpenseSource;
+      recommendedInsuranceTier: 4 | 5;  // always Tier 4+ for door
+      displayText:       string;
+    };
+```
+
+---
+
+## What makes this different from the venue flat guarantee
+
+The venue's `deal.guaranteeAmount` is a number the agent put in an email. The Smart Flat suggestion is a number the system derives from 497 settled shows. They are often the same, but not always — and when they differ, that difference is information.
+
+Build the UI to show this distinction explicitly:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Agent's guarantee:    $1,500                                 │
+│ Smart Flat suggestion: $1,487  ← based on 7 prior shows     │
+│                                                             │
+│ Difference: $13 — within normal range                       │
+│                                                             │
+│ Confidence: A  ·  Breakeven gross: $4,140                   │
+│ (pct would need $4,140 gross to beat the guarantee;         │
+│  show is expected at $3,400 — guarantee wins by $535)        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+When they differ by more than $150:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Agent's guarantee:    $1,426   ← LOW relative to history    │
+│ Smart Flat suggestion: $2,400  ← what data says it will be  │
+│                                                             │
+│ ⚠ The % calculation is likely to fire at this gross.        │
+│   If you lock to $1,426 flat, the artist may expect $2,400. │
+│   Suggest $2,400 or keep vs deal structure.                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+This is the feature's most important value beyond settlement night simplification: it catches deals where the guarantee is miscalibrated and the vs mechanism is the only protection against an underpayment dispute.
+
+---
+
+## Database schema additions (add to `db/schema.ts`)
+
+```typescript
+// Add expenseSource, expenseEstimate, breakevenGross to switch_suggestions
+// These columns make the suggestion auditable and explainable in the UI
+
+export const switchSuggestions = sqliteTable("switch_suggestions", {
+  id:                     text("id").primaryKey(),
+  showId:                 text("show_id").notNull().references(() => shows.id),
+  suggestedAt:            integer("suggested_at", { mode: "timestamp" }).notNull(),
+  dealTypeFrom:           text("deal_type_from").notNull(),
+
+  // The suggestion itself
+  suggestedFlat:          real("suggested_flat").notNull(),
+  suggestedFlatRounded:   real("suggested_flat_rounded").notNull(),
+  confidenceTier:         text("confidence_tier", { enum: ["A","B","C","D"] }).notNull(),
+  bandLow:                real("band_low").notNull(),
+  bandHigh:               real("band_high").notNull(),
+
+  // What historical data was used — the audit trail
+  expenseEstimate:        real("expense_estimate").notNull(),
+  expenseSource:          text("expense_source", {
+    enum: [
+      "artist_history_2plus",  // Priority 1: ≥2 prior shows
+      "artist_history_1",      // Priority 2: exactly 1 prior show
+      "agent_history",         // Priority 3: agent's shows at venue
+      "genre_p75",             // Priority 4: genre-level P75
+      "venue_mean",            // Priority 5: venue-wide fallback
+    ]
+  }).notNull(),
+  expenseCap:             real("expense_cap").notNull(),
+  artistShowCount:        integer("artist_show_count").notNull().default(0),
+  agentShowCount:         integer("agent_show_count").notNull().default(0),
+
+  // Calculation details
+  winnerMargin:           real("winner_margin").notNull(),   // positive = guarantee won
+  breakevenGross:         real("breakeven_gross"),           // null for non-vs/pn deals
+  recommendedInsuranceTier: integer("recommended_insurance_tier").notNull(),
+
+  // Decision state
+  accepted:               integer("accepted", { mode: "boolean" }),
+  acceptedAt:             integer("accepted_at", { mode: "timestamp" }),
+  declinedAt:             integer("declined_at", { mode: "timestamp" }),
+  agentNotifiedAt:        integer("agent_notified_at", { mode: "timestamp" }),
+
+  // Door hybrid fields (null for non-door deals)
+  doorFloor:              real("door_floor"),
+  doorSplit:              real("door_split"),
+  doorEstimatedArtist:    real("door_estimated_artist"),
+  doorEstimatedVenue:     real("door_estimated_venue"),
+});
+```
+
+---
+
+## Trigger: where in the app this runs
+
+Add a call to `generateSwitchSuggestion` in the deal save API route, immediately after the deal record is written:
+
+```typescript
+// app/api/deals/route.ts  (or wherever deals are created/updated)
+
+const suggestion = await generateSwitchSuggestion(deal, show, artist, venue, expectedGross);
+
+if (suggestion !== null) {
+  await saveSwitchSuggestion({ showId: show.id, ...suggestion.calculation });
+  await db.update(deals)
+    .set({ switchStatus: "suggested" })
+    .where(eq(deals.id, deal.id));
+}
+```
+
+`expectedGross` comes from:
+1. The deal's `deal_notes_freetext` if it contains a gross estimate (parse it)
+2. The artist's average gross at this venue from prior shows
+3. The agent's average gross at this venue across all their acts
+4. `0` — which will produce a Tier D suggestion with zero confidence
+
+---
+
+## What NOT to do
+
+- Do not read `deal.guaranteeAmount` and return it as the suggestion without running the calculation. The calculation must run. The guarantee may or may not match the suggestion. That gap is information.
+
+- Do not use the same expense estimate for all deal types. vs deals at under $5K have higher average expenses ($1,607) than % of net deals ($1,526) at the same gross level. Use the deal-type-specific constants from `SWITCH_CONSTANTS.expenseMean`.
+
+- Do not suggest flat conversion for vs deals where the breakeven gross is below the expected gross. If `breakevenGross < expectedGross`, the % calc is likely to fire and a flat at the guarantee would underpay the artist. In this case, set `autoSendToAgent = false` and show Mariana a warning: "The % may exceed the guarantee at this gross level. Review before suggesting to agent."
+
+- Do not call this module at settlement time. By then, actual expenses are known and `calculateSettlement` in `dealMath.ts` handles the real calculation.
+
+- Do not store the suggestion as a rounded number only. Store both `suggestedFlat` (raw) and `suggestedFlatRounded` (displayed). The rounding is for display; the math runs on the raw number.
+
+---
+
+## Acceptance criteria
+
+- [ ] `generateSwitchSuggestion` returns null for vs deals where expected gross ≥ $5,000
+- [ ] For a vs deal with artist history ≥ 2 shows, expense source = `artist_history_2plus`
+- [ ] For a cold booking, expense source = `venue_mean` and confidence tier = D
+- [ ] `suggestedFlat` differs from `deal.guaranteeAmount` by ≤ $50 on 43/43 historical vs-under-$5K shows when artist history is available
+- [ ] `breakevenGross` is computed for every vs and % of net deal
+- [ ] `switchSuggestions` record is written on every eligible deal save, with all audit columns populated
+- [ ] `autoSendToAgent = false` for Tier D suggestions
+- [ ] Insurance tier = 4 for all door deals, 2 for Tier A standard deals
+- [ ] The UI shows both the guarantee amount AND the smart flat suggestion side by side with the delta
+- [ ] `lib/updateSwitchConstants.ts` script exists and can be run to refresh all constants from live data

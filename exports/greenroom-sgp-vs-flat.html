@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Greenroom · Smart Guaranteed Pricing vs Flat Deals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1c2426;
+    --dim:#5a6a6e;
+    --softer:#7d8c90;
+    --rule:#dee5e6;
+    --bg:#fafaf7;
+    --paper:#ffffff;
+    --accent:#0e6b5a;
+    --amber:#a96a18;
+    --sans:'DM Sans', system-ui, sans-serif;
+    --serif:'Lora', Georgia, serif;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+  }
+  *{ box-sizing:border-box }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:13px; line-height:1.55; }
+  .page{ max-width:880px; margin:0 auto; padding:48px 56px; background:var(--paper); }
+  .eyebrow{ font-family:var(--mono); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:var(--accent); margin-bottom:14px; }
+  h1{ font-family:var(--serif); font-weight:600; font-size:34px; line-height:1.15; margin:0 0 14px; }
+  h2{ font-family:var(--serif); font-weight:600; font-size:22px; margin:38px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--rule); }
+  h3{ font-family:var(--serif); font-weight:600; font-size:16px; margin:22px 0 6px; }
+  h4{ font-family:var(--mono); font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim); margin:18px 0 6px; }
+  p{ margin:0 0 10px; }
+  p.intro{ font-family:var(--serif); font-style:italic; font-size:15px; color:var(--dim); line-height:1.6; max-width:680px; margin-bottom:18px; }
+  code{ font-family:var(--mono); font-size:11.5px; background:#eef2f1; padding:1px 5px; border-radius:3px; color:#163a35; }
+  ul, ol{ padding-left:20px; margin:0 0 12px; }
+  li{ margin-bottom:5px; }
+  table{ width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:12px; }
+  th, td{ text-align:left; padding:7px 9px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th{ font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim); font-weight:500; }
+  td.mono, .mono{ font-family:var(--mono); font-size:11.5px; }
+  .source-line{ font-family:var(--mono); font-size:10.5px; color:var(--dim); border-top:1px solid var(--rule); padding-top:10px; margin-top:18px; }
+  .callout{ border-left:3px solid var(--accent); background:#f0f7f4; padding:11px 14px; border-radius:0 4px 4px 0; margin:14px 0; font-size:12.5px; }
+  .callout.amber{ border-left-color:var(--amber); background:#fbf3e7; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin:10px 0 14px; }
+  .card{ border:1px solid var(--rule); border-radius:6px; padding:12px 14px; background:#fdfdfb; }
+  .card h3{ margin-top:0; font-size:14px; }
+  .pill{ display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:10px; background:#eef2f1; color:#163a35; margin-right:5px; }
+  .pill.amber{ background:#fbf3e7; color:#7a4d12; }
+  .pill.rose{ background:#fce8ec; color:#8a233a; }
+  hr{ border:none; border-top:1px solid var(--rule); margin:24px 0; }
+  .step{ display:grid; grid-template-columns: 28px 1fr; gap:10px; margin:8px 0 14px; }
+  .step .num{ font-family:var(--mono); font-size:11px; color:var(--accent); border:1px solid var(--accent); border-radius:50%; width:24px; height:24px; line-height:22px; text-align:center; }
+  .step .body h4{ margin-top:0; }
+  pre.formula{ font-family:var(--mono); font-size:11.5px; background:#f6f8f7; border-left:3px solid var(--accent); padding:9px 12px; margin:8px 0; white-space:pre-wrap; }
+  @page{ size:Letter; margin:0.6in 0.55in; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="eyebrow">Greenroom · Pricing Engine Reference · May 2026</div>
+  <h1>Smart Guaranteed Pricing vs Flat Deals</h1>
+  <p class="intro">A flat deal is a contract shape — a fixed dollar guarantee with no percentage upside. Smart Guaranteed Pricing (SGP) is a pricing engine — the seven-step model that decides <em>what the dollar number on a flat contract should be</em> when you're converting a vs / % of net / % of gross / door deal into one. This document explains the distinction, then walks the engine end to end, exactly as it runs in <code>artifacts/api-server/src/lib/smartGuarantee.ts</code>.</p>
+  <div class="source-line">Sourced from <code>lib/smartGuarantee.ts</code>, <code>lib/smartSwitch.ts</code>, and <code>lib/switchSavings.ts</code>. All step numbers, source-enum names, and tier thresholds are taken from the live code.</div>
+
+  <h2 id="distinction">1. The distinction, in one paragraph</h2>
+  <p>A <strong>flat deal</strong> is one of the five contract shapes the venue can sign — alongside <code>vs</code>, <code>percentage_of_net</code>, <code>percentage_of_gross</code>, and <code>door</code>. It says "the artist gets <span class="mono">$X</span>, no settlement-night arithmetic." Nothing about a flat deal explains <em>where the X came from</em>; historically it came from Mariana's gut, the agent's ask, and a 5-minute back-of-envelope.</p>
+  <p><strong>Smart Guaranteed Pricing</strong> is what produces the X. It reads the deal's structure (deal type, guarantee, percentage, expense cap), looks up comparable history at this venue, runs a deterministic seven-step waterfall, and emits a single suggested flat dollar amount — together with a confidence tier, an insurance tier, a basis sentence, and a full audit JSON. The booker can then either accept it (the deal converts to a clean flat in the DB) or keep negotiating with the agent against a number that has receipts.</p>
+
+  <div class="callout">
+    <strong>Restated:</strong> Flat is the destination. SGP is the map. A flat deal entered by hand and a flat deal produced by SGP look identical in the database, but only the SGP one carries a paper trail.
+  </div>
+
+  <h2 id="why">2. Why SGP exists at all</h2>
+  <ul>
+    <li><strong>vs / %-of-net deals win the percentage clause most nights.</strong> Across this venue's <span class="mono">137</span> historical vs/$1–5K settlements, the percentage clause out-paid the guarantee <span class="mono">87.6%</span> of the time, with mean overshoot <span class="mono">~$2,338/show</span>. A flat-equivalent that ignored that fact would systematically underpay.</li>
+    <li><strong>Door deals lose money for the venue <span class="mono">93%</span> of the time</strong> at The Crescent. Converting them needs a structurally different shape (a floor + capped split, not a flat) — SGP and Smart Switch coordinate that.</li>
+    <li><strong>Bookers were doing this math anyway,</strong> in a spreadsheet, inconsistently, with no audit. SGP standardizes the calculation and surfaces the inputs so the agent's pushback has somewhere to land.</li>
+  </ul>
+
+  <h2 id="waterfall">3. The seven-step waterfall</h2>
+  <p>Every call to <code>generateGuarantee(showId)</code> runs these seven steps in order. The intermediate values are persisted on the <code>guarantee_suggestions</code> row and exposed via the <code>auditJson</code> field, so every number on screen can be traced back to its inputs.</p>
+
+  <div class="step"><div class="num">1</div><div class="body">
+    <h4>Expected gross</h4>
+    <p>How much money will the door bring in? Picked from a six-level source waterfall (first hit wins):</p>
+    <table class="compact">
+      <tr><th>Source</th><th>Picked when</th></tr>
+      <tr><td class="mono">artist_at_venue</td><td>≥1 prior show by this artist at this venue (uses their mean gross here)</td></tr>
+      <tr><td class="mono">artist_anywhere</td><td>≥1 prior show by this artist (any venue)</td></tr>
+      <tr><td class="mono">agent_history</td><td>≥3 prior shows by this agent at this venue</td></tr>
+      <tr><td class="mono">cell_mean</td><td>Mean gross across all past <em>dealType × sizeBucket</em> cells matching this deal</td></tr>
+      <tr><td class="mono">venue_mean</td><td>Mean gross across all past shows at the venue</td></tr>
+      <tr><td class="mono">capacity_proxy</td><td>Fallback synthesis: <span class="mono">venueCapacity × $30 × 0.6 load</span></td></tr>
+    </table>
+  </div></div>
+
+  <div class="step"><div class="num">2</div><div class="body">
+    <h4>Ticketing fees</h4>
+    <pre class="formula">ticketingFees = expectedGross × 0.10</pre>
+    <p>Flat <span class="mono">10%</span> ticketing fee. This is a venue-level constant; if your platform changes, edit <code>TICKETING_FEE_RATE</code>.</p>
+  </div></div>
+
+  <div class="step"><div class="num">3</div><div class="body">
+    <h4>Net after fees</h4>
+    <pre class="formula">netAfterFees = expectedGross − ticketingFees</pre>
+  </div></div>
+
+  <div class="step"><div class="num">4</div><div class="body">
+    <h4>Capped expense estimate</h4>
+    <p>Like step 1, the <em>raw</em> expense number comes from a source waterfall:</p>
+    <table class="compact">
+      <tr><th>Source</th><th>Picked when</th></tr>
+      <tr><td class="mono">artist_history_2plus</td><td>≥2 prior shows by this artist (mean of their actual expense totals)</td></tr>
+      <tr><td class="mono">artist_history_1</td><td>Exactly 1 prior show by this artist</td></tr>
+      <tr><td class="mono">agent_history</td><td>≥1 prior show by this agent</td></tr>
+      <tr><td class="mono">genre_p75</td><td>P75 of expenses across the artist's genre</td></tr>
+      <tr><td class="mono">venue_mean</td><td>Mean of all past expenses at the venue</td></tr>
+    </table>
+    <p>Then the raw value is <strong>capped</strong> twice — first by the deal's own <code>expenseCap</code> if signed, then by a per-bucket default (<span class="mono">$0–1K → $800</span>, <span class="mono">$1–5K → $1,500</span>, <span class="mono">$5–15K → $3,500</span>, <span class="mono">$15K+ → $7,500</span>). The lower of the two is the <code>effectiveCap</code>:</p>
+    <pre class="formula">expenseEstimate = min(raw, effectiveCap)
+effectiveCap   = min(deal.expenseCap ?? ∞, defaultCap[bucket])</pre>
+  </div></div>
+
+  <div class="step"><div class="num">5</div><div class="body">
+    <h4>Net base</h4>
+    <pre class="formula">netBase = max(0, netAfterFees − expenseEstimate)</pre>
+    <p>This is the pool the percentage clause would draw from for vs / % of net / door deals.</p>
+  </div></div>
+
+  <div class="step"><div class="num">6</div><div class="body">
+    <h4>Projected percentage payout</h4>
+    <p>What the artist would walk away with under the structured part of the deal, given the projection:</p>
+    <pre class="formula">if dealType == "percentage_of_gross":  basis = expectedGross
+elif dealType == "door":               basis = netBase   (pct defaults to 0.70 if unset)
+else (vs, "% of net"):                 basis = netBase
+
+percentagePayout = max(0, pct × basis)</pre>
+    <p>A defensive normalization divides <code>pct</code> by 100 if a legacy row stored "85" instead of "0.85", so the math doesn't blow up.</p>
+  </div></div>
+
+  <div class="step"><div class="num">7</div><div class="body">
+    <h4>Winner &amp; suggested price</h4>
+    <pre class="formula">winnerValue   = max(guarantee, percentagePayout)
+suggestedPrice = roundTo50(winnerValue)
+breakevenGross = (suggestedPrice + expenseEstimate) / (1 − 0.10)</pre>
+    <p>SGP picks <em>whichever side of the deal the artist would have won that night</em> and proposes that as the flat. The <code>winnerMargin</code> (absolute gap between the two) feeds the tier calculation in the next section.</p>
+  </div></div>
+
+  <h2 id="tiers">4. Confidence &amp; insurance tiers</h2>
+
+  <h3>Confidence tier (how much we trust the number)</h3>
+  <p>Computed by <code>computeConfidenceTier(artistShowCount, agentShowCount, winnerMargin, hasGenreData)</code>:</p>
+  <table>
+    <tr><th>Tier</th><th>Rule</th><th>Meaning</th></tr>
+    <tr><td><span class="pill">A</span></td><td>≥3 prior shows by this artist <em>and</em> winnerMargin &gt; $200</td><td>"We've seen this artist enough that the projection is solid, and the winning side wasn't a coin flip."</td></tr>
+    <tr><td><span class="pill">B</span></td><td>≥1 prior show by this artist <em>or</em> ≥3 by this agent</td><td>"Some signal, but not enough to put it on the front page without a band."</td></tr>
+    <tr><td><span class="pill amber">C</span></td><td>≥1 prior show by this agent <em>or</em> genre data exists</td><td>"Indirect signal only. Use as a starting point, not a number."</td></tr>
+    <tr><td><span class="pill rose">D</span></td><td>None of the above</td><td>"First-time artist, first-time agent, no genre history. Treat as a guess."</td></tr>
+  </table>
+
+  <h3>Insurance tier (how risky the show is for the venue)</h3>
+  <p>A separate, orthogonal dimension. <code>computeInsuranceTier()</code> classifies the venue's downside risk:</p>
+  <table>
+    <tr><th>Tier</th><th>Rule</th></tr>
+    <tr><td><span class="pill">1</span></td><td>Non-door deal, confidence A, <em>and</em> ≥$1,500 cushion between projected net (after fees + expense) and the suggested price</td></tr>
+    <tr><td><span class="pill">2</span></td><td>Cushion ≥$500, confidence A or B, non-door</td></tr>
+    <tr><td><span class="pill amber">3</span></td><td>Cushion &lt;$500 (near-breakeven), or confidence C</td></tr>
+    <tr><td><span class="pill rose">4</span></td><td>Confidence D, or any door deal (door is always tier 4 — see §2)</td></tr>
+  </table>
+  <p class="mono" style="color:var(--dim)">cushion = expectedGross × (1 − 0.10) − expenseEstimate − suggestedPrice</p>
+
+  <h2 id="outputs">5. What SGP emits</h2>
+  <p>A single call to <code>generateGuarantee()</code> returns a row that is persisted on <code>guarantee_suggestions</code> and includes:</p>
+  <table class="compact">
+    <tr><th>Field</th><th>Meaning</th></tr>
+    <tr><td class="mono">agentGuarantee</td><td>The dollar guarantee in the signed contract</td></tr>
+    <tr><td class="mono">suggestedPrice</td><td>The single number SGP proposes (rounded to nearest $50)</td></tr>
+    <tr><td class="mono">delta</td><td><code>suggestedPrice − agentGuarantee</code></td></tr>
+    <tr><td class="mono">expectedGross, expectedGrossSource</td><td>Step 1 output + which source the waterfall picked</td></tr>
+    <tr><td class="mono">ticketingFees, netAfterFees</td><td>Steps 2 &amp; 3</td></tr>
+    <tr><td class="mono">expenseEstimate, expenseSource, expenseCap</td><td>Step 4 — including the effective cap that was applied</td></tr>
+    <tr><td class="mono">netBase, percentagePayout</td><td>Steps 5 &amp; 6</td></tr>
+    <tr><td class="mono">winner, winnerMargin, breakevenGross</td><td>Step 7</td></tr>
+    <tr><td class="mono">artistShowCount, agentShowCount</td><td>Inputs to the tier formula</td></tr>
+    <tr><td class="mono">confidenceTier, insuranceTier</td><td>§4</td></tr>
+    <tr><td class="mono">basis</td><td>One-sentence English summary the UI can paste into a counter-offer email</td></tr>
+    <tr><td class="mono">auditJson</td><td>The full step-by-step record (inputs + step1..step7) — every number on screen is reachable from here</td></tr>
+  </table>
+
+  <h2 id="example">6. Worked example</h2>
+  <p>Take a hypothetical vs deal at the $1–5K bucket: <code>guarantee = $4,000</code>, <code>pct = 0.85</code>, signed expense cap = $2,000. The artist has 4 prior shows at the venue.</p>
+  <pre class="formula">Step 1  expectedGross   = $9,000   (source: artist_at_venue, n=4)
+Step 2  ticketingFees   = $900     (= 9,000 × 0.10)
+Step 3  netAfterFees    = $8,100
+Step 4  raw expense     = $1,700   (source: artist_history_2plus)
+        defaultCap[$1–5K] = $1,500
+        effectiveCap    = min($2,000, $1,500) = $1,500
+        expenseEstimate = min($1,700, $1,500) = $1,500
+Step 5  netBase         = $8,100 − $1,500 = $6,600
+Step 6  percentagePayout = 0.85 × $6,600 = $5,610
+Step 7  winnerValue     = max($4,000, $5,610) = $5,610   (winner: percentage)
+        suggestedPrice  = roundTo50($5,610) = $5,600
+        breakevenGross  = ($5,600 + $1,500) / 0.90 ≈ $7,889
+Tiers   confidenceTier  = A   (4 prior shows ≥ 3, winnerMargin $1,610 &gt; $200)
+        cushion         = 9,000 × 0.90 − 1,500 − 5,600 = $1,000
+        insuranceTier   = 2   (non-door, tier A, cushion &lt; $1,500)</pre>
+  <p>The booker sees: <em>"Smart Guaranteed Price <strong>$5,600</strong>, tier A · insurance 2. Projected $5,610 % payout exceeds the $4,000 guarantee by $1,610, so SGP picks the percentage side rounded to $50."</em> If the agent pushes back, every input is one click away in the audit JSON.</p>
+
+  <h2 id="callsites">7. Where SGP plugs into the rest of the app</h2>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Smart Switch ($1–5K vs / % of net)</h3>
+      <p><code>lib/smartSwitch.ts</code> routes through <code>generateGuarantee()</code> for the <span class="mono">vs</span> and <span class="mono">% of net</span> deals in the <span class="mono">$1–5K</span> bucket. If SGP returns tier <strong>A</strong> or <strong>B</strong>, the suggested flat <em>is</em> the SGP price (source: <code>sgp_engine</code>). If SGP returns tier C/D, Smart Switch falls back to anchoring on the contract guarantee (source: <code>guarantee_amount</code>) rather than emitting a low-confidence number.</p>
+    </div>
+    <div class="card">
+      <h3>Switch Savings backtest (Insights)</h3>
+      <p><code>lib/switchSavings.ts</code> re-runs SGP against every past settled <span class="mono">vs / pn / door</span> deal in the last N months using only data <em>available before the show</em>, then compares the counterfactual SGP-driven payout against what actually settled. That's the "Money saved / Time saved" panel on the Insights tab.</p>
+    </div>
+    <div class="card">
+      <h3>Show detail panel</h3>
+      <p>On any upcoming <span class="mono">vs / pn / % gross / door</span> show whose settlement is in an actionable stage, the right rail renders the SGP card directly: suggested price, tier chip, insurance chip, basis sentence, and a "show the math" disclosure that pretty-prints the audit JSON.</p>
+    </div>
+    <div class="card">
+      <h3>Insurance pricing brief</h3>
+      <p>The May 2026 insurance pricing brief (<code>exports/greenroom-insurance-pricing.pdf</code>) prices Product 2 directly off SGP backtest output — the <span class="mono">SGP − actual</span> gaps across the full 12-month corpus (n=156, median gap $870, P75 $1,569). Without SGP there is no Product 2.</p>
+    </div>
+  </div>
+
+  <h2 id="contrast">8. Side-by-side</h2>
+  <table>
+    <tr><th></th><th>Flat deal (entered by hand)</th><th>Flat deal produced by SGP</th></tr>
+    <tr><td><strong>Contract shape in DB</strong></td><td><code>dealType = "flat"</code>, <code>guaranteeAmount = X</code></td><td>Identical: <code>dealType = "flat"</code>, <code>guaranteeAmount = X</code></td></tr>
+    <tr><td><strong>Where X came from</strong></td><td>Booker's head, agent's ask</td><td>Seven-step waterfall over comparable history</td></tr>
+    <tr><td><strong>Auditability</strong></td><td>None</td><td>Full <code>auditJson</code> blob — every input, every source, every step</td></tr>
+    <tr><td><strong>Confidence label</strong></td><td>—</td><td>A / B / C / D with explicit rule</td></tr>
+    <tr><td><strong>Range disclosure</strong></td><td>—</td><td>Smart Switch surfaces P10–P90 band; demotes display tier when the band &gt; $1,000</td></tr>
+    <tr><td><strong>Risk label</strong></td><td>—</td><td>Insurance tier 1–4 with cushion math</td></tr>
+    <tr><td><strong>Contract-guarantee floor</strong></td><td>—</td><td>SGP's winner step uses <code>max(guarantee, percentagePayout)</code> so the suggested flat is anchored at or above the signed guarantee (see §8)</td></tr>
+    <tr><td><strong>Door hybrid floor</strong></td><td>—</td><td>Door conversions carry a fixed <span class="mono">$500</span> minimum the artist walks with regardless of walk-up — separate concept (see §8)</td></tr>
+    <tr><td><strong>Counter-offer copy</strong></td><td>—</td><td><code>basis</code> sentence is generated and pastable</td></tr>
+    <tr><td><strong>Backtestable</strong></td><td>No</td><td>Yes — <code>switchSavings.ts</code> replays the engine against the entire 12-month corpus</td></tr>
+  </table>
+
+  <div class="callout amber">
+    <strong>One thing flat deals do that SGP does not:</strong> when an artist is genuinely new to the room — first-time artist, first-time agent, no genre history — SGP returns confidence <strong>D</strong> and Smart Switch <em>refuses</em> to emit a single suggested flat. In that case the booker is back to a hand-entered flat, and that's the correct behavior. The engine knows when it doesn't know.
+  </div>
+
+  <h2 id="floors">8. Floors — three different things called the same word</h2>
+  <p>"Floor" shows up in three distinct mechanisms inside Smart Switch + SGP. They protect different parties at different moments and are not interchangeable.</p>
+
+  <h3>8a. The contract-guarantee floor (inside SGP step 7)</h3>
+  <p>This isn't a separate check — it falls out of the winner formula:</p>
+  <pre class="formula">winnerValue    = max(guarantee, percentagePayout)
+suggestedPrice = roundTo50(winnerValue)</pre>
+  <p>By taking <code>max(guarantee, percentagePayout)</code>, SGP guarantees the suggested flat starts from at least the contract guarantee. The artist never gets quoted a flat that's <em>below</em> the signed number, even when the percentage clause would have been a worse outcome.</p>
+  <div class="callout amber">
+    <strong>Honest rounding caveat:</strong> <code>roundTo50</code> rounds to the <em>nearest</em> $50, not up. So if the contract guarantee is $4,024 and the projected percentage payout is $3,900, <code>winnerValue</code> is $4,024 and the rounded suggested flat is $4,000 — <span class="mono">$24</span> below the contract guarantee. In practice this is sub-$50 noise, but strictly the invariant is "suggested flat ≥ guarantee, modulo $50 rounding." A one-line fix (round up when the winner is the guarantee) closes the gap if you want strict ≥-enforcement.
+  </div>
+
+  <h3>8b. The conservative-floor fallback (Smart Switch when SGP is uncertain)</h3>
+  <p>When SGP returns confidence <strong>C</strong> or <strong>D</strong>, Smart Switch refuses to use the low-confidence projection and instead anchors the flat to the contract guarantee <em>exactly</em>:</p>
+  <pre class="formula">const flat = deal.guaranteeAmount;  // mirrors the signed number, no math</pre>
+  <p>Source enum on the persisted suggestion: <code>guarantee_amount</code>, so the UI can badge the provenance. In this branch <code>suggestedFlat == contractGuarantee</code> by construction — no rounding gap. The basis copy is explicit: <em>"Smart Guaranteed Price didn't have enough comparable deals to project a confident number, so Smart Switch fell back to the contract guarantee. The flat mirrors the signed number exactly — same dollar value, no settlement-night recoup math. Heads-up: historically at this venue, the percentage clause out-paid the guarantee on most nights, so the agent may push back on freezing the upside. Treat this as a conservative floor for the negotiation, not a payout prediction."</em></p>
+
+  <h3>8c. The door hybrid floor (a different parameter entirely)</h3>
+  <p>For door deals, "floor" means the artist's <strong>minimum settlement-night payout regardless of walk-up</strong>, not "the suggested flat won't underpay the contract." Three constants in <code>smartSwitch.ts</code>:</p>
+  <pre class="formula">DOOR_FLOOR       = $500    // artist always walks with this much
+DOOR_SPLIT_PCT   = 0.60    // plus 60% of pool above expense cap
+DOOR_EXPENSE_CAP = $1,500  // cap that hard ceiling</pre>
+  <p>The hybrid replaces a pure door deal with: <em>$500 floor regardless of walk-up + 60% of the pool above the $1,500 expense cap.</em> When the projected available pool after expenses is ≤ the floor, the split never fires; Smart Switch surfaces that case with source <code>door_dead_pool</code> and an explicit <code>isDeadPool: true</code> boolean so the UI can label the suggestion as effectively-a-flat-$500.</p>
+
+  <h3>Side-by-side</h3>
+  <table>
+    <tr><th>Floor</th><th>Where</th><th>Mechanism</th><th>Equals what?</th></tr>
+    <tr><td>Contract-guarantee floor</td><td><code>smartGuarantee.ts</code> step 7</td><td><code>max(guarantee, percentagePayout)</code> inside the winner step</td><td>Suggested flat ≥ contract guarantee (± $50 rounding)</td></tr>
+    <tr><td>Conservative fallback</td><td><code>smartSwitch.ts</code> (source: <code>guarantee_amount</code>)</td><td>Literal copy of <code>deal.guaranteeAmount</code> when SGP returns tier C/D</td><td>Suggested flat == contract guarantee exactly</td></tr>
+    <tr><td>Door hybrid floor</td><td><code>smartSwitch.ts</code> (constant <code>DOOR_FLOOR</code>)</td><td>Fixed $500 minimum baked into the hybrid shape</td><td>Artist's settlement-night minimum, regardless of walk-up</td></tr>
+  </table>
+
+  <h2 id="summary">9. The one-line takeaway</h2>
+  <p>A flat deal is a contract type with no math. Smart Guaranteed Pricing is the math that decides whether the flat number on a converted contract is honest — a seven-step deterministic waterfall over comparable venue history, surfaced with a confidence tier, an insurance tier, a P10–P90 band, and a full audit JSON. Both end up as <code>dealType="flat"</code> in the DB. Only one of them has receipts.</p>
+
+  <div class="source-line">References: <code>artifacts/api-server/src/lib/smartGuarantee.ts</code> (generateGuarantee, computeConfidenceTier, computeInsuranceTier, resolveExpectedGross, resolveExpense), <code>artifacts/api-server/src/lib/smartSwitch.ts</code> (computeTier, generateSuggestion, switchAppliesTo), <code>artifacts/api-server/src/lib/switchSavings.ts</code> (backtest). Regenerate this PDF with: <code>python3 -c "from weasyprint import HTML; HTML('exports/greenroom-sgp-vs-flat.html').write_pdf('exports/greenroom-sgp-vs-flat.pdf')"</code>.</div>
+
+</div>
+</body>
+</html>

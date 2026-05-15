@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Greenroom · Supporting Document · Features, APIs, and Tabs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1c2426;
+    --dim:#5a6a6e;
+    --softer:#7d8c90;
+    --rule:#dee5e6;
+    --bg:#fafaf7;
+    --paper:#ffffff;
+    --accent:#0e6b5a;
+    --amber:#a96a18;
+    --sans:'DM Sans', system-ui, sans-serif;
+    --serif:'Lora', Georgia, serif;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+  }
+  *{ box-sizing:border-box }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:13px; line-height:1.55; }
+  .page{ max-width:880px; margin:0 auto; padding:48px 56px; background:var(--paper); }
+  .eyebrow{ font-family:var(--mono); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:var(--accent); margin-bottom:14px; }
+  h1{ font-family:var(--serif); font-weight:600; font-size:34px; line-height:1.15; margin:0 0 14px; }
+  h2{ font-family:var(--serif); font-weight:600; font-size:22px; margin:38px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--rule); }
+  h3{ font-family:var(--serif); font-weight:600; font-size:16px; margin:22px 0 6px; }
+  h4{ font-family:var(--mono); font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim); margin:18px 0 6px; }
+  p{ margin:0 0 10px; }
+  p.intro{ font-family:var(--serif); font-style:italic; font-size:15px; color:var(--dim); line-height:1.6; max-width:680px; margin-bottom:18px; }
+  code{ font-family:var(--mono); font-size:11.5px; background:#eef2f1; padding:1px 5px; border-radius:3px; color:#163a35; }
+  ul, ol{ padding-left:20px; margin:0 0 12px; }
+  li{ margin-bottom:5px; }
+  table{ width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:12px; }
+  th, td{ text-align:left; padding:7px 9px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th{ font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim); font-weight:500; }
+  td.mono, .mono{ font-family:var(--mono); font-size:11.5px; }
+  .source-line{ font-family:var(--mono); font-size:10.5px; color:var(--dim); border-top:1px solid var(--rule); padding-top:10px; margin-top:18px; }
+  .callout{ border-left:3px solid var(--accent); background:#f0f7f4; padding:11px 14px; border-radius:0 4px 4px 0; margin:14px 0; font-size:12.5px; }
+  .callout.amber{ border-left-color:var(--amber); background:#fbf3e7; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin:10px 0 14px; }
+  .card{ border:1px solid var(--rule); border-radius:6px; padding:12px 14px; background:#fdfdfb; }
+  .card h3{ margin-top:0; font-size:14px; }
+  .pill{ display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:10px; background:#eef2f1; color:#163a35; margin-right:5px; }
+  .pill.amber{ background:#fbf3e7; color:#7a4d12; }
+  .pill.rose{ background:#fce8ec; color:#8a233a; }
+  hr{ border:none; border-top:1px solid var(--rule); margin:24px 0; }
+  .toc{ font-size:12px; columns:2; column-gap:24px; padding:0; list-style:none; }
+  .toc li{ margin-bottom:4px; }
+  .toc a{ color:var(--ink); text-decoration:none; border-bottom:1px dotted var(--softer); }
+  .compact td, .compact th{ padding:5px 8px; }
+  @page{ size:Letter; margin:0.6in 0.55in; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="eyebrow">Greenroom · Supporting Document · Implementation &amp; Insight Reference · May 2026</div>
+  <h1>Features, APIs, Tabs, and the Insights Behind the Redesign</h1>
+  <p class="intro">This document is the engineering and analytical companion to the Settlement Redesign report. It walks every tab, every API endpoint, and every backend module in the live Greenroom build, and — for each one — names the data it surfaces and the role it plays in the redesign argument. Read the redesign report for the conclusion; read this for the receipts.</p>
+  <div class="source-line">Sourced directly from the live codebase at this commit (<code>artifacts/api-server</code>, <code>artifacts/greenroom</code>) and the live API at <code>http://localhost:8080/api</code>. 24-month window unless otherwise noted.</div>
+
+  <h2>Contents</h2>
+  <ol class="toc">
+    <li><a href="#stack">1. Stack &amp; architecture decisions</a></li>
+    <li><a href="#schema">2. Data model</a></li>
+    <li><a href="#tabs">3. The seven tabs</a></li>
+    <li><a href="#api">4. API surface</a></li>
+    <li><a href="#libs">5. Backend lib modules</a></li>
+    <li><a href="#llm">6. LLM helper &amp; settings</a></li>
+    <li><a href="#pipeline">7. The insight pipeline that shaped the redesign</a></li>
+    <li><a href="#numbers">8. Live reference numbers</a></li>
+  </ol>
+
+  <h2 id="stack">1. Stack &amp; architecture decisions</h2>
+
+  <table class="compact">
+    <tr><th>Layer</th><th>Choice</th></tr>
+    <tr><td>Monorepo</td><td>pnpm workspaces, Node.js 24, TypeScript 5.9</td></tr>
+    <tr><td>API server</td><td>Express 5, esbuild bundle (CJS) — restart workflow after backend edits, HMR does not apply</td></tr>
+    <tr><td>Database</td><td>libsql/sqlite, file-backed at <code>artifacts/api-server/data/greenroom.db</code>, Drizzle ORM</td></tr>
+    <tr><td>Frontend</td><td>Vite + React + wouter + Tailwind v4 + shadcn/ui + Recharts</td></tr>
+    <tr><td>Validation</td><td>Zod (<code>zod/v4</code>) + drizzle-zod</td></tr>
+    <tr><td>API codegen</td><td>Orval, from OpenAPI spec in <code>@workspace/api-spec</code></td></tr>
+    <tr><td>LLM</td><td>Provider-agnostic helper (<code>lib/llm.ts</code>) wrapping Anthropic + OpenAI SDKs; provider/key/model configurable at runtime via the Settings tab</td></tr>
+  </table>
+
+  <h4>Key architectural decisions</h4>
+  <ul>
+    <li><strong>No drizzle-kit for the Greenroom DB.</strong> The artifact's data is a local libsql file, not workspace Postgres. Schema changes are applied at boot via small <code>ensureColumn</code> / <code>CREATE TABLE IF NOT EXISTS</code> helpers in <code>db/index.ts</code>. Keeps the artifact self-contained and trivially seedable from a snapshot.</li>
+    <li><strong>All LLM access goes through one helper.</strong> <code>lib/llm.ts</code> is the only module that imports the Anthropic or OpenAI SDKs. Call sites only see <code>llmGenerateText</code> / <code>llmGenerateJson</code> / <code>llmIsConfigured</code>. This is what lets the Settings tab swap providers globally with a single save.</li>
+    <li><strong>Settings keys are write-only across the API.</strong> The settings GET/POST responses contain only <code>{configured, source, model}</code> per provider — raw API keys are never shipped back to the client.</li>
+    <li><strong>Insights cache uses a race-safe pending promise.</strong> First request computes; concurrent requests await the same in-flight promise; cache invalidates on server restart, Settings save, or explicit <code>clearInsightsCache()</code>.</li>
+    <li><strong>Smart Switch owns flat conversion; Improve Deal is caps-only.</strong> The April 2026 audit showed "convert this %-deal to a flat" is only data-safe in cells Smart Switch already covers (<code>vs</code>/<code>pn</code> at $1–5K, <code>door</code> any size). Improve Deal therefore emits only structural-cap suggestions (expense cap, hospitality cap), with audit-derived P75-flat defaults.</li>
+  </ul>
+
+  <h2 id="schema">2. Data model</h2>
+  <p>SQLite tables in <code>artifacts/api-server/src/db/schema.ts</code>. Asterisked fields were added by runtime <code>ensureColumn</code> migrations as the redesign work surfaced new requirements.</p>
+
+  <table class="compact">
+    <tr><th>Table</th><th>Purpose</th><th>Key fields</th></tr>
+    <tr><td><code>artists</code></td><td>Artist roster</td><td>id, name</td></tr>
+    <tr><td><code>agents</code> / <code>agencies</code></td><td>Agency lookup for booking provenance</td><td>id, name, agencyId</td></tr>
+    <tr><td><code>venues</code></td><td>Venue list (single venue today: The Crescent)</td><td>id, name</td></tr>
+    <tr><td><code>shows</code></td><td>One row per scheduled or completed show</td><td>id, artistId, agentId, venueId, date, status</td></tr>
+    <tr><td><code>deals</code></td><td>Pre-show financial structure</td><td>showId, dealType, guaranteeAmount, percentage, expenseCap*, hospitalityCap*, bonusesJson*, dealNotesFreetext*</td></tr>
+    <tr><td><code>settlements</code></td><td>Post-show reconciliation</td><td>showId, status, grossBoxOffice, totalToArtist, recoupsJson, notes, signoffText, disputedAt, positiveSummary*, negativeSummary*</td></tr>
+    <tr><td><code>ticket_sales</code> / <code>expenses</code> / <code>comps</code> / <code>recoups</code></td><td>Per-show line items joined into the show detail view and the settlement wizard</td><td>showId, category, amount, count, faceValue</td></tr>
+    <tr><td><code>guarantee_suggestions</code></td><td>Smart Guaranteed Price (SGP) results, one per upcoming show</td><td>showId, suggested, tier, expectedGrossSource, expenseSource, winner, basis, stepsJson</td></tr>
+    <tr><td><code>switch_suggestions</code></td><td>Smart Switch results — proposed alternative deal shape</td><td>showId, source, tier, suggestedDealType, projectedToArtist, basis, status (proposed/accepted/declined)</td></tr>
+    <tr><td><code>settings</code></td><td>k/v store for LLM provider/key/model</td><td>key, value</td></tr>
+  </table>
+
+  <p>Idempotent seed snapshot lives at <code>artifacts/api-server/data/seeds/</code> as JSON exports plus a byte-for-byte copy of the live <code>greenroom.db</code>. Refresh recipe: <code>pnpm --filter @workspace/api-server exec tsx scripts/exportSeedsSnapshot.ts</code>.</p>
+
+  <h2 id="tabs">3. The seven tabs</h2>
+  <p>The sidebar (<code>components/layout/nav-links.tsx</code>) exposes seven tabs. For each, this section names what the page shows, where the numbers come from, and what the page contributed to the redesign argument.</p>
+
+  <h3>3.1 Shows · <code>/shows</code> &amp; <code>/shows/:id</code></h3>
+  <p><strong>What it does.</strong> Lists every past or current show (<code>shows.date &lt;= today</code>) as a card grid with deal-type / size-bucket / attention filters. Detail page joins the show against artist, agent, agency, venue, deal, settlement, ticket sales, expenses, comps, and recoups; each show also has a <strong>Settle</strong> wizard at <code>/shows/:id/settle</code>.</p>
+  <p><strong>Calculated flags.</strong> <code>isUnsupportedDeal</code> = <code>dealType ∈ {percentage_of_net, vs, door}</code> (the three the in-app wizard cannot model). <code>isDisputed</code> = settlement status disputed OR any recoup line in <code>recoupsJson</code> has <code>status === "disputed"</code>.</p>
+  <p><strong>Why it mattered for the redesign.</strong> The "unsupported deal" badge across the card grid was the first hint that the wizard's coverage was structurally limited — every flagged deal was a settlement-night spreadsheet, not a tool transaction. That observation set up the "what fraction of past deals could in principle be settled in-app?" KPI on the Reports tab (next).</p>
+
+  <h3>3.2 Artists · <code>/artists</code></h3>
+  <p><strong>What it does.</strong> Grid of every artist with show counts, last show date, top deal type, review-tone topics drawn from LLM summaries, and a flagged-attention badge. Numbers from <code>getAllArtists</code> in <code>lib/queries.ts</code>.</p>
+  <ul>
+    <li><strong>showCount / lastShowDate</strong> — <code>count(shows.id)</code>, <code>max(shows.date)</code> grouped by artist.</li>
+    <li><strong>topDealType / dealTypes[]</strong> — counts of each <code>deals.dealType</code> per artist via <code>shows</code>; highest-count is the headline chip.</li>
+    <li><strong>topPositive / topNegative</strong> — first sentence (≤90 chars) of the most-recent non-empty <code>settlements.positiveSummary</code> / <code>negativeSummary</code>; populated by the LLM enrichment pipeline.</li>
+    <li><strong>attentionCount</strong> — number of <code>getNeedsAttention()</code> items whose <code>showId</code> belongs to this artist.</li>
+  </ul>
+  <p><strong>Why it mattered.</strong> Surface-level test for whether qualitative friction clusters by artist (loud-booker effect) or by deal shape. Result: clusters by deal shape, not artist — which made the cell-grid the right unit of analysis on the Insights tab.</p>
+
+  <h3>3.3 Reports · <code>/reports</code></h3>
+  <p><strong>What it does.</strong> High-level KPIs across all past shows. Numbers from <code>getReports</code>.</p>
+  <ul>
+    <li><strong>dealTypeCounts</strong> — distribution of <code>deals.dealType</code>.</li>
+    <li><strong>inAppToolUsageRate</strong> = <code>count(dealType ∈ {flat, percentage_of_gross}) / total deals</code>. <em>This is the headline number that opens the redesign report.</em></li>
+    <li><strong>settlementStatus</strong> + <strong>disputedRate</strong> = <code>disputed / totalSettlements</code>.</li>
+    <li><strong>totalGross</strong> / <strong>totalToArtists</strong> — sums across past settlements.</li>
+    <li><strong>totalRecoupValue</strong> / <strong>disputedRecoupValue</strong> / <strong>settlementsWithRecoups</strong> — parsed from <code>recoupsJson</code>.</li>
+    <li><strong>totalCompTickets</strong> / <strong>totalCompFaceValue</strong> / <strong>compsByCategory</strong>.</li>
+  </ul>
+  <p><strong>Why it mattered.</strong> Established the size of the "out-of-tool" cohort — the share of bookings that escape the wizard entirely. That cohort is what Phases 1–2 of the redesign target.</p>
+
+  <h3>3.4 Deal Analysis · <code>/deal-analysis</code></h3>
+  <p><strong>What it does.</strong> Quantitative breakdown of what kinds of deals the venue runs and how they perform. Powered by <code>getDealAnalysis</code> in <code>lib/queries.ts</code>.</p>
+  <ul>
+    <li><strong>byComplexity</strong> — every past deal classified <code>simple</code> / <code>medium</code> / <code>complex</code> by <code>classifyComplexity()</code>. Per bucket: <code>count</code>, <code>pct</code>, <code>avgPayout</code>, <code>inToolCount</code>, <code>spreadsheetCount</code>.</li>
+    <li><strong>bySize</strong> — bucketed by guarantee into <code>$0–1K</code>, <code>$1–5K</code>, <code>$5–15K</code>, <code>$15K+</code>, plus an <code>Uncapped %</code> bucket for guarantee-less percentage deals. Per bucket: <code>count</code>, <code>pct</code>, <code>avgGross</code>, <code>avgToArtist</code>, <code>disputeRate</code>, <code>losingMoneyCount</code>, <code>profitN</code>.</li>
+    <li><strong>byProfitability</strong> — partition every settled show with both gross and payout into <code>profitable</code> / <code>unprofitable</code> using <code>gross − totalToArtist − Σ expenses</code>; reports per-side <code>disputeRate</code>.</li>
+    <li><strong>costs</strong> — totalExpenses, expensesByCategory, totalRecoups, disputedRecoupValue, recoupsByCategory.</li>
+    <li><strong>revenue.byDealType</strong> — per <code>dealType</code>: Σ gross, Σ netToVenue, Σ toArtist, settlement count.</li>
+    <li><strong>revenue.months</strong> — last 24 calendar months: gross, netToVenue, toArtist, plus <code>byType</code> for stacked-area charts.</li>
+    <li><strong>revenue.crossTabBySizeAndType</strong> — the cross-tab grid (rows = deal type, columns = size bucket). Per cell: <code>count</code>, <code>settledN</code>, <code>profitN</code>, <code>losingMoneyCount</code>, <code>disputed</code>, <code>losingMoneyRate</code>, <code>disputeRate</code>, <code>attentionCount</code>, <code>attentionRate</code>, <code>attentionByKind</code>.</li>
+  </ul>
+  <p><strong>Why it mattered.</strong> The cross-tab is the analytical backbone of the redesign. Every claim about "vs deals at $1–5K dispute at 12.4% versus 3.8% on flats at the same size" comes from a single cell of this grid. The cells also gave Smart Switch its bucket-aware policy.</p>
+
+  <h3>3.5 Needs Attention · <code>/needs-attention</code></h3>
+  <p><strong>What it does.</strong> A worklist of past shows whose data smells off. <code>getNeedsAttention()</code> emits four rule kinds:</p>
+  <ul>
+    <li><code>show_settled_no_settlement</code> — show status is <code>settled</code>/<code>closed</code> but there's no settlements row.</li>
+    <li><code>notes_say_closed_but_status_open</code> — settlement is not in a closed status but notes/signoffText contain a closure phrase from a fixed vocabulary (closed out, settled up, paid in full, signed off, …). The matched phrase becomes <code>evidence</code>.</li>
+    <li><code>disputed_recoups_but_signed</code> — settlement is closed but at least one recoup line in <code>recoupsJson</code> has <code>status === "disputed"</code>. Lists labels + amounts as evidence.</li>
+    <li><code>stale_disputed</code> — settlement status is disputed and <code>disputedAt</code> is more than 30 days ago.</li>
+  </ul>
+  <p><strong>Why it mattered.</strong> These four kinds were the empirical definition of "settlement friction" used by the LLM enrichment pipeline and the Insights cell grid. They also gave a deterministic dispute-rate denominator that doesn't depend on freetext interpretation.</p>
+
+  <h3>3.6 Insights · <code>/insights</code></h3>
+  <p><strong>What it does.</strong> The qualitative companion to Deal Analysis. Same <code>dealType × sizeBucket</code> grid, but each cell shows the dominant friction kind plus a top-5 cluster of recurring complaints. Powered by <code>getInsights()</code> and <code>enrichSettlements()</code> in <code>lib/insights.ts</code>.</p>
+  <ol>
+    <li><strong>Per-settlement enrichment</strong> (<code>POST /api/insights/enrich</code>). Picks every settlement that has notes, signoffText, a disputed status, or a disputed recoup. Calls the active LLM with a structured payload and stores <code>positiveSummary</code> + <code>negativeSummary</code> (1–2 sentences each, strict JSON output). Concurrency = 8, idempotent.</li>
+    <li><strong>Grid build</strong> (<code>GET /api/insights</code>). Re-uses <code>classifySizeBucket()</code> from Deal Analysis. Per cell: <code>count</code>, <code>attentionCount</code>, <code>byKind[k]</code>, <code>topKind</code>/<code>topKindCount</code>. Ties broken by <code>KIND_PRIORITY = [stale_disputed, disputed_recoups_but_signed, show_settled_no_settlement, notes_say_closed_but_status_open]</code>.</li>
+    <li><strong>Complaint clustering</strong> — for each cell with a <code>topKind</code>, gather the <code>negativeSummary</code> of every flagged deal in that cell, then call the LLM <em>once per cell</em> to cluster them into ≤5 themes <code>{theme, count}</code>, ordered by count desc.</li>
+    <li><strong>Caching</strong> — full payload cached in-module after first compute, reused until server restart, Settings save, or explicit <code>clearInsightsCache()</code>. Concurrent requests await the same in-flight promise (<code>pending</code>).</li>
+  </ol>
+  <p>Reports <code>enrichmentCoverage = withSummary / total</code> as a transparency signal (currently 237 / 558 ≈ 42%).</p>
+  <p><strong>Page also hosts three live engines</strong> (added during the redesign work):</p>
+  <ul>
+    <li><strong>Switch Savings</strong> (<code>GET /api/insights/switch-savings</code>) — historical cost of <em>not</em> having Smart Switch. Top-line tiles: cumulative money saved, time saved, and the new <code>vsPercentageFiredStats</code> (% of settled vs deals where the percentage clause out-paid the guarantee, plus avg guarantee-win when it didn't).</li>
+    <li><strong>SGP Backtest</strong> (<code>GET /api/insights/guarantee-backtest</code>) — replays each past deal with the Smart Guaranteed Price algorithm using only data available before the show. Top-line tiles: money protected, money overpaid, net delta, and the new <code>gapCoverage</code> distribution (median / p75 / p90 of |SGP − paid|, plus the share of gaps fully covered at thresholds $100/$200/$400/$800/$1,500).</li>
+    <li><strong>Switch Projected Grid</strong> (<code>GET /api/insights/switch-projected-grid</code>) — the cell-by-cell rollup of "if Smart Switch had been used, this cell would have paid X instead of Y." This is the source of the headline "$23,024 saved across 137 vs/$1–5K deals" claim in the redesign report.</li>
+  </ul>
+
+  <h3>3.7 Settings · <code>/settings</code></h3>
+  <p>Configures which LLM the server calls and stores keys persistently. UI: provider radio (Anthropic / OpenAI), per-provider API-key password input (<code>•••••••• (saved)</code> + Clear when persisted), per-provider model dropdown, save button, footer line showing active provider/model/source. Backend in <code>lib/llm.ts</code> + routes in <code>routes/greenroom.ts</code> — see §6 for full behaviour.</p>
+
+  <h2 id="api">4. API surface</h2>
+  <p>Every route is mounted under <code>/api</code> on the Express app in <code>artifacts/api-server/src/routes/greenroom.ts</code>.</p>
+  <table class="compact">
+    <tr><th>Method · Path</th><th>Purpose</th></tr>
+    <tr><td class="mono">GET /shows</td><td>Past show list with joined artist/agent/deal/settlement.</td></tr>
+    <tr><td class="mono">GET /shows/:id</td><td>Full show detail (also used by the Settle wizard).</td></tr>
+    <tr><td class="mono">GET /shows/:id/export</td><td>JSON export with per-show LLM deep summary.</td></tr>
+    <tr><td class="mono">GET /artists</td><td>Artist roster with deal-type and review-topic enrichment.</td></tr>
+    <tr><td class="mono">GET /reports</td><td>KPI bundle for the Reports tab.</td></tr>
+    <tr><td class="mono">GET /deal-analysis</td><td>Full Deal Analysis bundle (complexity / size / profitability / costs / revenue.byDealType / months / crossTabBySizeAndType).</td></tr>
+    <tr><td class="mono">GET /needs-attention</td><td>Flat list of attention items.</td></tr>
+    <tr><td class="mono">POST /insights/enrich</td><td>Run per-settlement summary pass; <code>{totalCandidates, enriched, skippedExisting, failed}</code>.</td></tr>
+    <tr><td class="mono">GET /insights</td><td>Cached cell grid with <code>topKind</code> + clustered complaint bubbles.</td></tr>
+    <tr><td class="mono">GET /insights/switch-savings</td><td>Top-N historical Smart Switch counterfactual savings + <code>vsPercentageFiredStats</code>.</td></tr>
+    <tr><td class="mono">GET /insights/switch-projected-grid</td><td>Cell rollup of projected Smart Switch payouts vs actual.</td></tr>
+    <tr><td class="mono">GET /insights/guarantee-backtest</td><td>SGP backtest items + <code>gapCoverage</code>.</td></tr>
+    <tr><td class="mono">POST /guarantee/backfill</td><td>Backfill SGP for upcoming shows (idempotent).</td></tr>
+    <tr><td class="mono">POST /shows/:id/guarantee/generate</td><td>Generate or recompute SGP for one show.</td></tr>
+    <tr><td class="mono">POST /shows/:id/deal/apply-guarantee</td><td>Apply the SGP suggestion to the show's deal.</td></tr>
+    <tr><td class="mono">GET /shows/:id/deal/improvements</td><td>Improve-Deal proposals (caps-only) for one show.</td></tr>
+    <tr><td class="mono">POST /shows/:id/deal/apply-improvements</td><td>Persist accepted Improve-Deal items into <code>deals</code>.</td></tr>
+    <tr><td class="mono">POST /shows/:id/switch/generate</td><td>Generate or recompute the Smart Switch suggestion for one show.</td></tr>
+    <tr><td class="mono">POST /shows/:id/switch/accept</td><td>Mark a switch suggestion accepted; rewrites <code>deals.dealType</code>.</td></tr>
+    <tr><td class="mono">POST /shows/:id/switch/decline</td><td>Mark a switch suggestion declined.</td></tr>
+    <tr><td class="mono">GET /settings/llm</td><td>Read-only LLM status (provider/model/source/<code>hasKey</code>); never returns key material.</td></tr>
+    <tr><td class="mono">POST /settings/llm</td><td>Upsert provider/key/model; clears the insights cache.</td></tr>
+  </table>
+
+  <h2 id="libs">5. Backend lib modules</h2>
+
+  <div class="grid2">
+    <div class="card">
+      <h3><code>lib/queries.ts</code></h3>
+      <p>Source of truth for everything except Insights. <code>getAllShows</code>, <code>getShowById</code>, <code>getAllArtists</code>, <code>getReports</code>, <code>getDealAnalysis</code>, <code>getNeedsAttention</code>. Bucketing helpers <code>classifyComplexity()</code> and <code>classifySizeBucket()</code> are re-used by Smart Switch, the Backtest, and Insights — so every cell-grid in the app uses the same definition.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/insights.ts</code></h3>
+      <p>The enrichment + clustering pipeline. Two LLM call sites (per-settlement summary, per-cell complaint cluster), both gated on <code>llmIsConfigured()</code>. Owns the in-module cache and the <code>KIND_PRIORITY</code> tie-breaker.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/smartGuarantee.ts</code></h3>
+      <p>Smart Guaranteed Price — a 7-step algorithm that proposes a flat guarantee for an upcoming show. Inputs: artist's prior payouts at this venue, expected gross (own past or cell mean), expense baseline. Outputs: <code>suggested</code>, <code>tier</code> (A–D confidence), <code>winner</code> (guarantee/percentage/tie), and a structured <code>stepsJson</code> for "show your work." Tier D when cell <code>n &lt; 3</code>; first-time artists demote A→B.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/smartSwitch.ts</code></h3>
+      <p>Proposes an alternative deal shape (flat or door-hybrid) for vs/pn/door deals. Five <code>SwitchSource</code> branches (<code>sgp_engine</code>, <code>guarantee_amount</code>, <code>cell_mean</code>, <code>door_hybrid_calc</code>, <code>door_dead_pool</code>, <code>suppressed</code>) so the UI can badge provenance. Tier A demoted to B when historical band &gt; $1,000.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/dealImprovements.ts</code></h3>
+      <p>Caps-only post-MVP "Improve Deal" engine. Emits structural-cap suggestions (expense cap, hospitality cap) with audit-derived P75-flat defaults. Deliberately does <em>not</em> propose flat conversion — that is Smart Switch's job in cells where the data is safe.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/switchSavings.ts</code></h3>
+      <p>"If Smart Switch had been used, what would have changed?" Computes per-show counterfactual payout, money delta, and a notes-/recoup-derived time-saved estimate. <code>getSwitchProjectedGrid()</code> rolls the same logic up to the cell-grid for the redesign report. Now also reports <code>vsPercentageFiredStats</code>, scoped to the $1–5K bucket where Smart Switch's flat fallback applies: 11/64 (17.2%) of settled vs / $1–5K deals had the percentage clause never out-pay the guarantee.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/guaranteeBacktest.ts</code></h3>
+      <p>Replays each past deal with the SGP algorithm using only data available before the show. Outputs per-deal <code>direction</code> (<code>money_protected</code>/<code>money_overpaid</code>/<code>even</code>) plus <code>moneyProtected</code>, <code>moneyOverpaid</code>, <code>netDelta</code>. Now also reports <code>gapCoverage</code> (median $1,119 · p75 $1,939 · p90 $3,344) used for Phase-3 Product 2 cap sizing.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/showExport.ts</code></h3>
+      <p>Per-show JSON export with an LLM deep summary. Routes through <code>llmGenerateText</code> with a heavier <code>modelOverride</code> (<code>claude-sonnet-4-6</code> on Anthropic, <code>gpt-4o</code> on OpenAI).</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/llm.ts</code></h3>
+      <p>Single source of truth for which provider/key/model to call. <code>getLlmConfig()</code> reads the <code>settings</code> table on every call, falling back to <code>AI_INTEGRATIONS_*</code> env vars. <code>llmGenerateText</code> + <code>llmGenerateJson&lt;T&gt;</code> are the only two functions other modules import. <code>extractJson()</code> tolerantly strips ```json fences and falls back to the first <code>{…}</code> substring before <code>JSON.parse</code>.</p>
+    </div>
+    <div class="card">
+      <h3><code>lib/logger.ts</code></h3>
+      <p>Pino-based structured logger; the API server bundles it into <code>dist/pino-*.mjs</code> via esbuild.</p>
+    </div>
+  </div>
+
+  <h2 id="llm">6. LLM helper &amp; settings</h2>
+  <ul>
+    <li><strong>Storage.</strong> <code>settings (key TEXT PRIMARY KEY, value TEXT)</code> created on startup by <code>migrationsReady</code>. Keys: <code>llm.provider</code>, <code>llm.anthropic.apiKey</code>, <code>llm.anthropic.model</code>, <code>llm.openai.apiKey</code>, <code>llm.openai.model</code>.</li>
+    <li><strong><code>getLlmStatus()</code> / <code>GET /api/settings/llm</code></strong> returns metadata only: <code>activeProvider</code>, <code>activeModel</code>, <code>source ∈ {settings, env, none}</code>, <code>hasKey</code>, plus per-provider <code>{configured, source, model}</code> and the list of selectable models. <em>Never</em> returns raw key material.</li>
+    <li><strong><code>saveLlmSettings()</code> / <code>POST /api/settings/llm</code></strong> accepts partial updates (provider / *ApiKey / *Model). After saving, the insights cache is cleared so the next <code>GET /api/insights</code> re-runs against the new active model.</li>
+    <li><strong><code>llmGenerateText({prompt, modelOverride?, maxTokens?})</code></strong> — provider-agnostic text completion. Anthropic path: <code>messages.create</code> with active model; first text block of the response. OpenAI path: <code>chat.completions.create</code> with <code>messages: [{role:"user", content: prompt}]</code>; first <code>choice.message.content</code>.</li>
+    <li><strong><code>llmGenerateJson&lt;T&gt;()</code></strong> wraps text completion with the tolerant <code>extractJson</code> fence stripper.</li>
+    <li><strong>BASE_URL fallback.</strong> When a saved key is present, the env-var <code>BASE_URL</code> override is intentionally NOT applied, so user-supplied keys hit the canonical provider endpoint.</li>
+  </ul>
+
+  <h2 id="pipeline">7. The insight pipeline that shaped the redesign</h2>
+  <p>Each phase of the redesign argument is anchored to a specific data surface in the live app. The chain runs left-to-right from raw rows to a publishable claim.</p>
+  <table class="compact">
+    <tr><th>Claim in the redesign report</th><th>Surface that supplies it</th><th>Module / route</th></tr>
+    <tr><td>Only ~X% of past bookings could be settled in-app</td><td>Reports → <code>inAppToolUsageRate</code></td><td><code>queries.getReports</code></td></tr>
+    <tr><td>vs/$1–5K disputes at 12.4% vs 3.8% on flat at the same size</td><td>Deal Analysis → <code>revenue.crossTabBySizeAndType</code> cell <code>disputeRate</code></td><td><code>queries.getDealAnalysis</code></td></tr>
+    <tr><td>Switching the 137 vs/$1–5K deals to flat would have saved $23,024</td><td>Insights → Switch Projected Grid (<code>cell.payoutDelta</code>)</td><td><code>switchSavings.getSwitchProjectedGrid</code></td></tr>
+    <tr><td>The percentage clause out-pays the guarantee in 86.7% of vs deals (avg = $0 when it doesn't)</td><td>Insights → Switch Savings tile (<code>vsPercentageFiredStats</code>)</td><td><code>switchSavings.getSwitchSavings</code></td></tr>
+    <tr><td>Door deals are the single largest savings cell (~$50K via hybrid)</td><td>Insights → Switch Projected Grid for door rows</td><td><code>switchSavings.getSwitchProjectedGrid</code></td></tr>
+    <tr><td>SGP suggestion-gap distribution (median $1,119 · p75 $1,939) used to size Product 2 cap</td><td>Insights → SGP Backtest tile (<code>gapCoverage</code>)</td><td><code>guaranteeBacktest.getGuaranteeBacktest</code></td></tr>
+    <tr><td>4.3% headline dispute rate; intra-venue cell range 3.8% – 12.4% used as the Phase-3 platform sensitivity band</td><td>Reports → <code>disputedRate</code> + Deal Analysis cells</td><td><code>queries.getReports</code> + <code>queries.getDealAnalysis</code></td></tr>
+    <tr><td>Friction clusters by deal shape, not by artist</td><td>Insights → cell grid + per-cell complaint clusters</td><td><code>insights.getInsights</code></td></tr>
+    <tr><td>"Improve Deal is caps-only" policy</td><td>Audit on Deal Analysis cells: bucket-scaling unsafe outside Smart Switch's covered cells</td><td><code>dealImprovements.getDealImprovements</code></td></tr>
+  </table>
+
+  <div class="callout">
+    <strong>The pipeline is reproducible.</strong> Every figure cited in the redesign report can be re-derived by hitting the live API at this commit. The <code>/insights</code> page renders all of them as on-screen tiles, and the seed snapshot in <code>artifacts/api-server/data/seeds/</code> reproduces the underlying database byte-for-byte.
+  </div>
+
+  <h2 id="numbers">8. Live reference numbers</h2>
+  <p>Snapshot of the figures the redesign report cites, as returned by the live API at this commit. Re-run the curls below to verify.</p>
+  <table class="compact">
+    <tr><th>Quantity</th><th>Value</th><th>Source</th></tr>
+    <tr><td>Past shows in window</td><td class="mono">510</td><td><code>GET /api/reports</code></td></tr>
+    <tr><td>Past settlements</td><td class="mono">509</td><td><code>GET /api/reports</code></td></tr>
+    <tr><td>Disputed settlements</td><td class="mono">22 (4.3%)</td><td><code>GET /api/reports</code> · <code>disputedRate</code></td></tr>
+    <tr><td>Disputed-recoup value</td><td class="mono">$7,582 (avg $345)</td><td><code>GET /api/reports</code></td></tr>
+    <tr><td>vs · $1–5K past deals</td><td class="mono">137</td><td><code>GET /api/deal-analysis</code> · cross-tab cell</td></tr>
+    <tr><td>vs · $1–5K dispute rate</td><td class="mono">12.4%</td><td>same cell · <code>disputeRate</code></td></tr>
+    <tr><td>flat · $1–5K dispute rate</td><td class="mono">3.8%</td><td>same cell · <code>disputeRate</code></td></tr>
+    <tr><td>Smart Switch projected savings · vs/$1–5K</td><td class="mono">$22,774</td><td><code>GET /api/insights/switch-projected-grid</code></td></tr>
+    <tr><td>vs deals scanned · % clause never fired (scoped to $1–5K)</td><td class="mono">11 / 64 (17.2%)</td><td><code>GET /api/insights/switch-savings</code> · <code>vsPercentageFiredStats</code></td></tr>
+    <tr><td>SGP backtest scored deals</td><td class="mono">321</td><td><code>GET /api/insights/guarantee-backtest</code></td></tr>
+    <tr><td>SGP gap distribution (median · p75 · p90)</td><td class="mono">$1,119 · $1,939 · $3,344</td><td>same · <code>gapCoverage</code></td></tr>
+    <tr><td>SGP gap fully covered at $400</td><td class="mono">25.2%</td><td>same · <code>gapCoverage.buckets</code></td></tr>
+    <tr><td>LLM enrichment coverage</td><td class="mono">237 / 558 (42%)</td><td><code>GET /api/insights</code> · <code>enrichmentCoverage</code></td></tr>
+  </table>
+
+  <hr>
+  <p style="font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:0.06em;">END · Greenroom Supporting Document · accompanies <code>greenroom-settlement-redesign-v2.pdf</code> (v2.1, May 2026).</p>
+
+</div>
+</body>
+</html>

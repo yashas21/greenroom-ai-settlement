@@ -1,267 +1,261 @@
-<div align="center">
-
 # Greenroom
 
-**Software for independent music venues.**
+A booker-facing dashboard for **The Crescent**, a small live-music venue.
+Greenroom tracks shows, deals, and settlements; flags follow-ups; and surfaces
+qualitative friction patterns across past deals using an LLM enrichment
+pipeline. On top of the read-only booking view it adds three pricing /
+recommendation engines — **Smart Guaranteed Price**, **Smart Switch**, and
+**Improve Deal** — and a long-form **Insights** tab that clusters recurring
+complaints behind each cell of the deal-type × size grid.
 
-This is the starter codebase for the Greenroom Applied AI PM case study.
+This repo is a fork of
+[`samay-cbh/greenroom-starter`](https://github.com/samay-cbh/greenroom-starter)
+(a Next.js skeleton). Everything below the starter line — monorepo
+restructure, recommendation engines, settlement wizard, Insights pipeline,
+test suite, and design documents — was added on top.
 
-</div>
-
----
-
-You're looking at a working but mediocre product. It's enough to feel real, but every workflow has gaps. **Your job isn't to fix everything — it's to pick a slice and design it well.** See your case study brief for full instructions.
-
-## Before you start
-
-You'll need:
-
-1. **Node.js, version 20 or higher** — get it from [nodejs.org](https://nodejs.org/) (pick the LTS version). Verify with `node -v`.
-2. **Git** — most computers have it. Verify with `git --version`. If not, install from [git-scm.com](https://git-scm.com/).
-3. **A code editor.** [VS Code](https://code.visualstudio.com/) is great. [Cursor](https://cursor.com/) is what we'd reach for if we were doing this case study.
-4. **A GitHub account.** Free at [github.com](https://github.com/).
-
-If you're on Windows, run all the commands below in **Git Bash**, **PowerShell**, or **WSL** — not the legacy Command Prompt.
-
-## Setup, step by step
-
-### 1. Fork this repo to your own GitHub account
-
-Click the **Fork** button at the top right of [https://github.com/samay-cbh/greenroom-starter](https://github.com/samay-cbh/greenroom-starter). You'll get a copy under your own username.
-
-> _Why fork?_ A fork is your own copy of the repo. You'll commit your changes there, and submit your fork's URL when you're done. We can see your commit history that way.
-
-### 2. Clone your fork to your computer
+## Quickstart
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/greenroom-starter
-cd greenroom-starter
+pnpm install
+pnpm --filter @workspace/api-server run dev      # API server (port 8080 in dev)
+pnpm --filter @workspace/greenroom run dev       # Web app (Vite, proxied)
+pnpm --filter @workspace/mockup-sandbox run dev  # Component preview server
+
+pnpm run typecheck                               # tsc -b across all packages
+pnpm run build                                   # typecheck + build all
+pnpm --filter @workspace/api-server test         # vitest suite (85 tests)
 ```
 
-(Replace `YOUR-USERNAME` with your actual GitHub username.)
+Required env:
 
-### 3. Install dependencies
+- `DATABASE_URL` — Postgres connection string (workspace-level; the
+  Greenroom artifact itself uses a local libsql/sqlite file at
+  `artifacts/api-server/data/greenroom.db`).
 
-```bash
-npm install
+Optional env (LLM fallback if no key is saved in the Settings tab):
+
+- `AI_INTEGRATIONS_ANTHROPIC_API_KEY`, `AI_INTEGRATIONS_ANTHROPIC_BASE_URL`
+- `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL`
+
+## Stack
+
+- pnpm workspaces, Node.js 24, TypeScript 5.9
+- API: Express 5, esbuild bundle, libsql/sqlite + Drizzle ORM
+- Frontend: Vite + React + wouter + Tailwind v4 + shadcn/ui + Recharts
+- Validation: Zod (`zod/v4`), `drizzle-zod`
+- API codegen: Orval (from OpenAPI spec)
+- Tests: Vitest (fixture-based, no DB needed)
+- LLM: provider-agnostic helper wrapping the Anthropic and OpenAI SDKs
+
+## Monorepo layout
+
+```
+artifacts/
+  api-server/        Express API + libsql DB + LLM helper + test suite
+  greenroom/         Vite + React frontend (the booker dashboard)
+  mockup-sandbox/    Isolated component-preview server (design workflow)
+packages/
+  api-spec/          OpenAPI source-of-truth + Orval-generated hooks
+  db/                Shared Drizzle config / schemas
+exports/             Design PDFs (settlement redesign, supporting doc,
+                     insurance pricing brief) + their HTML sources
+code-review/         Self-contained dataset snapshot + schema/purpose
+                     guide for external code-review agents
 ```
 
-This pulls down all the JavaScript packages the project needs. Takes about 60 seconds. You may see a few warnings — those are normal and safe to ignore.
+## The seven tabs
 
-### 4. Start the app
+The sidebar exposes seven pages. The short description of each:
 
-```bash
-npm run dev
-```
+1. **Shows** (`/shows`) — every past or current show with joined artist,
+   agent, agency, deal, settlement, ticket sales, expenses, comps, recoups.
+   Each show has a **Settle** wizard at `/shows/:id/settle`.
+2. **Artists** (`/artists`) — roster grid with show count, last-show date,
+   top deal type, review-tone topics extracted by the LLM, and an
+   attention badge.
+3. **Reports** (`/reports`) — top-level KPIs: deal-type counts, in-tool
+   coverage rate, settlement-status distribution, dispute rate,
+   total-gross / total-to-artists, comp ticket totals.
+4. **Deal Analysis** (`/deal-analysis`) — the quantitative breakdown of
+   deal complexity, size buckets, profitability, costs, and the
+   `dealType × sizeBucket` cross-tab.
+5. **Needs Attention** (`/needs-attention`) — worklist of past shows whose
+   data smells off (settled-but-no-settlement, notes-vs-status mismatch,
+   disputed recoups on closed settlements, stale disputes).
+6. **Insights** (`/insights`) — the qualitative companion to Deal
+   Analysis. Same grid, but each cell shows the dominant friction kind
+   plus a top-5 cluster of recurring complaints. Powered by a
+   per-settlement LLM enrichment pass + per-cell clustering.
+7. **Settings** (`/settings`) — picks the active LLM provider/model and
+   stores the API key persistently (write-only across the API).
 
-You'll see something like:
+`replit.md` in this repo has the long-form spec for each tab — every
+formula, every classifier, every cache decision. Treat it as the
+operations guide; this README is the entry point.
 
-```
-▲ Next.js 16.x
-- Local:   http://localhost:3000
+## New additions on top of the starter
 
-✓ Ready in 1.2s
-```
+This fork added the following on top of the upstream starter dataset:
 
-### 5. Open it in your browser
+### Recommendation engines (`artifacts/api-server/src/lib/`)
 
-Go to **[http://localhost:3000](http://localhost:3000)**.
+- **`smartGuarantee.ts`** — Smart Guaranteed Price (SGP) backtest engine.
+  Given a `dealType × sizeBucket` cell, returns a recommended flat
+  guarantee plus a confidence tier (A / B / C / D) and provenance
+  (`sgp_engine` / `cell_mean` / `door_hybrid_calc` / `door_dead_pool` /
+  `suppressed`). Tier `A → B` is demoted when the historical band is
+  wider than $1,000 so the UI never overstates certainty.
+- **`smartSwitch.ts`** — Smart Switch suggestions for upcoming shows.
+  Currently covers `vs` / `pn` at `$1–5K` and `door` at any size, with a
+  first-time-artist demotion (artist with no prior shows at the venue
+  drops tier `A → B`).
+- **`dealImprovements.ts`** — Improve Deal. Caps-only suggestions
+  (expense cap, hospitality cap) with audit-derived P75-flat defaults.
+  Bucket-scaling deliberately omitted since expenses are flat across
+  gross levels at this venue.
+- **`switchSavings.ts`** — counterfactual replay. For each past
+  vs / pn / door deal in the last N months, computes the dollar money
+  saved if Smart Switch had been accepted, time saved (from
+  notes/signoff/recoup activity), and a structured breakdown.
+- **`guaranteeBacktest.ts`** — 12-month rolling backtest harness that
+  feeds the pricing tables in the insurance brief.
 
-You'll land on Mariana's home view at The Crescent. **Click "Where to start" in the sidebar** for an in-product orientation.
+### Insights pipeline (`artifacts/api-server/src/lib/insights.ts`)
 
-> **Tip:** Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) anywhere in the app to open the command palette — search across shows and artists instantly.
+A three-stage LLM pipeline gated on `llmIsConfigured()`:
 
----
+1. **Per-settlement enrichment** (`POST /api/insights/enrich`) — picks
+   every settlement with notes / signoff / disputed status / disputed
+   recoup, calls the active LLM, stores a 1–2 sentence
+   `positiveSummary` + `negativeSummary` on the row. Concurrency 8.
+   Idempotent unless `force: true`.
+2. **Grid build** (`GET /api/insights`) — re-uses the same size-bucket
+   classifier from Deal Analysis. Per cell: count, attention count,
+   distinct-kind counts, dominant kind via deterministic
+   `KIND_PRIORITY`.
+3. **Complaint clustering** — for each cell with a dominant kind, calls
+   the LLM once to cluster the gathered `negativeSummary` strings into
+   AT MOST 5 themes (`{theme, count}`), ordered by count desc.
 
-## What's running
+The full payload is cached in-module with a race-safe pending promise.
+Invalidated only on a server restart, a Settings save, or an explicit
+`clearInsightsCache()`.
 
-You're logged in automatically as **Mariana Reyes**, lead booker at The Crescent (650-cap, Nashville). The product has these surfaces:
+### Settle wizard
 
-| Route | What it is |
+`/shows/:id/settle` is a guided flow for `flat` and `percentage_of_gross`
+deals. The cells covered by Smart Switch (`vs` / `pn` at $1–5K, `door`
+at any size) get a "switch to flat / door-hybrid" suggestion *before*
+entering the wizard, so bookers don't have to fall to a spreadsheet for
+the supported shapes.
+
+### Test suite (`artifacts/api-server/src/lib/*.test.ts`)
+
+85 fixture-based tests across nine files. No DB or HTTP server is
+required — every classifier and engine accepts plain row objects and
+returns plain values. Highlights:
+
+- `classifyComplexity.test.ts` — structural read of deal shape, plus
+  a regression guard against the May-2026 "every deal looks complex"
+  bug (deal-notes freetext no longer fires the classifier).
+- `queries.test.ts` / `queries.extra.test.ts` — bucket classifiers and
+  the audit-fixed `getReports.settledCount` (past shows with status in
+  `{settled, closed}`, not every past show).
+- `smartGuarantee.test.ts` / `smartGuarantee.absorbedByVenue.test.ts` —
+  pricing math; the absorbed-by-venue branch must not double-count.
+- `smartSwitch.test.ts` — provenance ladder, tier demotion, band-width
+  guards.
+- `switchSavings.test.ts` / `switchSavings.vsStats.test.ts` — replay
+  math + the never-fired-vs-percentage histogram.
+- `dealImprovements.test.ts` — caps-only behaviour.
+
+Run with `pnpm --filter @workspace/api-server test`.
+
+### Design documents (`exports/`)
+
+| File | What it is |
 |---|---|
-| `/shows` | Mariana's home view. 24 months of completed shows, searchable and grouped by month. |
-| `/shows/[id]` | Show detail. Deal terms, artist info, ticket sales, expenses, comps. |
-| `/shows/[id]/settle` | The in-app settlement worksheet. **Try it on a few shows.** |
-| `/artists` | Roster of artists who've played the venue, bucketed by frequency. |
-| `/reports` | Aggregate metrics. The numbers Pri (the CEO) is watching. |
-| `/context` | Orientation for you, the candidate. Linked from the sidebar. |
+| `greenroom-settlement-redesign-v2.pdf` | **Settlement Redesign · v2.1** (May 2026). The three-phase argument — simplify the deal types Smart Switch already covers, then layer Improve-Deal caps and insurance on top. Every figure sourced from the live API. |
+| `greenroom-supporting-document.pdf` | Engineering and analytical companion: every tab, every API endpoint, every backend lib module, with a direct mapping from each surface to the claim it supplies in the redesign report. |
+| `greenroom-insurance-pricing.pdf` | Pricing brief for two Phase-3 insurance products. Per-show expected-cost derivation from `/api/reports` (Product 1) and a 12-mo SGP backtest (Product 2). Tier ladder, two-sided discount math, bundles, platform revenue model, sensitivity bands. |
 
-### Recommended path your first time through
+HTML sources sit next to each PDF; re-export with WeasyPrint.
 
-1. Open `/context` (the sidebar's "Where to start" link). 5-minute tour.
-2. Then `/shows`. Pick a Vs-deal show. Click **Settle**. See what's broken.
-3. Pick a Flat-deal show. Click **Settle**. See what works.
-4. Read `data/transcripts/*.md` and `data/ceo-memo.md`.
-5. Look at `data/dispute-thread.md`. Then press **⌘K** and search "Coastal Spell" to find the matching show.
+### Code-review bundle (`code-review/`)
 
----
+Self-contained snapshot of the live dataset (shows, artists, per-deal
+extracted insights) plus a schema/purpose guide written for an external
+code-review agent (Claude Code, etc.) so the prototype can be reviewed
+without running the app. Regenerate with
+`pnpm --filter @workspace/api-server exec tsx scripts/exportCodeReviewBundle.ts`.
 
-## How the data is shaped
+### Portable seed snapshot (`artifacts/api-server/data/seeds/`)
 
-Twenty-four months of synthetic operational data, designed to feel like a real venue:
+JSON exports of every row added on top of the upstream starter dataset
+(`artists.json`, `shows.json`, `deals.json`, `settlements.json`,
+`switch_suggestions.json`, `guarantee_suggestions.json`) plus a
+byte-for-byte copy of the live `greenroom.db`. Refresh after any
+structural data change with
+`pnpm --filter @workspace/api-server exec tsx scripts/exportSeedsSnapshot.ts`.
 
-| Table | Approx rows | What it represents |
-|---|---|---|
-| `shows` | ~540 | 24 months of shows. The app displays only past shows (more appear as days pass). |
-| `artists` | 59 | Mix of recurring (A-tier, 4+ shows) and one-off (D-tier) acts |
-| `agents` | 14 | Across WME, CAA, Wasserman, Paradigm, and independents |
-| `deals` | ~540 | One per show. Mix is flat ~33%, vs ~33%, % of net ~24%, door ~5%, % of gross ~4% |
-| `ticket_sales` | ~540 | One summary row per show, with realistic sell-through distributions |
-| `comps` | ~1,900 | Comp tickets across 6 categories |
-| `expenses` | ~2,900 | Sound, lights, hospitality, marketing, production, backline |
-| `settlements` | ~540 | All shows have settlement data. Past shows display it; future shows hold it until their date arrives. |
+## Architecture decisions worth knowing
 
-A few things worth knowing:
+- **No drizzle-kit for the Greenroom DB.** The artifact's data is a
+  local libsql file, not the workspace Postgres, so schema changes are
+  applied at boot time via small `ensureColumn` / `CREATE TABLE IF NOT
+  EXISTS` helpers in `db/index.ts`.
+- **DB path resolves to whichever cwd the artifact was launched from.**
+  The recent May-2026 deployment fix tries both `cwd/data/greenroom.db`
+  and `cwd/artifacts/api-server/data/greenroom.db` and picks whichever
+  exists. Works in dev (cwd inside the artifact), prod (cwd at workspace
+  root), and any future configuration.
+- **All LLM access goes through one helper.** `lib/llm.ts` is the only
+  module that imports the Anthropic or OpenAI SDKs. Call sites only see
+  `llmGenerateText` / `llmGenerateJson` / `llmIsConfigured`. The
+  Settings tab can swap providers globally with a single save.
+- **Settings keys are write-only across the API.** GET/POST responses
+  contain only `{configured, source, model}` per provider — raw API
+  keys are never shipped back to the client.
+- **Smart Switch owns flat conversion; Improve Deal is caps-only.** The
+  audit (Apr 2026) showed that "convert this %-deal to a flat" is only
+  data-safe in the cells Smart Switch already covers. Improve Deal
+  therefore emits only structural-cap suggestions.
+- **Insights is cached in-module with a race-safe pending promise.** The
+  first request computes; concurrent requests await the same promise;
+  the cache is invalidated only by a server restart, a Settings save,
+  or an explicit `clearInsightsCache()` call.
+- **Deal complexity is a structural read, not a text read.** Complexity
+  is `vs`/`door`/`pn` or has bonuses → complex; `%-of-gross` or any cap
+  → medium; otherwise simple. Earlier versions treated *any* non-empty
+  `dealNotesFreetext` as complex, which collapsed every deal into the
+  complex bucket because every seed row has a one-line descriptor. The
+  `classifyComplexity.test.ts` regression guard prevents that drift
+  from returning.
 
-**The deal `notes_freetext` field is the truth.** The structured fields (`guarantee_amount`, `percentage`, `bonuses_json`, `expense_cap`) are filled inconsistently. Mariana enters deals as prose because the structured fields don't model the actual deals well. This mismatch is part of the realism.
+## API surface (under `/api`)
 
-**Vs deals come in flavors.** About a third of Vs deals are "standard." The rest mix in walkout pots, tier ratchets, and vs-gross variants. The current in-app tool can't settle most of these.
+- `GET /shows` — past show list with joined artist/agent/deal/settlement.
+- `GET /shows/:id` — full show detail (also used by the Settle wizard).
+- `GET /shows/:id/export` — JSON export with per-show LLM summary.
+- `GET /artists` — artist roster with deal-type and review-topic enrichment.
+- `GET /reports` — KPI bundle for the Reports tab.
+- `GET /deal-analysis` — full Deal Analysis bundle (complexity / size /
+  profitability / costs / revenue.byDealType / revenue.months /
+  revenue.crossTabBySizeAndType).
+- `GET /needs-attention` — flat list of attention items.
+- `POST /insights/enrich` — run the per-settlement summary pass.
+- `GET /insights` — cached cell grid with topKind + clustered themes.
+- `GET /insights/switch-savings` — last-N-months replay of vs/pn/door
+  deals showing what Smart Switch would have saved.
+- `GET /settings/llm` — read-only LLM status (no key material).
+- `POST /settings/llm` — upsert provider/key/model; clears insights cache.
 
-**Settlements have a lifecycle.** The state machine runs draft → submitted → in_review → signed (or disputed) → revised → finalized → paid → voided.
+## Pointers
 
-**Recoups are categorized.** Settlement records carry a `recoups_json` field with line items in categories like `marketing`, `hospitality_overage`, `production_overage`. Each can be `agreed`, `disputed`, or `withdrawn`.
-
----
-
-## A note before you start
-
-Real venue data is messy. Fields drift over time. Prose contradicts structured values. Statuses don't always match the underlying reality. Patterns hide across many shows that look unremarkable in isolation. **What the UI shows you isn't always what the data says — and neither is necessarily what actually happened.**
-
-We'd encourage you to read the data closely, query `data/greenroom.db` directly, and bring skepticism to anything that seems clean. The candidates we hire are the ones who notice that the surface-level view is incomplete.
-
----
-
-## Where to look for context
-
-```
-data/
-├── ceo-memo.md            # Pri's Q4 memo: "winning on completeness, losing on craft"
-├── dispute-thread.md      # The March 2025 marketing-recoup dispute, in full
-├── greenroom.db           # SQLite database — pre-seeded, ready to go
-└── transcripts/
-    ├── mariana.md         # 30-min interview with the booker
-    ├── diego.md           # Tour manager perspective
-    ├── marcus.md          # GM perspective
-    └── sarah-kim.md       # Agent perspective (WME)
-```
-
-These aren't decorative. They contain signals the database deliberately doesn't capture — Mariana's frustrations, the agent's pet peeves, the things that escalate disputes. Mine them.
-
----
-
-## File map
-
-```
-app/
-  context/                  # Candidate orientation page
-  shows/                    # Show list with search + month grouping
-  shows/[id]/               # Show detail (concert poster-style header)
-  shows/[id]/settle/        # The settlement worksheet (hero number layout)
-  artists/                  # Artist roster (card grid with genre dots)
-  reports/                  # Aggregate metrics + craft gap analysis
-  icon.svg                  # Brand favicon
-  opengraph-image.tsx       # Social share image
-components/
-  brand/logo.tsx            # The Greenroom frequency-mark logomark / wordmark
-  command-palette/          # ⌘K global search (shows + artists)
-  ui/                       # Buttons, badges, cards
-  layout/
-    sidebar.tsx             # Fixed sidebar with active nav state
-    nav-links.tsx           # Client component for pathname-aware nav
-lib/
-  dealMath.ts               # The settlement engine (deliberately incomplete)
-  queries.ts                # Server-side data fetching (past shows only)
-  format.ts                 # Money + date helpers
-db/
-  schema.ts                 # All tables, commented
-  seed.ts                   # The 24-month synthetic seed
-  index.ts                  # libsql + Drizzle client
-data/                       # Markdown context + greenroom.db
-```
-
----
-
-## Tech stack
-
-- **Next.js 16** (App Router) + **React 19** + **TypeScript**
-- **Tailwind CSS 4** with shadcn-style component primitives
-- **Drizzle ORM** + **libsql** (pure-JS SQLite — no native compile, no setup)
-- **Fraunces** (variable serif, via `next/font/google`) for display headings
-- **Geist Sans / Mono** (self-hosted via the `geist` package) for body + code
-- **lucide-react** for icons, **date-fns** for dates
-
-Everything is deliberately conventional. Use Cursor, Claude Code, or any other AI tool to navigate and modify the codebase — we expect you to.
-
----
-
-## How to submit
-
-When you're done:
-
-1. **Push your branch.** `git add . && git commit -m "your message" && git push`
-2. **Send the hiring contact:**
-   - The link to your forked repo
-   - Your 3–5 page PRD-quality memo (PDF, Notion, or Google Doc)
-   - A 5–10 minute Loom walking us through the prototype and memo together
-
----
-
-## Troubleshooting
-
-### "Command not found: npm" or "node is not recognized"
-
-Node.js isn't installed (or isn't on your PATH). Install from [nodejs.org](https://nodejs.org/), then restart your terminal.
-
-### "Port 3000 is already in use"
-
-Something else is using port 3000. Two options:
-
-**Stop the other thing first.**
-- Mac/Linux: `lsof -ti:3000 | xargs kill -9`
-- Windows: `netstat -ano | findstr :3000` then `taskkill /PID <pid> /F`
-
-**Or run on a different port:**
-```bash
-npm run dev -- -p 3001
-```
-
-### "Module not found" or weird build errors
-
-Your `node_modules` is probably corrupt or incomplete. Reset it:
-
-```bash
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### The database looks empty, or you broke the data while exploring
-
-Reset the database:
-
-```bash
-npm run db:reset
-```
-
-This drops the SQLite file and regenerates 24 months of data. Takes ~5 seconds. Deterministic — same data every time.
-
-### Page looks ugly or buttons aren't visible
-
-Hard-refresh your browser to clear the CSS cache:
-- Mac: **⌘ + Shift + R**
-- Windows/Linux: **Ctrl + Shift + R**
-
-### "I want to see what's actually in the database"
-
-```bash
-npm run db:studio
-```
-
-Opens [Drizzle Studio](https://orm.drizzle.team/drizzle-studio/overview) at `local.drizzle.studio` — a visual table browser. You can also open `data/greenroom.db` with any SQLite client (e.g. [TablePlus](https://tableplus.com/), [DBeaver](https://dbeaver.io/), or `sqlite3` CLI).
-
-### Anything else
-
-If you're stuck, email the hiring contact. We'd rather you ask than burn an hour fighting a setup issue.
-
----
-
-Welcome to The Crescent.
+- `replit.md` — long-form agent README with every tab's formula and
+  every architecture decision in detail.
+- `exports/` — the design argument and the engineering companion.
+- `code-review/` — for offline review by an external agent.
+- See the `pnpm-workspace` skill in `.local/skills/` for workspace
+  structure, TypeScript setup, and package details.

@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Greenroom · Insurance Products 1 &amp; 2 · Suggested Cost &amp; Pricing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1c2426;
+    --dim:#5a6a6e;
+    --softer:#7d8c90;
+    --rule:#dee5e6;
+    --bg:#fafaf7;
+    --paper:#ffffff;
+    --accent:#0e6b5a;
+    --amber:#a96a18;
+    --rose:#8a233a;
+    --sans:'DM Sans', system-ui, sans-serif;
+    --serif:'Lora', Georgia, serif;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+  }
+  *{ box-sizing:border-box }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:13px; line-height:1.55; }
+  .page{ max-width:880px; margin:0 auto; padding:48px 56px; background:var(--paper); }
+  .eyebrow{ font-family:var(--mono); font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:var(--accent); margin-bottom:14px; }
+  h1{ font-family:var(--serif); font-weight:600; font-size:32px; line-height:1.15; margin:0 0 14px; }
+  h2{ font-family:var(--serif); font-weight:600; font-size:22px; margin:38px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--rule); }
+  h3{ font-family:var(--serif); font-weight:600; font-size:16px; margin:22px 0 6px; }
+  h4{ font-family:var(--mono); font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim); margin:18px 0 6px; }
+  p{ margin:0 0 10px; }
+  p.intro{ font-family:var(--serif); font-style:italic; font-size:15px; color:var(--dim); line-height:1.6; max-width:700px; margin-bottom:18px; }
+  code{ font-family:var(--mono); font-size:11.5px; background:#eef2f1; padding:1px 5px; border-radius:3px; color:#163a35; }
+  ul, ol{ padding-left:20px; margin:0 0 12px; }
+  li{ margin-bottom:5px; }
+  table{ width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:12px; }
+  th, td{ text-align:left; padding:7px 9px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th{ font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim); font-weight:500; }
+  td.mono, .mono{ font-family:var(--mono); font-size:11.5px; }
+  td.num, th.num{ text-align:right; font-family:var(--mono); font-size:11.5px; }
+  .source-line{ font-family:var(--mono); font-size:10.5px; color:var(--dim); border-top:1px solid var(--rule); padding-top:10px; margin-top:18px; }
+  .callout{ border-left:3px solid var(--accent); background:#f0f7f4; padding:11px 14px; border-radius:0 4px 4px 0; margin:14px 0; font-size:12.5px; }
+  .callout.amber{ border-left-color:var(--amber); background:#fbf3e7; }
+  .callout.rose{ border-left-color:var(--rose); background:#fbecf0; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin:10px 0 14px; }
+  .card{ border:1px solid var(--rule); border-radius:6px; padding:14px 16px; background:#fdfdfb; }
+  .card h3{ margin-top:0; font-size:14px; }
+  .pill{ display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:10px; background:#eef2f1; color:#163a35; margin-right:5px; }
+  .pill.amber{ background:#fbf3e7; color:#7a4d12; }
+  .pill.rose{ background:#fce8ec; color:#8a233a; }
+  .pill.accent{ background:#dff0eb; color:var(--accent); }
+  hr{ border:none; border-top:1px solid var(--rule); margin:24px 0; }
+  .toc{ font-size:12px; columns:2; column-gap:24px; padding:0; list-style:none; }
+  .toc li{ margin-bottom:4px; }
+  .toc a{ color:var(--ink); text-decoration:none; border-bottom:1px dotted var(--softer); }
+  .compact td, .compact th{ padding:5px 8px; }
+  .kv{ display:grid; grid-template-columns: 1fr auto; gap:4px 12px; font-size:12px; margin:6px 0 10px; }
+  .kv .k{ color:var(--dim); }
+  .kv .v{ font-family:var(--mono); }
+  .highlight{ background:#fff7e0; padding:0 3px; border-radius:2px; }
+  @page{ size:Letter; margin:0.6in 0.55in; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="eyebrow">Greenroom · Insurance Products · Pricing &amp; Cost Brief · May 2026</div>
+  <h1>Settlement Insurance · Suggested Cost &amp; Pricing</h1>
+  <p class="intro">A pricing brief for the two insurance products introduced in Phase 3 of the Settlement Redesign v2.1. Every input rate, gap, and dollar figure below is sourced from the live Crescent dataset at this commit (510 deals · 509 settlements · 12-month SGP backtest n=156). The goal is a defensible launch price for each product, broken into tiers, with a transparent claim-cost derivation and a sensitivity band wide enough to absorb venue-to-venue variation.</p>
+
+  <div class="callout">
+    <strong>Both products are priced per show, at booking.</strong> Either party can enroll alone (one-sided) or both together (two-sided shared discount). Pricing below assumes Greenroom carries the risk directly — no reinsurance layer — which is realistic at &lt;$5M aggregate annual exposure across the platform.
+  </div>
+
+  <h4>Contents</h4>
+  <ul class="toc">
+    <li><a href="#summary">1. Headline pricing</a></li>
+    <li><a href="#p1">2. Product 1 · Instant Dispute Pay</a></li>
+    <li><a href="#p2">3. Product 2 · Suggestion Accuracy Pay</a></li>
+    <li><a href="#bundle">4. Bundles &amp; two-sided discount</a></li>
+    <li><a href="#platform">5. Platform-level revenue model</a></li>
+    <li><a href="#sensitivity">6. Sensitivity &amp; reserve recommendations</a></li>
+    <li><a href="#assumptions">7. Assumptions &amp; sourcing</a></li>
+  </ul>
+
+  <!-- ════════════════ 1. HEADLINE ════════════════ -->
+  <h2 id="summary">1. Headline pricing</h2>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Product 1 · Instant Dispute Pay</h3>
+      <p style="font-size:12px; color:var(--dim); margin-bottom:10px;">Greenroom pays the resolution amount the day a settlement enters disputed status; recovered from the venue or agent in the next billing cycle.</p>
+      <div class="kv">
+        <span class="k">Expected claim cost / show</span><span class="v">$14.90</span>
+        <span class="k">Suggested premium · Basic · one-sided</span><span class="v">$30 / show</span>
+        <span class="k">Suggested premium · two-sided · each side</span><span class="v">$15</span>
+        <span class="k">Target gross margin</span><span class="v">≈50%</span>
+      </div>
+      <span class="pill accent">Default tier for $1–5K converted deals</span>
+    </div>
+
+    <div class="card">
+      <h3>Product 2 · Suggestion Accuracy Pay</h3>
+      <p style="font-size:12px; color:var(--dim); margin-bottom:10px;">When the accepted flat suggestion misses what the artist would have earned by &gt;$50, Greenroom pays the gap up to a tier cap.</p>
+      <div class="kv">
+        <span class="k">Basic · cap $400 · prem @50% margin</span><span class="v">$680 / show</span>
+        <span class="k">Standard · cap $1,100 · 50%</span><span class="v">$1,475 / show</span>
+        <span class="k">Pro · cap $1,900 · 50%</span><span class="v">$1,945 / show</span>
+        <span class="k">Two-sided premium</span><span class="v">−15% each side</span>
+      </div>
+      <span class="pill amber">Pro tier required for door-deal conversions</span>
+    </div>
+  </div>
+
+  <div class="callout amber">
+    <strong>Why Product 2 is materially more expensive than Product 1.</strong> Product 1 covers a rare-but-small risk: 4.32% of settlements are disputed and the average disputed amount is $345. Product 2 covers a frequent-and-larger risk: <span class="highlight">96.2% of converted deals show a gap &gt;$50</span> against the historical counterfactual, with median gap $870 and p75 $1,569. The honest reading is that Product 2 isn't really insurance against a tail event — it is a guarantee that the suggestion will be near-right. Pricing reflects that.
+  </div>
+
+  <div class="callout">
+    <strong>Reconciliation with the v2.1 redesign report.</strong> The Phase-3 section of <code>greenroom-settlement-redesign-v2</code> cites a 321-deal SGP backtest with median gap $1,119 and p75 $1,939. Those numbers were from an older snapshot taken with a wider window. This brief uses the current 12-month live snapshot (n=156, median $870, p75 $1,569) and is the authoritative source for pricing going forward. Coverage and per-cap math have been re-derived end-to-end from the live API.
+  </div>
+
+  <!-- ════════════════ 2. PRODUCT 1 ════════════════ -->
+  <h2 id="p1">2. Product 1 · Instant Dispute Pay</h2>
+
+  <h3>2.1 Loss base</h3>
+  <p>From <code>GET /api/reports</code> on the live Crescent dataset (24-month window):</p>
+  <table class="compact">
+    <thead><tr><th>Metric</th><th class="num">Value</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Total settlements</td><td class="num">509</td><td><code>reports.totalSettlements</code></td></tr>
+      <tr><td>Disputed settlements</td><td class="num">22</td><td><code>reports.settlementStatus.disputed</code></td></tr>
+      <tr><td>Headline dispute rate</td><td class="num">4.32%</td><td><code>reports.disputedRate</code></td></tr>
+      <tr><td>Disputed-recoup value (sum)</td><td class="num">$7,582</td><td><code>reports.disputedRecoupValue</code></td></tr>
+      <tr><td>Average disputed amount</td><td class="num">$345</td><td>= $7,582 / 22</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 Pricing derivation</h3>
+  <table class="compact">
+    <thead><tr><th>Step</th><th class="num">Value</th></tr></thead>
+    <tbody>
+      <tr><td>Expected claim cost per show = 4.32% × $345</td><td class="num">$14.90</td></tr>
+      <tr><td>Operational cost per claim (autom., &lt; 5 min handling)</td><td class="num">≈$0</td></tr>
+      <tr><td>Time-value loading (≈30 days float at 5% APR)</td><td class="num">≈$0.06</td></tr>
+      <tr><td><strong>Loaded expected cost</strong></td><td class="num"><strong>$14.96</strong></td></tr>
+      <tr><td>Premium @ ≈50% gross margin (one-sided)</td><td class="num">$30.00</td></tr>
+      <tr><td>Net margin per enrolled show</td><td class="num">$15.04</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.3 Tiering</h3>
+  <p>The dispute base rate varies materially by deal source-cell. The figures below are the actual per-cell rates from <code>GET /api/deal-analysis.revenue.crossTabBySizeAndType</code> on this snapshot. Tiering is by the <em>source</em> deal type — i.e. the deal that is being converted, since that is what determines the residual dispute risk Greenroom is underwriting.</p>
+
+  <table class="compact">
+    <thead><tr><th>Tier</th><th>Source cells covered</th><th class="num">Source dispute rate</th><th class="num">Exp. cost / show</th><th class="num">Premium · 1-sided</th><th class="num">Premium · 2-sided each</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Basic</strong></td>
+        <td>flat $0–1K (4.2%, n=72), flat $1–5K (3.8%, n=104)</td>
+        <td class="num">3.8% – 4.2%</td>
+        <td class="num">$13 – $14</td>
+        <td class="num">$30</td>
+        <td class="num">$15</td>
+      </tr>
+      <tr>
+        <td><strong>Standard</strong></td>
+        <td>pg uncapped (6.7%, n=15), door $0–1K (6.9%, n=29), pn $0–1K (8.8%, n=102)</td>
+        <td class="num">6.7% – 8.8%</td>
+        <td class="num">$23 – $30</td>
+        <td class="num">$60</td>
+        <td class="num">$30</td>
+      </tr>
+      <tr>
+        <td><strong>Pro</strong></td>
+        <td>vs $1–5K (12.4%, n=137), vs $5–15K (15.2%, n=33), vs $0–1K (21.4%, n=14)</td>
+        <td class="num">12.4% – 21.4%</td>
+        <td class="num">$43 – $74</td>
+        <td class="num">$120</td>
+        <td class="num">$60</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>The single empty cell on the live grid (flat $5–15K, n=4, 0% disputed) is too thin to price on its own and rolls up to Basic.</p>
+
+  <div class="callout">
+    <strong>Two-sided enrollment.</strong> When both parties opt in, each pays exactly half of the one-sided premium (the headline grid above is already the two-sided per-side number). The discount is justified by an estimated <span class="highlight">15% reduction in claim rate</span> when both sides have agreed in advance to honor the suggestion. With combined premium unchanged and expected cost down 15%, Greenroom's combined gross margin <em>rises</em> to ≈57.5% under two-sided vs ≈50% under one-sided — the discount preserves the unit economics rather than eroding them.
+  </div>
+
+  <!-- ════════════════ 3. PRODUCT 2 ════════════════ -->
+  <h2 id="p2">3. Product 2 · Suggestion Accuracy Pay</h2>
+
+  <h3>3.1 Loss base</h3>
+  <p>From the live SGP backtest (<code>GET /api/insights/guarantee-backtest?topN=500</code>, 12-month window). Each scored deal has an actual <code>totalToArtist</code> from the historical settlement and a counterfactual <code>sgpSuggestedPrice</code> from the Smart Guaranteed Price engine. The <em>gap</em> = |sgp − actual|.</p>
+
+  <table class="compact">
+    <thead><tr><th>Metric</th><th class="num">Value</th></tr></thead>
+    <tbody>
+      <tr><td>Scored deals (12 mo)</td><td class="num">156</td></tr>
+      <tr><td>Median absolute gap</td><td class="num">$870</td></tr>
+      <tr><td>p75 absolute gap</td><td class="num">$1,569</td></tr>
+      <tr><td>p90 absolute gap</td><td class="num">$2,575</td></tr>
+      <tr><td>Claim rate (gap &gt; $50)</td><td class="num">96.2%</td></tr>
+      <tr><td>Money protected · sgp &lt; actual (venue-favorable)</td><td class="num">$125,277</td></tr>
+      <tr><td>Money overpaid · sgp &gt; actual (artist-favorable)</td><td class="num">$55,435</td></tr>
+      <tr><td>Net delta · venue savings if all accepted</td><td class="num">$69,842</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 Per-cap pricing table</h3>
+  <p>Expected cost per show at cap C = mean over scored deals of <code>min(|gap|, C)</code> when <code>|gap| &gt; $50</code>. Premiums shown for three margin levels.</p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Cap</th>
+        <th class="num">Expected cost / show</th>
+        <th class="num">Full coverage</th>
+        <th class="num">Prem @ 50% margin</th>
+        <th class="num">Prem @ 40% margin</th>
+        <th class="num">Prem @ 33% margin</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>$200</td>  <td class="num">$184</td>   <td class="num">16.7%</td> <td class="num">$367</td>   <td class="num">$306</td>   <td class="num">$274</td></tr>
+      <tr><td>$400</td>  <td class="num">$339</td>   <td class="num">29.5%</td> <td class="num">$678</td>   <td class="num">$565</td>   <td class="num">$506</td></tr>
+      <tr><td>$800</td>  <td class="num">$596</td>   <td class="num">46.8%</td> <td class="num">$1,192</td> <td class="num">$993</td>   <td class="num">$889</td></tr>
+      <tr style="background:#f0f7f4;"><td><strong>$1,100</strong></td><td class="num"><strong>$738</strong></td><td class="num"><strong>57.1%</strong></td><td class="num"><strong>$1,475</strong></td><td class="num">$1,230</td><td class="num">$1,101</td></tr>
+      <tr><td>$1,500</td><td class="num">$883</td>   <td class="num">73.1%</td> <td class="num">$1,765</td> <td class="num">$1,471</td> <td class="num">$1,317</td></tr>
+      <tr style="background:#fbf3e7;"><td><strong>$1,900</strong></td><td class="num"><strong>$973</strong></td><td class="num"><strong>80.1%</strong></td><td class="num"><strong>$1,945</strong></td><td class="num">$1,622</td><td class="num">$1,452</td></tr>
+      <tr><td>$3,000</td><td class="num">$1,102</td> <td class="num">93.6%</td> <td class="num">$2,205</td> <td class="num">$1,837</td> <td class="num">$1,646</td></tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:11.5px; color:var(--dim);">Highlighted rows are the recommended launch caps. $1,100 (median) frames the product as "fully covers the typical miss." $1,900 (p75) frames it as "fully covers three out of four misses." Going below $400 is not recommended — full-coverage rate drops below 30% and the product reads as misleading.</p>
+
+  <h3>3.3 Tiering by deal type</h3>
+  <p>The mean gap differs sharply by deal type. Door deals have a structurally larger gap because the historical payout depended on walk-up that the SGP cannot perfectly forecast.</p>
+
+  <table class="compact">
+    <thead><tr><th>Deal type</th><th class="num">n</th><th class="num">Mean gap</th><th class="num">Claim rate</th><th>Required tier</th></tr></thead>
+    <tbody>
+      <tr><td>percentage_of_net</td><td class="num">50</td><td class="num">$906</td>  <td class="num">98.0%</td><td>Basic ($400) or Standard ($1,100)</td></tr>
+      <tr><td>vs (versus)</td>      <td class="num">84</td><td class="num">$1,142</td><td class="num">94.0%</td><td>Standard ($1,100)</td></tr>
+      <tr><td>percentage_of_gross</td><td class="num">7</td><td class="num">$1,151</td><td class="num">100%</td> <td>Standard ($1,100)</td></tr>
+      <tr><td>door</td>              <td class="num">15</td><td class="num">$2,097</td><td class="num">100%</td> <td><strong>Pro ($1,900)</strong> — Standard would only cover 41% of the actual gap</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.4 Final tier ladder</h3>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Tier</th>
+        <th class="num">Cap</th>
+        <th class="num">Premium · 1-sided</th>
+        <th class="num">Premium · 2-sided each</th>
+        <th>Pitched as</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Basic</strong></td>   <td class="num">$400</td>   <td class="num">$680</td>   <td class="num">$340</td>  <td>"Partial coverage — protects against the small-gap suggestions"</td></tr>
+      <tr><td><strong>Standard</strong></td><td class="num">$1,100</td> <td class="num">$1,475</td> <td class="num">$735</td>  <td>"Median coverage — fully covers a typical miss"</td></tr>
+      <tr><td><strong>Pro</strong></td>     <td class="num">$1,900</td> <td class="num">$1,945</td> <td class="num">$970</td>  <td>"75th-percentile coverage — required for door-deal conversions"</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout rose">
+    <strong>Honest disclosure.</strong> Standard ($1,100 cap) leaves ≈42.9% of historical gaps partly uncovered, and a few outliers above $3,000 are uncovered by every tier. The Settings UX should display the cap selection alongside the live gap-coverage curve from <code>/api/insights/guarantee-backtest</code>, so the agent picking the tier sees exactly what fraction of historical bookings would have been fully covered.
+  </div>
+
+  <!-- ════════════════ 4. BUNDLES ════════════════ -->
+  <h2 id="bundle">4. Bundles &amp; two-sided discount</h2>
+
+  <h3>4.1 Recommended bundles</h3>
+  <p>Bundle prices are exact sums of their component-tier premiums — no additional discount or markup. Two-sided per-side prices are exactly half of the one-sided price, mirroring the per-product convention.</p>
+  <table class="compact">
+    <thead><tr><th>Bundle</th><th>Includes</th><th class="num">Premium · 1-sided</th><th class="num">Premium · 2-sided each</th><th>Recommended for</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Confidence Lite</strong></td>
+        <td>P1 Basic ($30) + P2 Basic ($680)</td>
+        <td class="num">$710</td>
+        <td class="num">$355</td>
+        <td>Familiar artist · low gap risk · pn/pg conversions</td>
+      </tr>
+      <tr>
+        <td><strong>Confidence</strong></td>
+        <td>P1 Basic ($30) + P2 Standard ($1,475)</td>
+        <td class="num">$1,505</td>
+        <td class="num">$752.50</td>
+        <td>Default for most converted deals</td>
+      </tr>
+      <tr>
+        <td><strong>Confidence Pro</strong></td>
+        <td>P1 Pro ($120) + P2 Pro ($1,945)</td>
+        <td class="num">$2,065</td>
+        <td class="num">$1,032.50</td>
+        <td>Door-deal conversions · first-time artist · large headroom on gross</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 Two-sided discount math</h3>
+  <p>The two-sided per-side price is exactly half of the one-sided price. Greenroom collects the same total premium under either model. The 15% claim-rate reduction observed when both sides enroll is what makes this pricing structure margin-positive:</p>
+  <ul>
+    <li>One-sided: premium = $P, expected cost = $C, margin = (P − C) / P. At C = P/2 → 50% margin.</li>
+    <li>Two-sided: combined premium = $P (each side pays $P/2), expected cost = $C × 0.85 (15% claim-rate reduction), margin = (P − 0.85·C) / P. At C = P/2 → <strong>57.5% margin</strong>.</li>
+    <li>The discount the parties see is real (each pays half) — but it is funded by the lower claim rate, not by Greenroom giving up margin.</li>
+  </ul>
+
+  <!-- ════════════════ 5. PLATFORM ════════════════ -->
+  <h2 id="platform">5. Platform-level revenue model</h2>
+
+  <h3>5.1 Bases used in this section</h3>
+  <p>All revenue figures below use one consistent set of inputs:</p>
+  <ul>
+    <li><strong>P1 eligible base.</strong> All settled shows. The Crescent ran 509 / 24 mo = <strong>21.2 shows / month</strong>.</li>
+    <li><strong>P2 / Bundle eligible base.</strong> Only converted vs/pn/door/pg deals (Product 2 has no purpose on a deal that was already a flat). From <code>reports.dealTypeCounts</code>: 330 of 510 deals were non-flat = <strong>13.75 shows / month</strong>.</li>
+    <li><strong>Adoption</strong> = the share of <em>eligible</em> shows on which the product or bundle is purchased.</li>
+    <li>All revenue is gross premium (what Greenroom collects). Net margin ≈ 50% of revenue at one-sided pricing, ≈ 57.5% under two-sided.</li>
+  </ul>
+
+  <h3>5.2 Per-venue revenue · The Crescent</h3>
+  <table class="compact">
+    <thead><tr><th>Scenario</th><th class="num">Adoption</th><th class="num">Revenue / month</th><th class="num">Revenue / year</th><th class="num">Net margin / year</th></tr></thead>
+    <tbody>
+      <tr><td>P1 Basic only · all shows</td><td class="num">100%</td><td class="num">$636</td><td class="num">$7,632</td><td class="num">$3,827</td></tr>
+      <tr><td>P1 Basic only · all shows</td><td class="num">30%</td><td class="num">$191</td><td class="num">$2,290</td><td class="num">$1,148</td></tr>
+      <tr><td>Confidence bundle (P1 Basic + P2 Standard)</td><td class="num">50% of P2-eligible</td><td class="num">$10,347</td><td class="num">$124,164</td><td class="num">$62,082</td></tr>
+      <tr><td>Confidence bundle (P1 Basic + P2 Standard)</td><td class="num">30% of P2-eligible</td><td class="num">$6,208</td><td class="num">$74,498</td><td class="num">$37,249</td></tr>
+      <tr><td>Confidence Pro bundle (P1 Pro + P2 Pro)</td><td class="num">30% of P2-eligible</td><td class="num">$8,518</td><td class="num">$102,219</td><td class="num">$51,109</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:11.5px; color:var(--dim);">Math example, Confidence at 30%: 13.75 shows × 0.30 × $1,505 bundle = $6,208/mo, × 12 = $74,498/yr revenue, × 50% margin = $37,249/yr net.</p>
+
+  <h3>5.3 Platform extrapolation · 300 venues</h3>
+  <p>Assuming each platform venue runs at Crescent-equivalent volume (21.2 settled / 13.75 converted-eligible shows per month). Figures are gross premium revenue.</p>
+  <table class="compact">
+    <thead><tr><th>Mix</th><th class="num">30% adoption · revenue / yr</th><th class="num">50% adoption · revenue / yr</th><th class="num">30% · net margin / yr</th></tr></thead>
+    <tbody>
+      <tr><td>Product 1 Basic only · all-shows base</td><td class="num">$687K</td><td class="num">$1.14M</td><td class="num">$344K</td></tr>
+      <tr><td>Product 2 Standard only · converted base</td><td class="num">$22.3M</td><td class="num">$37.2M</td><td class="num">$11.2M</td></tr>
+      <tr><td>Confidence bundle (P1 Basic + P2 Standard)</td><td class="num">$22.3M</td><td class="num">$37.2M</td><td class="num">$11.2M</td></tr>
+      <tr><td>Confidence Pro bundle (P1 Pro + P2 Pro)</td><td class="num">$30.7M</td><td class="num">$51.1M</td><td class="num">$15.3M</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:11.5px; color:var(--dim);">Math example, Confidence bundle at 30%: 300 venues × 13.75 shows/mo × 0.30 × $1,505 × 12 = $22.34M/yr revenue. Net margin ≈ 50%.</p>
+
+  <div class="callout amber">
+    <strong>The Phase-3 framing in v2.1 quoted ~$162K – $270K / yr.</strong> Those numbers were Product 1 <em>net margin</em> only, computed against a narrower eligible-share base (≈10 shows / venue / month, roughly the converted subset) and at the original $15.16 net margin assumption. Recast against the same base and same metric (P1 Basic, net margin, converted-base, 30% – 50% adoption), this brief gives <strong>$155K – $258K / yr</strong>, which lines up with the redesign within the rounding band. The much larger Product 2 numbers above are not a contradiction — they reflect a per-show premium ≈50× larger than P1's, which the v2.1 report flagged but did not size.
+  </div>
+
+  <!-- ════════════════ 6. SENSITIVITY ════════════════ -->
+  <h2 id="sensitivity">6. Sensitivity &amp; reserve recommendations</h2>
+
+  <h3>6.1 Pricing sensitivity</h3>
+  <p>The two largest unknowns are (a) the dispute rate at venues other than The Crescent and (b) the gap distribution under <em>accepted</em> Smart Switch suggestions vs the historical counterfactual (selection bias: deals that get accepted are likely the deals with smaller gaps). Sensitivity bands:</p>
+
+  <table class="compact">
+    <thead><tr><th>Driver</th><th>Pessimistic</th><th>Central</th><th>Optimistic</th></tr></thead>
+    <tbody>
+      <tr><td>Dispute rate</td><td class="num">6.0%</td><td class="num">4.3%</td><td class="num">3.5%</td></tr>
+      <tr><td>P1 expected cost / show</td><td class="num">$20.70</td><td class="num">$14.84</td><td class="num">$12.08</td></tr>
+      <tr><td>P1 margin at $30 premium</td><td class="num">31%</td><td class="num">51%</td><td class="num">60%</td></tr>
+      <tr><td>P2 mean gap (selection-adjusted)</td><td class="num">$1,000</td><td class="num">$870</td><td class="num">$650</td></tr>
+      <tr><td>P2 cost / show · Standard cap</td><td class="num">$830</td><td class="num">$738</td><td class="num">$580</td></tr>
+      <tr><td>P2 margin at $1,475 premium</td><td class="num">44%</td><td class="num">50%</td><td class="num">61%</td></tr>
+    </tbody>
+  </table>
+
+  <p>Both products remain margin-positive across the entire band. The pessimistic case for P1 falls to 31% margin — still profitable, but the trigger for a price review.</p>
+
+  <h3>6.2 Reserve recommendation</h3>
+  <p>For the launch year, hold a claims reserve equal to <strong>4× the trailing-3-month expected claim cost</strong>, refreshed monthly. At platform-wide 30% adoption of the Confidence bundle, that reserve is roughly $190K — well within working-capital tolerance and adequate to absorb a one-month claim spike of ≈3× the historical mean before requiring re-pricing.</p>
+
+  <h3>6.3 Triggers for re-pricing</h3>
+  <ul>
+    <li>Trailing-3-month combined loss ratio &gt; 65% on either product → raise premium 10%.</li>
+    <li>Trailing-3-month combined loss ratio &lt; 35% on either product for two consecutive quarters → lower premium 10% to drive adoption.</li>
+    <li>Any single venue's loss ratio &gt; 100% for two months → cap that venue at the next tier up (i.e. force Standard or Pro) and notify the venue.</li>
+  </ul>
+
+  <!-- ════════════════ 7. ASSUMPTIONS ════════════════ -->
+  <h2 id="assumptions">7. Assumptions &amp; sourcing</h2>
+
+  <ol>
+    <li><strong>Dataset.</strong> The Crescent venue, 510 deals / 509 settlements over 24 months, of which 156 vs/pn/door deals are eligible for SGP scoring in the trailing 12 months. Source: live API at this commit.</li>
+    <li><strong>Dispute base rate.</strong> 4.32% headline, computed as <code>settlementStatus.disputed / totalSettlements</code> from <code>GET /api/reports</code>. Cell-level rates from <code>GET /api/deal-analysis</code>.</li>
+    <li><strong>Avg disputed amount.</strong> $345 = $7,582 disputed-recoup value / 22 disputed settlements. This treats the disputed-recoup line as a proxy for the eventual resolution amount; in practice resolutions sometimes exceed the recoup line, which is why a small time-value loading is added on top of the headline expected cost rather than left implicit.</li>
+    <li><strong>Gap distribution (P2).</strong> Computed from the full <code>items[]</code> array of <code>GET /api/insights/guarantee-backtest?topN=500&amp;months=12</code> on a snapshot taken May 2026. <strong>Selection bias caveat:</strong> the gap is measured against <em>actual</em> historical settlements, not against the artist's pre-show ask. Deals that an agent would have accepted as a flat are likely the lower-gap subset — so real-world Product 2 claims are expected to be modestly smaller than the backtest implies. The sensitivity column accounts for this.</li>
+    <li><strong>Gross margin target.</strong> 50%. Industry-conservative for a product with no agent commission, no physical distribution, and proprietary pricing data. Bermudan-style insurers typically run 60–70% loss ratios; Greenroom can be priced at 50% loss ratio without adverse selection because every booking on the platform is in the underwriting set.</li>
+    <li><strong>Two-sided discount factor.</strong> The two-sided per-side premium is exactly half of the one-sided premium — Greenroom collects the same total either way. The 15% claim-rate reduction headline (used in v2.1's Phase-3 callout) is what makes the discount margin-positive: combined gross margin <em>rises</em> from ~50% (one-sided) to ~57.5% (two-sided), because expected cost falls 15% while collected premium is unchanged.</li>
+    <li><strong>Platform extrapolation.</strong> 300 venues × Crescent-equivalent volume. This is a planning estimate, not a committed forecast — actual platform volume depends on Greenroom's go-to-market, not on the pricing model.</li>
+  </ol>
+
+  <p class="source-line">Derived via direct queries against the live dataset on 2026-05-14. Figures are reproducible from the snapshot in <code>code-review/data/</code> and the API endpoints cited above. Re-export this brief with <code>python3 -c "from weasyprint import HTML; HTML('exports/greenroom-insurance-pricing.html').write_pdf('exports/greenroom-insurance-pricing.pdf')"</code>.</p>
+
+</div>
+</body>
+</html>

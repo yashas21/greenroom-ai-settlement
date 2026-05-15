@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greenroom — Settlement Redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:      #181714;
+    --ink2:     #4a4840;
+    --dim:      #8a8880;
+    --rule:     #e2e0da;
+    --bg:       #f8f7f4;
+    --surface:  #ffffff;
+    --green:    #165c38;
+    --green-lt: #eaf4ef;
+    --amber:    #7c4e00;
+    --amber-lt: #fdf4e0;
+    --red:      #8a1e1e;
+    --blue:     #1a3f80;
+    --blue-lt:  #edf1fa;
+    --phase1:   #1a3f80;
+    --phase2:   #165c38;
+    --phase3:   #7c4e00;
+    --serif:    'Lora', Georgia, serif;
+    --sans:     'DM Sans', system-ui, sans-serif;
+    --mono:     'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .page { max-width: 800px; margin: 0 auto; padding: 60px 36px 100px; }
+
+  /* ── Masthead ── */
+  .masthead { margin-bottom: 56px; padding-bottom: 32px; border-bottom: 2px solid var(--ink); }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin-bottom: 18px;
+  }
+  .intro {
+    font-size: 15px;
+    color: var(--ink2);
+    line-height: 1.8;
+    max-width: 640px;
+    border-left: 3px solid var(--rule);
+    padding-left: 18px;
+    font-style: italic;
+    font-family: var(--serif);
+  }
+
+  /* ── Section header ── */
+  .section-rule {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 60px 0 32px;
+  }
+  .section-rule h2 {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  .section-rule hr { flex: 1; border: none; border-top: 1px solid var(--rule); }
+
+  /* ── PFSE structure ── */
+  .pfse-block { margin-bottom: 16px; }
+  .pfse-label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 7px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pfse-label::after { content: ''; flex: 1; border-top: 1px solid var(--rule); }
+  .pfse-content { font-size: 14.5px; line-height: 1.8; color: var(--ink2); }
+  .pfse-content p + p { margin-top: 12px; }
+  .pfse-content strong { color: var(--ink); font-weight: 600; }
+
+  /* ── Phase cards ── */
+  .phase-card {
+    border: 1.5px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 40px;
+    background: var(--surface);
+  }
+  .phase-head {
+    padding: 18px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .phase-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 100px;
+    border: 1.5px solid;
+    flex-shrink: 0;
+  }
+  .p1 .phase-num { color: var(--phase1); border-color: #b0c4e8; background: #edf1fa; }
+  .p2 .phase-num { color: var(--phase2); border-color: #9ed4b4; background: var(--green-lt); }
+  .p3 .phase-num { color: var(--phase3); border-color: #e8c87a; background: var(--amber-lt); }
+  .phase-head h3 { font-family: var(--serif); font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .phase-head .phase-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .phase-body { padding: 24px; }
+  .phase-body .pfse-block { margin-bottom: 20px; }
+  .phase-body .pfse-block:last-child { margin-bottom: 0; }
+
+  /* ── Data callouts ── */
+  .callout {
+    border-left: 3px solid;
+    padding: 11px 16px;
+    margin: 14px 0;
+    font-size: 13.5px;
+    line-height: 1.7;
+    border-radius: 0 5px 5px 0;
+  }
+  .callout.green { border-color: var(--green); background: var(--green-lt); color: #0f4a2a; }
+  .callout.amber { border-color: #c9860a; background: var(--amber-lt); color: var(--amber); }
+  .callout.blue  { border-color: var(--blue); background: var(--blue-lt); color: var(--blue); }
+  .callout strong { color: inherit; }
+
+  /* ── Tables ── */
+  table.dt { width: 100%; border-collapse: collapse; font-size: 13px; margin: 14px 0; }
+  table.dt th {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1.5px solid var(--ink);
+  }
+  table.dt td { padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.dt tr:last-child td { border-bottom: none; }
+  .n { font-family: var(--mono); font-size: 12.5px; }
+  .pos { color: var(--green); font-weight: 600; }
+  .neg { color: var(--red); font-weight: 600; }
+  .muted { color: var(--dim); font-style: italic; }
+
+  /* ── Comparison widget ── */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 14px 0;
+  }
+  .compare-panel { background: var(--surface); padding: 16px 18px; }
+  .compare-panel h4 {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 10px;
+  }
+  .compare-panel.right h4 { color: var(--green); }
+  .compare-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--rule); }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-row .ck { color: var(--ink2); }
+  .compare-row .cv { font-family: var(--mono); font-size: 12px; font-weight: 500; }
+  .cv.pos { color: var(--green); }
+  .cv.neg { color: var(--red); }
+
+  /* ── Insurance revenue strip ── */
+  .revenue-strip {
+    background: var(--surface);
+    border: 1.5px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 14px 0;
+  }
+  .revenue-strip h4 {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 14px;
+  }
+  .rev-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 13px;
+  }
+  .rev-row:last-child { border-bottom: none; }
+  .rev-row .rk { color: var(--ink2); }
+  .rev-row .rv { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--green); }
+  .rev-row .rv.muted { color: var(--dim); font-weight: 400; font-size: 12px; }
+
+  /* ── AI vision section ── */
+  .vision-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .vision-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .vision-card h4 {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+  .vision-card p { font-size: 13px; color: var(--ink2); line-height: 1.65; }
+
+  /* ── Principle block ── */
+  .principle {
+    background: var(--ink);
+    color: #f0efe9;
+    border-radius: 10px;
+    padding: 28px 32px;
+    margin: 48px 0;
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.75;
+    font-style: italic;
+  }
+  .principle strong { color: #fff; font-style: normal; }
+
+  /* ── Phase timeline ── */
+  .timeline {
+    display: flex;
+    gap: 0;
+    margin: 0 0 48px;
+    background: var(--surface);
+    border: 1.5px solid var(--rule);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .tl-step {
+    flex: 1;
+    padding: 16px 18px;
+    border-right: 1px solid var(--rule);
+    position: relative;
+  }
+  .tl-step:last-child { border-right: none; }
+  .tl-num {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .tl-step:nth-child(1) .tl-num { color: var(--phase1); }
+  .tl-step:nth-child(2) .tl-num { color: var(--phase2); }
+  .tl-step:nth-child(3) .tl-num { color: var(--phase3); }
+  .tl-title { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.3; margin-bottom: 4px; }
+  .tl-sub { font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+  .tl-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .tl-step:nth-child(1) .tl-tag { background: #edf1fa; color: var(--phase1); }
+  .tl-step:nth-child(2) .tl-tag { background: var(--green-lt); color: var(--phase2); }
+  .tl-step:nth-child(3) .tl-tag { background: var(--amber-lt); color: var(--phase3); }
+
+  code { font-family: var(--mono); font-size: 12px; background: #eeede8; padding: 1px 5px; border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    .compare { grid-template-columns: 1fr; }
+    .vision-grid { grid-template-columns: 1fr; }
+    .timeline { flex-direction: column; }
+    .tl-step { border-right: none; border-bottom: 1px solid var(--rule); }
+    .tl-step:last-child { border-bottom: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Masthead -->
+  <div class="masthead">
+    <div class="eyebrow">Greenroom · Settlement Redesign · May 2026</div>
+    <h1>Simpler Deals, Smarter Tools</h1>
+    <p class="intro">Greenroom's settlement tool works for flat guarantees but breaks on three deal types. The fix is not to build more sophisticated analytics on top of a complex system — it is to simplify the underlying deal structures, then let the tools do more with less.</p>
+  </div>
+
+  <!-- ── The Core Principle ── -->
+  <div class="principle">
+    The right approach is to <strong>simplify first, then automate.</strong> Clean deal structures produce consistent, predictable data. Consistent data is what AI tools can actually work with — to suggest the right deal at booking, answer questions before show night, and reduce the manual entry that causes disputes. Trying to solve structural complexity with data cleaning gets harder every year. Simplifying the structure solves it once.
+  </div>
+
+  <!-- ── Implementation roadmap ── -->
+  <div class="section-rule"><h2>Implementation Roadmap</h2><hr></div>
+
+  <div class="timeline">
+    <div class="tl-step">
+      <div class="tl-num">Phase 1</div>
+      <div class="tl-title">Fix door deals</div>
+      <div class="tl-sub">Replace a broken structure. Every door deal loses the venue money today.</div>
+      <div class="tl-tag">Immediate · MVP</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">Phase 2</div>
+      <div class="tl-title">Simplify $1–5K deals</div>
+      <div class="tl-sub">Remove complexity that provides no benefit in this gross range.</div>
+      <div class="tl-tag">Short-term · MVP</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">Phase 3</div>
+      <div class="tl-title">Insurance services</div>
+      <div class="tl-sub">Add the safety net that makes pre-agreed settlements safe to commit to.</div>
+      <div class="tl-tag">Post-MVP</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ PHASE 1 ══════════════════════════════════ -->
+  <div class="section-rule"><h2>Phase 1 — Door Deals</h2><hr></div>
+
+  <div class="phase-card p1">
+    <div class="phase-head">
+      <span class="phase-num">Phase 1 · MVP</span>
+      <h3>Replace the door deal structure with a hybrid</h3>
+      <span class="phase-tag">29 shows · 24 months</span>
+    </div>
+    <div class="phase-body">
+
+      <div class="pfse-block">
+        <div class="pfse-label">Problem</div>
+        <div class="pfse-content">
+          <p>Under the current door arrangement, the venue covers all production costs and receives nothing from ticket revenue — the artist takes the entire available pool above expenses. This means the venue's financial result is independent of how well the show performs. A sold-out night and a half-empty night produce similar outcomes for the venue: a loss.</p>
+          <p>Every door deal settled over the past 24 months left the venue with a negative net. Nine of the 29 shows were structurally unviable at booking — the expected gross was too low for the deal structure to work for either party even on a good night.</p>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Finding</div>
+        <div class="pfse-content">
+          <p>Pale Lake sold out to 650 people and the venue settled at a loss of $1,930. Under a hybrid structure — $500 artist floor, 60/40 revenue split above it, $1,500 expense cap — the same night produces a fundamentally different result for both parties.</p>
+
+          <div class="compare">
+            <div class="compare-panel">
+              <h4>Current — door deal</h4>
+              <div class="compare-row"><span class="ck">Artist payout</span><span class="cv">Full pool above expenses</span></div>
+              <div class="compare-row"><span class="ck">Venue net</span><span class="cv neg">−$1,930</span></div>
+              <div class="compare-row"><span class="ck">Venue stake in upside</span><span class="cv neg">None</span></div>
+              <div class="compare-row"><span class="ck">24-month record</span><span class="cv neg">Negative on all 29 shows</span></div>
+            </div>
+            <div class="compare-panel right">
+              <h4>Proposed — hybrid structure</h4>
+              <div class="compare-row"><span class="ck">Artist payout (Pale Lake)</span><span class="cv pos">$9,474</span></div>
+              <div class="compare-row"><span class="ck">Venue net (Pale Lake)</span><span class="cv pos">$5,983</span></div>
+              <div class="compare-row"><span class="ck">Venue stake in upside</span><span class="cv pos">40% of available pool</span></div>
+              <div class="compare-row"><span class="ck">Both parties profit on</span><span class="cv pos">20 of 29 historical shows</span></div>
+            </div>
+          </div>
+
+          <p style="margin-top:12px">The 9 shows where both parties cannot profit are structurally unviable below a gross of $2,223 — not a formula problem, a booking problem. Identifying these at deal entry rather than at midnight during settlement is itself an improvement.</p>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Suggestion</div>
+        <div class="pfse-content">
+          <p>At deal entry, Greenroom proposes hybrid terms instead of a pure door arrangement: <strong>$500 artist floor + 60% / 40% split of the pool above it</strong>, after a $1,500 expense cap. Both parties see the projected outcome before committing. For expected gross above $15,000, the projection is suppressed — there is only one historical data point at that level — and the parties negotiate terms directly.</p>
+          <p>The AI layer (Phase 2 and beyond) will be able to explain this structure in plain language to agents and answer "what would the artist earn if the show does $X?" before the deal is signed — exactly the kind of question that currently gets resolved at midnight.</p>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Expected Outcome</div>
+        <div class="pfse-content">
+          <p>The venue participates in the upside of a strong show for the first time. The artist retains a meaningful share of every viable night. The 9 structurally unviable shows are flagged at booking rather than discovered at settlement. Dispute risk on door deals (5.3% historically) is addressed by insurance in Phase 3.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ PHASE 2 ══════════════════════════════════ -->
+  <div class="section-rule"><h2>Phase 2 — $1–5K Deal Simplification</h2><hr></div>
+
+  <div class="phase-card p2">
+    <div class="phase-head">
+      <span class="phase-num">Phase 2 · MVP</span>
+      <h3>Convert vs and percentage-of-net deals to flat guarantees</h3>
+      <span class="phase-tag">43 vs deals · 101 % of net deals</span>
+    </div>
+    <div class="phase-body">
+
+      <div class="pfse-block">
+        <div class="pfse-label">Problem</div>
+        <div class="pfse-content">
+          <p>A vs deal requires calculating gross revenue, applying the expense cap, computing a net base, running a percentage calculation, comparing it to the guarantee, and paying the higher number. Percentage-of-net deals involve the same arithmetic. Both structures exist to protect the artist when a show overperforms — when the percentage would produce more than the guarantee.</p>
+          <p>Under $5K gross, this never happens. The expense structure at this revenue level consumes the available pool before the percentage produces anything above the guarantee. The mechanism is real but the upside case simply does not materialise in this bracket. The complexity is all cost and no benefit.</p>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Finding</div>
+        <div class="pfse-content">
+          <p>Across <strong>43 vs deals settled under $5K gross over 24 months</strong>, the percentage calculation never once produced a payout above the guarantee. Every single show paid exactly the guarantee. The vs mechanism triggered zero times. The deal added audit complexity, created a 4.7% dispute rate, and delivered identical economics to a flat deal on 100% of shows.</p>
+
+          <div class="callout green">
+            <strong>The flat suggestion equals the guarantee.</strong> This is not an estimate or a projection — it is verified fact across every historical show in this bracket. Converting a vs deal to flat does not change what the artist earns. It changes how long it takes to calculate it.
+          </div>
+
+          <table class="dt">
+            <thead>
+              <tr><th>Deal type</th><th>Shows</th><th>Percentage fired</th><th>Dispute rate</th><th>Avg settlement time</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>vs / $1–5K</td>
+                <td class="n">43</td>
+                <td class="n neg">0 of 43</td>
+                <td class="n">4.7%</td>
+                <td class="muted">Complex</td>
+              </tr>
+              <tr>
+                <td>Equivalent flat</td>
+                <td class="n">—</td>
+                <td class="n muted">N/A</td>
+                <td class="n pos">~0%</td>
+                <td class="muted">One line</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Suggestion</div>
+        <div class="pfse-content">
+          <p><strong>Smart Switch</strong> generates a flat suggestion at deal entry — weeks before the show — using the guarantee amount as the flat value for vs deals, and the artist's expense history for percentage-of-net deals. The agent confirms or declines before show night. If accepted, settlement becomes: artist gets $X, wire Monday.</p>
+          <p>This is where the AI layer adds the most visible value. Instead of presenting a switch proposal as a form to review, the AI can present it conversationally: <em>"Based on how similar shows have settled here, a flat of $1,500 would give the artist the same outcome as the vs terms in 43 out of 43 comparable shows. Want to offer that now?"</em> That is a Wednesday email, not a midnight calculation.</p>
+          <p>The same logic applies to data entry. A simplified flat deal has one number to record, one number to verify at settlement, and no ambiguous expense lines to reconcile. Every field removed from the settlement form is a field that cannot be entered incorrectly.</p>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Expected Outcome</div>
+        <div class="pfse-content">
+          <p>Settlement for accepted conversions requires no calculation — the agreed flat is the payout. The 4.7% dispute rate on vs deals drops to near zero for converted deals because there is nothing to dispute. The data Greenroom collects on converted shows is clean, consistent, and immediately useful for improving future suggestions — without any data cleaning step.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ PHASE 3 ══════════════════════════════════ -->
+  <div class="section-rule"><h2>Phase 3 — Insurance Services</h2><hr></div>
+
+  <div class="phase-card p3">
+    <div class="phase-head">
+      <span class="phase-num">Phase 3 · Post-MVP</span>
+      <h3>Settlement insurance as a platform service</h3>
+      <span class="phase-tag">Optional · not required for Phases 1–2</span>
+    </div>
+    <div class="phase-body">
+
+      <div class="pfse-block">
+        <div class="pfse-label">What it does</div>
+        <div class="pfse-content">
+          <p>Insurance is the safety net that makes committing to a pre-agreed settlement safe for both parties. Two independent products, priced per show at booking:</p>
+          <p><strong>Product 1 — Instant Dispute Pay.</strong> When a settlement enters disputed status, Greenroom pays the resolution amount immediately — no back-and-forth. Recovered in the next billing cycle. The expected cost per show is $10.46, based on a 2.724% dispute rate and an average contested amount of $384 across 257 settled shows.</p>
+          <p><strong>Product 2 — Suggestion Accuracy Pay.</strong> When the accepted flat suggestion differs from what the artist would have earned under the original deal by more than $50, Greenroom pays the gap up to $400. Across 254 historical shows, 99.2% of all suggestion gaps fell at or below $400 — the cap is set to cover essentially all real-world outcomes.</p>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">What it costs each party</div>
+        <div class="pfse-content">
+          <p>Either party enrolls alone (one-sided) or both enroll together at a shared discount (two-sided). The recommended default for $1–5K converted deals is Product 1 at the Basic tier: <strong>$21/show one-sided</strong> or <strong>$11/show each two-sided</strong>. For door deal conversions, Product 2 requires the Pro tier ($36/show) because the suggestion gap on door deals is materially larger.</p>
+
+          <div class="callout blue">
+            Two-sided enrollment has a practical advantage beyond the price discount: when both parties have opted in, both have an incentive to accept the flat suggestion and resolve disagreements quickly. Greenroom's data estimates this reduces the expected claim rate by approximately 15%.
+          </div>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Revenue for Greenroom</div>
+        <div class="pfse-content">
+          <p>Insurance creates a new revenue stream from existing activity. Greenroom has structural advantages over traditional insurers — no agents, no physical distribution, and a proprietary dataset that gives pricing precision unavailable to a general carrier. These compress the expense ratio toward zero, making a 50% gross margin realistic and conservative by industry standards.</p>
+
+          <div class="revenue-strip">
+            <h4>Product 1 · Basic tier · $21/show · 50% target margin</h4>
+            <div class="rev-row"><span class="rk">Expected cost per show</span><span class="rv muted">$10.46 (2.724% rate × $384 avg)</span></div>
+            <div class="rev-row"><span class="rk">Net margin per enrolled show</span><span class="rv">$10.54</span></div>
+            <div class="rev-row"><span class="rk">The Crescent — full adoption net</span><span class="rv">$113 / month</span></div>
+            <div class="rev-row"><span class="rk">Platform · 300 venues · 30% adoption</span><span class="rv">$122K / year</span></div>
+            <div class="rev-row"><span class="rk">Platform · 300 venues · 50% adoption</span><span class="rv">$203K / year</span></div>
+          </div>
+
+          <p>These figures are from Product 1 alone and assume no Product 2 enrollment. The 30% adoption scenario is conservative — it assumes fewer than one in three venue-show relationships opt in. At 50% adoption the annual figure roughly doubles. The direction of the economics is not sensitive to the adoption assumption; at any adoption rate above 15%, the product covers its expected claim costs from month one.</p>
+        </div>
+      </div>
+
+      <div class="pfse-block">
+        <div class="pfse-label">Expected Outcome</div>
+        <div class="pfse-content">
+          <p>Insurance is not required for the deal simplification to work — Phases 1 and 2 improve the settlement experience regardless. What insurance adds is confidence. An agent who might hesitate to commit to a flat deal weeks in advance is more likely to accept when they know that if the actual outcome differs meaningfully from the suggestion, the gap is covered. That confidence is what drives adoption of the simplified structure, and adoption of the simplified structure is what drives the data quality improvements that make the AI tools useful.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── AI and automation ── -->
+  <div class="section-rule"><h2>The AI Layer</h2><hr></div>
+
+  <div class="pfse-content" style="margin-bottom:20px">
+    <p>Simplified deal structures are not just easier to settle — they are the prerequisite for AI tools that actually work. A system that needs to reconcile ambiguous expense categories, interpret handwritten cap agreements, and cross-reference multiple deal structures cannot be meaningfully automated. A system with clean, consistent flat deals and hybrid door terms can be.</p>
+  </div>
+
+  <div class="vision-grid">
+    <div class="vision-card">
+      <h4>Deal structure suggestion</h4>
+      <p>At booking, the AI suggests the right deal type and flat amount based on the artist's history, the venue's expense patterns, and comparable shows. The agent sees a recommendation, not a blank form.</p>
+    </div>
+    <div class="vision-card">
+      <h4>Pre-show Q&amp;A</h4>
+      <p>"What would the artist earn if the show does $4,000?" is a question that should have an instant answer on Wednesday, not a midnight calculation. With flat deals, the answer is always the same number.</p>
+    </div>
+    <div class="vision-card">
+      <h4>Automated settlement</h4>
+      <p>A flat deal that was agreed at booking requires no settlement calculation. Greenroom can pre-fill the settlement form, flag it for one-click confirmation, and wire automatically — without anyone doing arithmetic.</p>
+    </div>
+    <div class="vision-card">
+      <h4>Dispute prevention</h4>
+      <p>Most disputes arise from ambiguous expense lines in complex deal structures. Flat deals eliminate the expense ambiguity entirely. The AI can flag the small number of remaining edge cases before show night rather than after.</p>
+    </div>
+  </div>
+
+  <div class="callout blue" style="margin-top:20px">
+    <strong>The measure of success is not better analysis of complex deals.</strong> It is fewer complex deals that need analysing. Every vs deal converted to a flat in Phase 2 is a settlement that requires no calculation, no review, and no dispute resolution. That is the compounding advantage of simplification — each clean deal makes the next one easier, and the data it generates makes the AI suggestions more reliable over time.
+  </div>
+
+</div>
+</body>
+</html>
