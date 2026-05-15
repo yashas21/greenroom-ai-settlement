@@ -42,3 +42,9 @@ id = "VjQBXDyDt8kV95ZEoZBTL"
 uri = "file://exports/greenroom-insurance-pricing.pdf"
 type = "pdf"
 title = "Insurance Products 1 & 2 · Suggested Cost & Pricing"
+
+[[outputs]]
+id = "aGYYcNrALm8uqY0Jc3eD1"
+uri = "file://exports/greenroom-sgp-vs-flat.pdf"
+type = "pdf"
+title = "Smart Guaranteed Pricing vs Flat Deals"
