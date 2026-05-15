@@ -27,8 +27,9 @@ import {
   formatMoney,
   formatShowDateFull,
 } from "@/lib/format";
-import type { Settlement, Recoup } from "@/db/schema";
+import type { Settlement, Recoup, Deal } from "@/db/schema";
 import { Logomark } from "@/components/brand/logo";
+import { SettlementExplanation } from "./SettlementExplanation";
 
 const RECOUP_LABELS: Record<Recoup["category"], string> = {
   marketing: "Marketing",
@@ -139,7 +140,10 @@ export default async function SettlePage({
             expenseRowCount={expenses.length}
           />
         ) : (
-          <SupportedSettlement calc={calc} existingSettlement={settlement} />
+          <>
+            <SupportedSettlement calc={calc} existingSettlement={settlement} />
+            <SettlementExplanation calc={calc} deal={deal} recoups={recoups} settlement={settlement} />
+          </>
         )}
 
         {recoups.length > 0 && <RecoupsSection recoups={recoups} />}
@@ -366,10 +370,8 @@ function UnsupportedDeal({
   expenseRowCount,
 }: {
   dealType: string;
-  deal: NonNullable<Awaited<ReturnType<typeof getShowById>>>["deal"];
-  existingSettlement: NonNullable<
-    Awaited<ReturnType<typeof getShowById>>
-  >["settlement"];
+  deal: Deal;
+  existingSettlement: Settlement | null;
   grossSoFar: number;
   totalFees: number;
   totalExpenses: number;
@@ -493,9 +495,7 @@ function SupportedSettlement({
     ReturnType<typeof calculateSettlement>,
     { supported: true }
   >;
-  existingSettlement: NonNullable<
-    Awaited<ReturnType<typeof getShowById>>
-  >["settlement"];
+  existingSettlement: Settlement | null;
 }) {
   return (
     <>

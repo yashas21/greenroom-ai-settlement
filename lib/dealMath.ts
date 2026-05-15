@@ -168,6 +168,175 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
     };
   }
 
+  // ---------- percentage of net ----------
+  if (deal.dealType === "percentage_of_net") {
+    if (deal.percentage == null) {
+      return {
+        supported: false,
+        reason: "Percentage-of-net deal is missing a percentage.",
+        dealType: deal.dealType,
+      };
+    }
+    
+    const allowedExpenses = deal.expenseCap != null 
+      ? Math.min(totalExpenses, deal.expenseCap) 
+      : totalExpenses;
+      
+    const netProfit = Math.max(0, netBoxOffice - allowedExpenses);
+    const payout = netProfit * deal.percentage;
+    
+    const bonusResult = applyBonuses(parseBonuses(deal), {
+      gross: grossBoxOffice,
+      tickets,
+      capacity: venueCapacity,
+    });
+    
+    const steps: SettlementCalculation["steps"] = [
+      { label: "Net box office", value: netBoxOffice },
+      { label: "Total expenses submitted", value: totalExpenses },
+    ];
+    
+    if (deal.expenseCap != null) {
+      steps.push({ label: "Expense cap applied", value: deal.expenseCap });
+    }
+    
+    steps.push({ 
+      label: "Deductible expenses", 
+      value: allowedExpenses,
+      note: deal.expenseCap != null && totalExpenses > deal.expenseCap 
+        ? "Capped at expense limit" 
+        : undefined
+    });
+    
+    steps.push({ 
+      label: "Net after expenses", 
+      value: netProfit, 
+      note: netBoxOffice - allowedExpenses < 0 ? "Losses not shared (floored at $0)" : undefined 
+    });
+    
+    steps.push({ 
+      label: `Artist share (${(deal.percentage * 100).toFixed(0)}%)`, 
+      value: payout, 
+      note: "Artist percentage of net profit" 
+    });
+    
+    bonusResult.applied.forEach(b => {
+      steps.push({ label: `Bonus: ${b.label}`, value: b.amount, note: b.reason });
+    });
+
+    return {
+      supported: true,
+      grossBoxOffice,
+      netBoxOffice,
+      totalExpenses,
+      totalToArtist: payout + bonusResult.totalApplied,
+      steps,
+      finalFormula: bonusResult.applied.length
+        ? `net profit × ${deal.percentage} + bonuses = ${(payout + bonusResult.totalApplied).toFixed(2)}`
+        : `net profit × ${deal.percentage} = ${payout.toFixed(2)}`,
+      bonusesApplied: bonusResult.applied,
+      bonusesNotTriggered: bonusResult.notTriggered,
+    };
+  }
+
+  // ---------- vs (guarantee vs percentage) ----------
+  if (deal.dealType === "vs") {
+    if (deal.guaranteeAmount == null || deal.percentage == null) {
+      return {
+        supported: false,
+        reason: "Vs deal is missing guarantee or percentage.",
+        dealType: deal.dealType,
+      };
+    }
+
+    const basis = deal.percentageBasis ?? "net";
+    
+    const allowedExpenses = deal.expenseCap != null 
+      ? Math.min(totalExpenses, deal.expenseCap) 
+      : totalExpenses;
+      
+    const netProfit = Math.max(0, netBoxOffice - allowedExpenses);
+    
+    let percentagePayout = 0;
+    if (basis === "gross") {
+      percentagePayout = grossBoxOffice * deal.percentage;
+    } else {
+      percentagePayout = netProfit * deal.percentage;
+    }
+
+    const guaranteePayout = deal.guaranteeAmount;
+    
+    const bonusResult = applyBonuses(parseBonuses(deal), {
+      gross: grossBoxOffice,
+      tickets,
+      capacity: venueCapacity,
+    });
+
+    const isGuaranteeWinner = guaranteePayout >= percentagePayout;
+    const basePayout = isGuaranteeWinner ? guaranteePayout : percentagePayout;
+
+    const steps: SettlementCalculation["steps"] = [];
+    
+    steps.push({ label: "Gross box office", value: grossBoxOffice });
+    if (basis === "net") {
+      steps.push({ label: "Net box office", value: netBoxOffice });
+      steps.push({ label: "Total expenses submitted", value: totalExpenses });
+      if (deal.expenseCap != null) {
+        steps.push({ label: "Expense cap applied", value: deal.expenseCap });
+      }
+      steps.push({ 
+        label: "Deductible expenses", 
+        value: allowedExpenses,
+        note: deal.expenseCap != null && totalExpenses > deal.expenseCap 
+          ? "Capped at expense limit" 
+          : undefined
+      });
+      steps.push({ 
+        label: "Net after expenses", 
+        value: netProfit, 
+        note: netBoxOffice - allowedExpenses < 0 ? "Losses not shared (floored at $0)" : undefined 
+      });
+    }
+
+    steps.push({ 
+      label: "Guarantee floor", 
+      value: guaranteePayout 
+    });
+
+    const pctLabel = `${(deal.percentage * 100).toFixed(0)}% of ${basis}`;
+    steps.push({ 
+      label: pctLabel, 
+      value: percentagePayout,
+      note: deal.percentageBasis == null ? "Warning: percentage basis was missing, defaulted to net." : undefined
+    });
+
+    steps.push({
+      label: "Vs comparison winner",
+      value: basePayout,
+      note: isGuaranteeWinner 
+        ? "Guarantee is greater than or equal to percentage." 
+        : "Percentage payout is greater than guarantee."
+    });
+
+    bonusResult.applied.forEach(b => {
+      steps.push({ label: `Bonus: ${b.label}`, value: b.amount, note: b.reason });
+    });
+
+    return {
+      supported: true,
+      grossBoxOffice,
+      netBoxOffice,
+      totalExpenses,
+      totalToArtist: basePayout + bonusResult.totalApplied,
+      steps,
+      finalFormula: isGuaranteeWinner
+        ? `guarantee ${guaranteePayout} + bonuses = ${(basePayout + bonusResult.totalApplied).toFixed(2)}`
+        : `${basis} × ${deal.percentage} + bonuses = ${(basePayout + bonusResult.totalApplied).toFixed(2)}`,
+      bonusesApplied: bonusResult.applied,
+      bonusesNotTriggered: bonusResult.notTriggered,
+    };
+  }
+
   // ---------- everything else: not supported ----------
   const friendlyName: Record<Deal["dealType"], string> = {
     flat: "Flat guarantee",
