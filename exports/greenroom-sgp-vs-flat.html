@@ -236,7 +236,8 @@ Tiers   confidenceTier  = A   (4 prior shows ≥ 3, winnerMargin $1,610 &gt; $20
     <tr><td><strong>Confidence label</strong></td><td>—</td><td>A / B / C / D with explicit rule</td></tr>
     <tr><td><strong>Range disclosure</strong></td><td>—</td><td>Smart Switch surfaces P10–P90 band; demotes display tier when the band &gt; $1,000</td></tr>
     <tr><td><strong>Risk label</strong></td><td>—</td><td>Insurance tier 1–4 with cushion math</td></tr>
-    <tr><td><strong>Floor protection</strong></td><td>—</td><td>Smart Switch enforces <code>suggestedFlat ≥ contractGuarantee</code> — converting never underpays the artist vs the signed number</td></tr>
+    <tr><td><strong>Contract-guarantee floor</strong></td><td>—</td><td>SGP's winner step uses <code>max(guarantee, percentagePayout)</code> so the suggested flat is anchored at or above the signed guarantee (see §8)</td></tr>
+    <tr><td><strong>Door hybrid floor</strong></td><td>—</td><td>Door conversions carry a fixed <span class="mono">$500</span> minimum the artist walks with regardless of walk-up — separate concept (see §8)</td></tr>
     <tr><td><strong>Counter-offer copy</strong></td><td>—</td><td><code>basis</code> sentence is generated and pastable</td></tr>
     <tr><td><strong>Backtestable</strong></td><td>No</td><td>Yes — <code>switchSavings.ts</code> replays the engine against the entire 12-month corpus</td></tr>
   </table>
@@ -244,6 +245,38 @@ Tiers   confidenceTier  = A   (4 prior shows ≥ 3, winnerMargin $1,610 &gt; $20
   <div class="callout amber">
     <strong>One thing flat deals do that SGP does not:</strong> when an artist is genuinely new to the room — first-time artist, first-time agent, no genre history — SGP returns confidence <strong>D</strong> and Smart Switch <em>refuses</em> to emit a single suggested flat. In that case the booker is back to a hand-entered flat, and that's the correct behavior. The engine knows when it doesn't know.
   </div>
+
+  <h2 id="floors">8. Floors — three different things called the same word</h2>
+  <p>"Floor" shows up in three distinct mechanisms inside Smart Switch + SGP. They protect different parties at different moments and are not interchangeable.</p>
+
+  <h3>8a. The contract-guarantee floor (inside SGP step 7)</h3>
+  <p>This isn't a separate check — it falls out of the winner formula:</p>
+  <pre class="formula">winnerValue    = max(guarantee, percentagePayout)
+suggestedPrice = roundTo50(winnerValue)</pre>
+  <p>By taking <code>max(guarantee, percentagePayout)</code>, SGP guarantees the suggested flat starts from at least the contract guarantee. The artist never gets quoted a flat that's <em>below</em> the signed number, even when the percentage clause would have been a worse outcome.</p>
+  <div class="callout amber">
+    <strong>Honest rounding caveat:</strong> <code>roundTo50</code> rounds to the <em>nearest</em> $50, not up. So if the contract guarantee is $4,024 and the projected percentage payout is $3,900, <code>winnerValue</code> is $4,024 and the rounded suggested flat is $4,000 — <span class="mono">$24</span> below the contract guarantee. In practice this is sub-$50 noise, but strictly the invariant is "suggested flat ≥ guarantee, modulo $50 rounding." A one-line fix (round up when the winner is the guarantee) closes the gap if you want strict ≥-enforcement.
+  </div>
+
+  <h3>8b. The conservative-floor fallback (Smart Switch when SGP is uncertain)</h3>
+  <p>When SGP returns confidence <strong>C</strong> or <strong>D</strong>, Smart Switch refuses to use the low-confidence projection and instead anchors the flat to the contract guarantee <em>exactly</em>:</p>
+  <pre class="formula">const flat = deal.guaranteeAmount;  // mirrors the signed number, no math</pre>
+  <p>Source enum on the persisted suggestion: <code>guarantee_amount</code>, so the UI can badge the provenance. In this branch <code>suggestedFlat == contractGuarantee</code> by construction — no rounding gap. The basis copy is explicit: <em>"Smart Guaranteed Price didn't have enough comparable deals to project a confident number, so Smart Switch fell back to the contract guarantee. The flat mirrors the signed number exactly — same dollar value, no settlement-night recoup math. Heads-up: historically at this venue, the percentage clause out-paid the guarantee on most nights, so the agent may push back on freezing the upside. Treat this as a conservative floor for the negotiation, not a payout prediction."</em></p>
+
+  <h3>8c. The door hybrid floor (a different parameter entirely)</h3>
+  <p>For door deals, "floor" means the artist's <strong>minimum settlement-night payout regardless of walk-up</strong>, not "the suggested flat won't underpay the contract." Three constants in <code>smartSwitch.ts</code>:</p>
+  <pre class="formula">DOOR_FLOOR       = $500    // artist always walks with this much
+DOOR_SPLIT_PCT   = 0.60    // plus 60% of pool above expense cap
+DOOR_EXPENSE_CAP = $1,500  // cap that hard ceiling</pre>
+  <p>The hybrid replaces a pure door deal with: <em>$500 floor regardless of walk-up + 60% of the pool above the $1,500 expense cap.</em> When the projected available pool after expenses is ≤ the floor, the split never fires; Smart Switch surfaces that case with source <code>door_dead_pool</code> and an explicit <code>isDeadPool: true</code> boolean so the UI can label the suggestion as effectively-a-flat-$500.</p>
+
+  <h3>Side-by-side</h3>
+  <table>
+    <tr><th>Floor</th><th>Where</th><th>Mechanism</th><th>Equals what?</th></tr>
+    <tr><td>Contract-guarantee floor</td><td><code>smartGuarantee.ts</code> step 7</td><td><code>max(guarantee, percentagePayout)</code> inside the winner step</td><td>Suggested flat ≥ contract guarantee (± $50 rounding)</td></tr>
+    <tr><td>Conservative fallback</td><td><code>smartSwitch.ts</code> (source: <code>guarantee_amount</code>)</td><td>Literal copy of <code>deal.guaranteeAmount</code> when SGP returns tier C/D</td><td>Suggested flat == contract guarantee exactly</td></tr>
+    <tr><td>Door hybrid floor</td><td><code>smartSwitch.ts</code> (constant <code>DOOR_FLOOR</code>)</td><td>Fixed $500 minimum baked into the hybrid shape</td><td>Artist's settlement-night minimum, regardless of walk-up</td></tr>
+  </table>
 
   <h2 id="summary">9. The one-line takeaway</h2>
   <p>A flat deal is a contract type with no math. Smart Guaranteed Pricing is the math that decides whether the flat number on a converted contract is honest — a seven-step deterministic waterfall over comparable venue history, surfaced with a confidence tier, an insurance tier, a P10–P90 band, and a full audit JSON. Both end up as <code>dealType="flat"</code> in the DB. Only one of them has receipts.</p>
