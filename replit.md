@@ -336,6 +336,8 @@ in `exports/`:
 
 | File | What it is |
 |---|---|
+| `exports/greenroom-settlement-final.pdf` | **Settlement Redesign · Final memo** (May 2026). The case-study deliverable — the consolidated PM memo handed in for the Greenroom Applied AI PM assignment. Cites the live API/UI work at this commit (Smart Switch, Smart Guaranteed Price, Improve-Deal caps, insurance products) as evidence. |
+| `exports/greenroom-settlement-final.html` | HTML source of the final memo. |
 | `exports/greenroom-settlement-redesign-v2.pdf` | **Settlement Redesign · v2.1** (May 2026). The opinionated three-phase argument — simplify the deal types Smart Switch already covers, then layer Improve-Deal caps and insurance on top. Every figure is sourced from the live API at this commit. |
 | `exports/greenroom-settlement-redesign-v2.html` | HTML source of the redesign report (re-export with `python3 -c "from weasyprint import HTML; HTML('exports/greenroom-settlement-redesign-v2.html').write_pdf('exports/greenroom-settlement-redesign-v2.pdf')"`). |
 | `exports/greenroom-supporting-document.pdf` | **Supporting Document · Features, APIs, and Tabs.** Engineering and analytical companion: every tab, every API endpoint, every backend lib module, with a direct mapping from each surface to the claim it supplies in the redesign report. |
