@@ -43,6 +43,7 @@ CONVENTIONS — apply these BEFORE flagging:
 - "85/15 split" or "85/15 on net": first number is artist share by convention. Don't flag unless prose explicitly contradicts this.
 - Hospitality cap is a sub-cap within the expense cap unless prose says otherwise. Don't flag the placement.
 - "vs" deals: artist takes whichever is HIGHER. Don't flag the direction.
+- The \`percentage\` field stores values as decimal fractions (e.g., 0.85 = 85%, 0.9 = 90%). This is the Greenroom storage convention. Treat a decimal in the structured field as equivalent to its percentage in the prose — do not flag this as ambiguous.
 
 SEVERITY RUBRIC:
 - HIGH: would change settlement by >$200, OR there is an explicit conflict between prose and a structured field, OR the term references external info that materially affects payout.
