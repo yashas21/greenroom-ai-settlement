@@ -2,15 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  Calculator,
   FileSpreadsheet,
   AlertCircle,
   Clock,
   TrendingUp,
 } from "lucide-react";
 import { getShowById } from "@/lib/queries";
-import { checkDealNotesAmbiguity, type DealAmbiguityReview } from "@/lib/dealAmbiguity";
-import { SettlementReadinessLauncher } from "./settlement-readiness-modal";
 import {
   Card,
   CardContent,
@@ -80,18 +77,6 @@ export default async function ShowDetailPage({
 
   const isDisputed = settlement?.status === "disputed";
 
-  const dealNotesTrimmed = deal?.dealNotesFreetext?.trim() ?? "";
-  let readinessReview: DealAmbiguityReview | null = null;
-  let readinessError: string | null = null;
-  if (dealNotesTrimmed && deal?.dealType === "vs") {
-    try {
-      readinessReview = await checkDealNotesAmbiguity(dealNotesTrimmed);
-    } catch (e) {
-      readinessError =
-        e instanceof Error ? e.message : "Could not complete AI review.";
-    }
-  }
-
   return (
     <div className="max-w-7xl">
       {/* Poster header */}
@@ -134,22 +119,12 @@ export default async function ShowDetailPage({
               </span>
             </div>
           </div>
-          <div className="mt-6 shrink-0 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <Link href={`/shows/${show.id}/settle`}>
-              <Button variant="brand" size="lg" className="w-full sm:w-auto gap-2">
-                <FileSpreadsheet className="h-4 w-4" />
-                {settlement ? "View settlement" : "Settle show"}
-              </Button>
-            </Link>
-            {deal?.dealType === "vs" && (
-              <Link href={`/shows/${show.id}/workspace`}>
-                <Button variant="secondary" size="lg" className="w-full sm:w-auto gap-2">
-                  <Calculator className="h-4 w-4" />
-                  Calculate settlement workspace
-                </Button>
-              </Link>
-            )}
-          </div>
+          <Link href={`/shows/${show.id}/settle`} className="mt-6 shrink-0">
+            <Button variant="brand" size="lg">
+              <FileSpreadsheet className="h-4 w-4" />
+              {settlement ? "View settlement" : "Settle show"}
+            </Button>
+          </Link>
         </div>
 
         {/* Key numbers strip */}
@@ -194,16 +169,6 @@ export default async function ShowDetailPage({
             <CardContent className="space-y-5">
               {deal ? (
                 <>
-                  {deal.dealType === "vs" && (
-                    <SettlementReadinessLauncher
-                      showId={show.id}
-                      dealType={deal.dealType}
-                      hasDealNotes={Boolean(dealNotesTrimmed)}
-                      review={readinessReview}
-                      error={readinessError}
-                      readinessAnswersJson={show.readinessAnswersJson ?? null}
-                    />
-                  )}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <Field
                       label="Guarantee"

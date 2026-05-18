@@ -81,8 +81,6 @@ export const shows = sqliteTable("shows", {
     .notNull()
     .default("standing"),
   internalNotes: text("internal_notes"),
-  /** JSON map: questionId -> selected option string, or string[] for multi_select. */
-  readinessAnswersJson: text("readiness_answers_json"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
