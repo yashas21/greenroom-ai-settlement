@@ -125,7 +125,54 @@ export const deals = sqliteTable("deals", {
   bonusesJson: text("bonuses_json"),
   dealNotesFreetext: text("deal_notes_freetext"),
 
+  lastAnalyzedAt: integer("last_analyzed_at"),
+  extractionConfidence: real("extraction_confidence"),
+
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+// -------- Deal Clarifications (AI-extracted flags) --------
+
+/**
+ * Stores AI-extracted flags for a deal. Each row is one flag that the booker
+ * can review, dismiss, or resolve before settlement.
+ *
+ * flag_type: "conflict"          — prose and structured fields materially disagree
+ *            "ambiguity"         — prose admits multiple readings
+ *            "missing_reference" — prose points to external info not provided
+ *
+ * severity: "high"   — would change settlement by >$200, or explicit field conflict
+ *           "medium" — real but lower-dollar ambiguity
+ *           "low"    — minor wording, strong convention but worth confirming
+ */
+export const dealClarifications = sqliteTable("deal_clarifications", {
+  id: text("id").primaryKey(),
+  dealId: text("deal_id")
+    .notNull()
+    .references(() => deals.id),
+
+  flagType: text("flag_type", {
+    enum: ["conflict", "ambiguity", "missing_reference"],
+  }).notNull(),
+  severity: text("severity", { enum: ["high", "medium", "low"] }).notNull(),
+
+  field: text("field"),
+  issue: text("issue").notNull(),
+
+  extractedValue: text("extracted_value"),
+  structuredValue: text("structured_value"),
+  interpretationA: text("interpretation_a"),
+  interpretationB: text("interpretation_b"),
+  financialImpact: text("financial_impact"),
+  recommendedClarification: text("recommended_clarification"),
+
+  status: text("status", { enum: ["open", "dismissed", "resolved"] })
+    .notNull()
+    .default("open"),
+  dismissalReason: text("dismissal_reason"),
+
+  createdAt: integer("created_at").notNull(),
+  resolvedAt: integer("resolved_at"),
 });
 
 // -------- Ticket sales --------
@@ -290,6 +337,7 @@ export type Agent = typeof agents.$inferSelect;
 export type Artist = typeof artists.$inferSelect;
 export type Show = typeof shows.$inferSelect;
 export type Deal = typeof deals.$inferSelect;
+export type DealClarification = typeof dealClarifications.$inferSelect;
 export type TicketSale = typeof ticketSales.$inferSelect;
 export type Comp = typeof comps.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;

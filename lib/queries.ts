@@ -9,6 +9,7 @@ import {
   agents,
   agencies,
   deals,
+  dealClarifications,
   ticketSales,
   comps,
   expenses,
@@ -100,6 +101,35 @@ export async function getShowById(id: string) {
 
 export type ShowWithRelations = NonNullable<
   Awaited<ReturnType<typeof getShowById>>
+>;
+
+/**
+ * Fetch a deal (by show_id) together with all its clarification flags,
+ * ordered by severity (high → medium → low) then newest first.
+ * Returns null if no deal exists for the show.
+ */
+export async function getDealWithClarifications(showId: string) {
+  const [dealRow] = await db
+    .select()
+    .from(deals)
+    .where(eq(deals.showId, showId));
+
+  if (!dealRow) return null;
+
+  const clarifications = await db
+    .select()
+    .from(dealClarifications)
+    .where(eq(dealClarifications.dealId, dealRow.id))
+    .orderBy(
+      sql`CASE ${dealClarifications.severity} WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`,
+      desc(dealClarifications.createdAt),
+    );
+
+  return { deal: dealRow, clarifications };
+}
+
+export type DealWithClarifications = NonNullable<
+  Awaited<ReturnType<typeof getDealWithClarifications>>
 >;
 
 /** All artists with show counts. */

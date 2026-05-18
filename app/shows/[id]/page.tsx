@@ -7,7 +7,7 @@ import {
   Clock,
   TrendingUp,
 } from "lucide-react";
-import { getShowById } from "@/lib/queries";
+import { getShowById, getDealWithClarifications } from "@/lib/queries";
 import {
   Card,
   CardContent,
@@ -26,6 +26,7 @@ import {
   relativeShowDate,
 } from "@/lib/format";
 import type { Bonus } from "@/db/schema";
+import { DealConfidenceCard } from "@/components/deal-confidence-card";
 
 const COMP_LABELS: Record<string, string> = {
   artist_gl: "Artist guest list",
@@ -43,7 +44,10 @@ export default async function ShowDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const data = await getShowById(id);
+  const [data, dealConfidence] = await Promise.all([
+    getShowById(id),
+    getDealWithClarifications(id),
+  ]);
   if (!data) notFound();
 
   const {
@@ -295,6 +299,18 @@ export default async function ShowDetailPage({
               )}
             </CardContent>
           </Card>
+
+          {/* Deal Confidence — AI analysis of prose vs structured fields */}
+          {dealConfidence && (
+            <DealConfidenceCard
+              dealId={dealConfidence.deal.id}
+              initialDeal={dealConfidence.deal}
+              initialClarifications={dealConfidence.clarifications}
+              artistName={artist?.name ?? undefined}
+              agentName={agent?.name ?? undefined}
+              agentEmail={agent?.email ?? undefined}
+            />
+          )}
 
           {/* Box office */}
           <Card>
