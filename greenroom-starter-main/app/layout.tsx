@@ -67,57 +67,8 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable} ${fraunces.variable} h-full antialiased`}
-      suppressHydrationWarning
     >
-      <body
-        className="min-h-full flex font-sans"
-        suppressHydrationWarning
-      >
-        {/* Strip Grammarly (and similar) body attrs before hydration — React 19 dev overlay can still warn even with suppressHydrationWarning. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-(function () {
-  if (typeof document === "undefined") return;
-  function isExtBodyAttr(name) {
-    return (
-      name === "data-gr-ext-installed" ||
-      name === "data-new-gr-c-s-check-loaded" ||
-      name.startsWith("data-gr-") ||
-      name.startsWith("data-grammarly")
-    );
-  }
-  function stripBody() {
-    var b = document.body;
-    if (!b || !b.getAttributeNames) return;
-    var names = b.getAttributeNames();
-    for (var i = 0; i < names.length; i++) {
-      var n = names[i];
-      if (isExtBodyAttr(n)) {
-        try {
-          b.removeAttribute(n);
-        } catch (_) {}
-      }
-    }
-  }
-  function arm() {
-    var b = document.body;
-    if (!b) return;
-    stripBody();
-    try {
-      new MutationObserver(function (muts) {
-        for (var j = 0; j < muts.length; j++) {
-          if (muts[j].type === "attributes" && muts[j].target === b) stripBody();
-        }
-      }).observe(b, { attributes: true });
-    } catch (_) {}
-  }
-  if (document.body) arm();
-  else document.addEventListener("DOMContentLoaded", arm, { once: true });
-})();
-            `.trim(),
-          }}
-        />
+      <body className="min-h-full flex font-sans">
         <Sidebar />
         <main className="flex-1 overflow-auto relative">{children}</main>
         <CommandPaletteData />

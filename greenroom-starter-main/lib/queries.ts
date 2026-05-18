@@ -17,7 +17,6 @@ import {
   type Recoup,
 } from "@/db/schema";
 import { desc, asc, eq, sql, lte } from "drizzle-orm";
-import { parseReadinessAnswersJson } from "@/lib/readinessAnswers";
 
 function todayDateString(): string {
   const d = new Date();
@@ -102,40 +101,6 @@ export async function getShowById(id: string) {
 export type ShowWithRelations = NonNullable<
   Awaited<ReturnType<typeof getShowById>>
 >;
-
-/** Merge one clarification answer into `shows.readiness_answers_json`. */
-export async function mergeShowReadinessAnswer(
-  showId: string,
-  questionId: string,
-  option: string,
-  questionType: "single_select" | "multi_select"
-): Promise<void> {
-  const [row] = await db
-    .select({ readinessAnswersJson: shows.readinessAnswersJson })
-    .from(shows)
-    .where(eq(shows.id, showId));
-  if (!row) return;
-  const answers = parseReadinessAnswersJson(row.readinessAnswersJson);
-  if (questionType === "multi_select") {
-    const cur = answers[questionId];
-    const arr = Array.isArray(cur)
-      ? [...cur]
-      : typeof cur === "string"
-        ? [cur]
-        : [];
-    const idx = arr.indexOf(option);
-    if (idx >= 0) arr.splice(idx, 1);
-    else arr.push(option);
-    if (arr.length === 0) delete answers[questionId];
-    else answers[questionId] = arr;
-  } else {
-    answers[questionId] = option;
-  }
-  await db
-    .update(shows)
-    .set({ readinessAnswersJson: JSON.stringify(answers) })
-    .where(eq(shows.id, showId));
-}
 
 /** All artists with show counts. */
 export async function getAllArtists() {
