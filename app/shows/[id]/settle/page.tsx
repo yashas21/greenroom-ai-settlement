@@ -664,6 +664,40 @@ function SignoffSection({ settlement }: { settlement: Settlement }) {
       <CardHeader>
         <CardTitle>Sign-off & notes</CardTitle>
       </CardHeader>
+      <Card className="mb-4 border-amber-200 bg-amber-50 shadow-sm">
+  <CardHeader>
+    <CardTitle>⚠ AI Settlement Review</CardTitle>
+    <CardDescription>
+      <span className="text-amber-600 font-semibold">
+  Settlement Risk: Medium ⚠
+      </span>
+    </CardDescription>
+  </CardHeader>
+
+  <CardContent>
+    <div className="space-y-3">
+      <div>
+        <strong>Why I flagged this:</strong>
+
+        <ul className="list-disc pl-5 mt-2">
+          <li>Settlement marked as disputed</li>
+          <li>Artist note references payment timing ("ok wire monday")</li>
+          <li>Waived backline charge may affect expectations</li>
+          <li>Dispute reason not clearly documented</li>
+        </ul>
+      </div>
+
+      <div>
+        <strong>Suggested next step:</strong>
+
+        <p>
+          Verify payment timing and confirm waived charges
+          before finalizing settlement.
+        </p>
+      </div>
+    </div>
+  </CardContent>
+</Card>
       <CardContent className="space-y-5">
         {settlement.signoffText && (
           <div>
